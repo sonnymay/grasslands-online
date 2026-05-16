@@ -1375,6 +1375,13 @@ class UIManager {
       fontSize: '14px', color: '#ffd24a', stroke: '#000', strokeThickness: 3,
     }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10003);
 
+    // Skill cooldown chips above EXP bar.
+    const skillStyle = { fontSize: '12px', color: '#ffffff', stroke: '#000', strokeThickness: 3 };
+    this.qSkillText = scene.add.text(GAME_W / 2 - 80, GAME_H - 64, '', skillStyle)
+      .setOrigin(0.5).setScrollFactor(0).setDepth(10003);
+    this.wSkillText = scene.add.text(GAME_W / 2 + 80, GAME_H - 64, '', skillStyle)
+      .setOrigin(0.5).setScrollFactor(0).setDepth(10003);
+
     // Mini-map top-right.
     this.miniW = 160;
     this.miniH = 160;
@@ -1416,6 +1423,16 @@ class UIManager {
 
     this.lvlText.setText(`Lv.${player.level}`);
     this.zenyText.setText(`Zeny: ${player.zeny}`);
+
+    // Skill cooldown chips.
+    const now = this.scene.time.now;
+    const qLeft = Math.max(0, POWER_STRIKE_COOLDOWN - (now - player.lastPowerStrike));
+    const wLeft = Math.max(0, SELF_HEAL_COOLDOWN    - (now - player.lastSelfHeal));
+    this.qSkillText.setText(qLeft > 0 ? `[Q] ${(qLeft / 1000).toFixed(1)}s` : `[Q] Power Strike  ${POWER_STRIKE_SP_COST} SP`);
+    this.qSkillText.setColor(player.sp < POWER_STRIKE_SP_COST ? '#888888' : (qLeft > 0 ? '#cccc66' : '#ffffff'));
+    this.wSkillText.setText(wLeft > 0 ? `[W] ${(wLeft / 1000).toFixed(1)}s` : `[W] Self-Heal  ${SELF_HEAL_SP_COST} SP`);
+    this.wSkillText.setColor(player.sp < SELF_HEAL_SP_COST ? '#888888' : (wLeft > 0 ? '#cccc66' : '#ffffff'));
+
     this.drawMinimap();
   }
 

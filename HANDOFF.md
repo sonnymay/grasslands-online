@@ -35,7 +35,9 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 
 - Click ground → A* path → walk
 - Click monster → walk into range + auto-attack until dead
-- `1` or `Q` → Power Strike skill (10 SP, ~1.7× damage)
+- `1`/`Q` → Power Strike skill (10 SP, ~1.7× damage)
+- `2`/`W` → Self-Heal skill (15 SP, +30 HP base, 3 s cooldown)
+- `Tab` → target nearest live monster
 - `Shift+R` → wipe save and reload
 - No WASD/arrows. RO is mouse-only.
 
@@ -121,6 +123,13 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 18. **SP stat + Power Strike skill** (`Q` or `1`, 10 SP, 1.7× damage, blue flash, "Power Strike!" float).
 19. **Death EXP penalty** (5 % of `expNeeded()` on death).
 20. **Organic map**: plain-grass base + random tile flips + decoration overlay layer.
+21. **Self-Heal skill** (`2`/`W`, 15 SP, +30 HP base scaling +5/level, 3 s cooldown, green flash).
+22. **Tab targeting** + persistent red ring around current attack target.
+23. **HealerNPC** near spawn — blue circle with `+`, full HP/SP restore on contact (5 s cooldown).
+24. **Day/night cycle** — cosine-driven darkness overlay, 2-minute loop, max alpha 0.45.
+25. **Boss MooHam** — rare 1-of variant (240 HP, 16 ATK, 90 EXP, 1.9× scale).
+26. **EXP gain float text** + respawn restores SP.
+27. **Skill cooldown HUD** above EXP bar showing `[Q] Power Strike` / `[W] Self-Heal` and remaining seconds.
 
 ### Session 2 — RO movement foundation
 - Researched RO movement; added tile grid + A* + click-only + diagonal sprites pipeline.
@@ -161,7 +170,7 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 - A* runs every repath; fine at 100×100 grid. Becomes expensive if grid grows. (max 8 000 iterations cap inside `findPath`).
 - Mini-map redraws every frame — cheap but allocates one graphics command list each tick.
 - Phaser banner spams the console on every reload. Cosmetic.
-- `?v=N` cache-bust in `index.html` — bump on every `game.js` change. Current: `?v=18`.
+- `?v=N` cache-bust in `index.html` — bump on every `game.js` change. Current: `?v=25`.
 
 ---
 
@@ -250,7 +259,7 @@ Stored in §9 of the older `~/Downloads/HANDOFF.md` and repeated for diagonals i
 5. Pick a task from §4 (or whatever the user asks for).
 6. **Every meaningful change:**
    - Edit code.
-   - Bump `?v=N` in `index.html` (next: `?v=19`).
+   - Bump `?v=N` in `index.html` (next: `?v=26`).
    - Reload preview, verify visually.
    - `git add` exact files, conventional-prefix commit, push.
 7. **End of session:**
