@@ -18,6 +18,11 @@ const MAX_PATH_LEN = 256;
 const HIT_STUN_MS = 200;
 const HP_REGEN_INTERVAL_MS = 3000;  // tick every 3s
 const HP_REGEN_PCT = 0.02;          // 2% of maxHP per tick
+const SP_REGEN_INTERVAL_MS = 3000;
+const SP_REGEN_PCT = 0.04;          // SP regens faster than HP
+const POWER_STRIKE_SP_COST = 10;
+const POWER_STRIKE_MULT = 1.7;
+const POWER_STRIKE_COOLDOWN = 1500;
 // Source PNGs are ~1254px tall; we display the player ~96px and bloblings ~64px.
 const PLAYER_DISPLAY_H = 96;
 const BLOBLING_DISPLAY_H = 64;
@@ -209,6 +214,10 @@ function create() {
   // RO camera reveals ~12-15 tiles wide — zoom out a touch.
   scene.cameras.main.setZoom(0.85);
 
+  // Skill hotkey: 1 or Q → Power Strike on current attack target.
+  scene.input.keyboard.on('keydown-ONE', () => player && player.powerStrike());
+  scene.input.keyboard.on('keydown-Q',   () => player && player.powerStrike());
+
   // Hover cursor: crosshair when over a monster, default otherwise.
   scene.input.on('pointermove', (pointer) => {
     const wx = pointer.worldX, wy = pointer.worldY;
@@ -249,6 +258,7 @@ function create() {
     ui.message('Welcome to Grasslands Online!');
   }
   ui.message('Click monsters to attack. Click ground to walk.');
+  ui.message('Hotkey 1 or Q = Power Strike (costs SP).');
 }
 
 // ---------- Update loop ----------
@@ -384,6 +394,10 @@ class PlayerController {
     this.def = 0;
     this.exp = 0;
     this.zeny = 0;
+    this.maxSP = 50;
+    this.sp = 50;
+    this.lastSpRegen = 0;
+    this.lastPowerStrike = 0;
     this.level = 1;
     this.dead = false;
     this.dir = 'south';
@@ -491,6 +505,12 @@ class PlayerController {
       this.lastRegen = time;
       const amount = Math.max(1, Math.floor(this.maxHP * HP_REGEN_PCT));
       this.hp = Math.min(this.maxHP, this.hp + amount);
+    }
+    // SP regen — same rule, slightly faster %.
+    if (!stunned && this.sp < this.maxSP && time - this.lastSpRegen >= SP_REGEN_INTERVAL_MS) {
+      this.lastSpRegen = time;
+      const amount = Math.max(1, Math.floor(this.maxSP * SP_REGEN_PCT));
+      this.sp = Math.min(this.maxSP, this.sp + amount);
     }
 
     // Advance the current step.
@@ -621,12 +641,51 @@ class PlayerController {
     }
   }
 
+  powerStrike() {
+    if (this.dead) return;
+    if (!this.attackTarget || !this.attackTarget.alive) {
+      ui.message('No target.');
+      return;
+    }
+    if (this.sp < POWER_STRIKE_SP_COST) {
+      ui.message('Not enough SP.');
+      sfxMiss();
+      return;
+    }
+    const now = this.scene.time.now;
+    if (now - this.lastPowerStrike < POWER_STRIKE_COOLDOWN) return;
+    const t = this.attackTarget;
+    const dx = t.sprite.x - this.sprite.x;
+    const dy = t.sprite.y - this.sprite.y;
+    if (Math.hypot(dx, dy) > ATTACK_RANGE) {
+      ui.message('Too far.');
+      return;
+    }
+    this.lastPowerStrike = now;
+    this.sp -= POWER_STRIKE_SP_COST;
+    this.attackPoseUntil = now + 350;
+    this.dir = pickDirection(dx, dy);
+
+    // Always hits; can still crit.
+    const crit = Math.random() < PLAYER_CRIT_CHANCE;
+    const variance = 1 + (Math.random() * 2 - 1) * DAMAGE_VARIANCE;
+    const dmg = Math.max(1, Math.round(this.atk * POWER_STRIKE_MULT * variance * (crit ? CRIT_MULTIPLIER : 1)));
+    t.takeDamage(dmg, { crit });
+    if (crit) sfxCrit(); else sfxHit();
+    spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 50, 'Power Strike!', 0x88ccff, { fontSize: '14px' });
+    // Tiny blue flash on player.
+    this.scene.tweens.add({ targets: this.sprite, tint: 0x88ccff, duration: 80, yoyo: true,
+      onComplete: () => this.sprite.clearTint() });
+  }
+
   levelUp() {
     this.level += 1;
     this.maxHP += 20;
+    this.maxSP += 5;
     this.atk += 3;
     this.def += 1;
     this.hp = this.maxHP;
+    this.sp = this.maxSP;
     ui.message(`LEVEL UP! Now Lv.${this.level} (+ATK +DEF)`);
     sfxLevelUp();
     saveGame();
@@ -759,6 +818,7 @@ function saveGame() {
       level: player.level, exp: player.exp,
       hp: player.hp, maxHP: player.maxHP,
       atk: player.atk, def: player.def, zeny: player.zeny,
+      sp: player.sp, maxSP: player.maxSP,
       cellCol: player.cellCol, cellRow: player.cellRow,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -782,6 +842,8 @@ function applySave() {
   player.atk    = save.atk    ?? player.atk;
   player.def    = save.def    ?? player.def;
   player.zeny   = save.zeny   ?? 0;
+  player.maxSP  = save.maxSP  ?? player.maxSP;
+  player.sp     = Math.min(save.sp ?? player.maxSP, player.maxSP);
   if (Number.isInteger(save.cellCol) && Number.isInteger(save.cellRow)) {
     player.cellCol = save.cellCol;
     player.cellRow = save.cellRow;
@@ -1126,13 +1188,22 @@ class UIManager {
     this.bar = scene.add.rectangle(0, GAME_H - 60, GAME_W, 60, 0x000000, 0.6)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10000);
 
-    // HP bar (left)
-    this.hpBg = scene.add.rectangle(20, GAME_H - 40, 200, 20, 0x333333)
+    // HP bar (left top)
+    this.hpBg = scene.add.rectangle(20, GAME_H - 46, 200, 14, 0x333333)
       .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10001);
-    this.hpFill = scene.add.rectangle(20, GAME_H - 40, 200, 20, 0xcc2222)
+    this.hpFill = scene.add.rectangle(20, GAME_H - 46, 200, 14, 0xcc2222)
       .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10002);
-    this.hpText = scene.add.text(120, GAME_H - 40, '', {
-      fontSize: '14px', color: '#ffffff', stroke: '#000', strokeThickness: 3,
+    this.hpText = scene.add.text(120, GAME_H - 46, '', {
+      fontSize: '12px', color: '#ffffff', stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10003);
+
+    // SP bar (left bottom, under HP)
+    this.spBg = scene.add.rectangle(20, GAME_H - 28, 200, 14, 0x333333)
+      .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10001);
+    this.spFill = scene.add.rectangle(20, GAME_H - 28, 200, 14, 0x3388ff)
+      .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10002);
+    this.spText = scene.add.text(120, GAME_H - 28, '', {
+      fontSize: '12px', color: '#ffffff', stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10003);
 
     // EXP bar (center)
@@ -1184,6 +1255,10 @@ class UIManager {
     const hpPct = Math.max(0, player.hp / player.maxHP);
     this.hpFill.width = 200 * hpPct;
     this.hpText.setText(`HP ${player.hp}/${player.maxHP}`);
+
+    const spPct = Math.max(0, player.sp / player.maxSP);
+    this.spFill.width = 200 * spPct;
+    this.spText.setText(`SP ${player.sp}/${player.maxSP}`);
 
     const expPct = Math.max(0, Math.min(1, player.exp / player.expNeeded()));
     this.expFill.width = 300 * expPct;
