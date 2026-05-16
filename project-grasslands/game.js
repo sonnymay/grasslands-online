@@ -665,6 +665,7 @@ class PlayerController {
       this.stepFromX = this.stepToX = this.sprite.x;
       this.stepFromY = this.stepToY = this.sprite.y;
       this.hp = this.maxHP;
+      this.sp = this.maxSP;
       this.dead = false;
     });
   }
@@ -1098,6 +1099,7 @@ class MonsterController {
     this.nameTag.setVisible(false);
     player.gainExp(this.expReward);
     ui.message(`Killed ${this.cfg.name} (+${this.expReward} EXP)`);
+    spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 30, `+${this.expReward} EXP`, 0x66ff66, { fontSize: '14px' });
 
     // Drop a small zeny pile — scaled to monster reward.
     const zenyDrop = Math.max(1, Math.round(this.expReward * Phaser.Math.FloatBetween(0.6, 1.6)));
