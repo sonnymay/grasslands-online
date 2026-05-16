@@ -218,6 +218,15 @@ function create() {
   scene.input.keyboard.on('keydown-ONE', () => player && player.powerStrike());
   scene.input.keyboard.on('keydown-Q',   () => player && player.powerStrike());
 
+  // Shift+R wipes localStorage save and reloads (for testing / new run).
+  scene.input.keyboard.on('keydown-R', (e) => {
+    if (e.shiftKey) {
+      localStorage.removeItem(SAVE_KEY);
+      ui.message('Save wiped. Reloading...');
+      setTimeout(() => location.reload(), 400);
+    }
+  });
+
   // Hover cursor: crosshair when over a monster, default otherwise.
   scene.input.on('pointermove', (pointer) => {
     const wx = pointer.worldX, wy = pointer.worldY;
@@ -623,7 +632,10 @@ class PlayerController {
     this.attackTarget = null;
     this.sprite.setOrigin(0.5, 0.5);
     this.sprite.scaleY = this.basePScale;
-    ui.message('You died.');
+    // Death penalty: lose 5% of current level's EXP requirement.
+    const penalty = Math.floor(this.expNeeded() * 0.05);
+    this.exp = Math.max(0, this.exp - penalty);
+    ui.message(`You died. Lost ${penalty} EXP.`);
     sfxDeath();
     this.scene.time.delayedCall(PLAYER_RESPAWN_MS, () => {
       const cx = Math.floor(GRID_COLS / 2);
