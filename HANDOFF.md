@@ -38,6 +38,7 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 - `1`/`Q` → Power Strike skill (10 SP, ~1.7× damage)
 - `2`/`W` → Self-Heal skill (15 SP, +30 HP base, 3 s cooldown)
 - `Tab` → target nearest live monster
+- `C` → toggle character stat panel
 - `Shift+R` → wipe save and reload
 - No WASD/arrows. RO is mouse-only.
 
@@ -130,6 +131,9 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 25. **Boss MooHam** — rare 1-of variant (240 HP, 16 ATK, 90 EXP, 1.9× scale).
 26. **EXP gain float text** + respawn restores SP.
 27. **Skill cooldown HUD** above EXP bar showing `[Q] Power Strike` / `[W] Self-Heal` and remaining seconds.
+28. **Character stat panel** (`C`) — overlay with Lv / EXP / HP / SP / ATK / DEF / Zeny / Kills.
+29. **Persistent kill counter** saved to localStorage.
+30. **Mini-map markers** — healer cyan dot, boss MooHam large yellow dot.
 
 ### Session 2 — RO movement foundation
 - Researched RO movement; added tile grid + A* + click-only + diagonal sprites pipeline.
@@ -170,7 +174,7 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 - A* runs every repath; fine at 100×100 grid. Becomes expensive if grid grows. (max 8 000 iterations cap inside `findPath`).
 - Mini-map redraws every frame — cheap but allocates one graphics command list each tick.
 - Phaser banner spams the console on every reload. Cosmetic.
-- `?v=N` cache-bust in `index.html` — bump on every `game.js` change. Current: `?v=25`.
+- `?v=N` cache-bust in `index.html` — bump on every `game.js` change. Current: `?v=28`.
 
 ---
 
@@ -259,7 +263,7 @@ Stored in §9 of the older `~/Downloads/HANDOFF.md` and repeated for diagonals i
 5. Pick a task from §4 (or whatever the user asks for).
 6. **Every meaningful change:**
    - Edit code.
-   - Bump `?v=N` in `index.html` (next: `?v=26`).
+   - Bump `?v=N` in `index.html` (next: `?v=29`).
    - Reload preview, verify visually.
    - `git add` exact files, conventional-prefix commit, push.
 7. **End of session:**
