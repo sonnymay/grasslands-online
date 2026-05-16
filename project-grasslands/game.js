@@ -32,7 +32,7 @@ const BLOBLING_DISPLAY_H = 64;
 const PLAYER_ATTACK_COOLDOWN = 1000;
 // Combat randomness — RO-style feel.
 const DAMAGE_VARIANCE = 0.2;       // ±20% on every hit
-const PLAYER_CRIT_CHANCE = 0.08;   // 8% crit
+const PLAYER_CRIT_CHANCE = 0.03;   // rare 3% crit
 const CRIT_MULTIPLIER = 2;
 const PLAYER_MISS_CHANCE = 0.05;   // 5% whiff
 const MONSTER_MISS_CHANCE = 0.10;  // 10% monsters miss player
@@ -238,9 +238,6 @@ function create() {
   scene.input.keyboard.on('keydown-TWO', () => player && player.selfHeal());
   scene.input.keyboard.on('keydown-W',   () => player && player.selfHeal());
 
-  // C toggles the character stat panel.
-  scene.input.keyboard.on('keydown-C', () => ui && ui.toggleStatPanel());
-
   // Tab cycles to the nearest live monster as the new attack target.
   scene.input.keyboard.on('keydown-TAB', (e) => {
     if (e.preventDefault) e.preventDefault();
@@ -313,7 +310,7 @@ function create() {
     ui.message('Welcome to Grasslands Online!');
   }
   ui.message('Click monsters to attack. Click ground to walk.');
-  ui.message('Skills: 1/Q, 2/W. Tab=target. C=stats. Shift+R=reset save.');
+  ui.message('Skills: 1/Q, 2/W. Tab=target. Shift+R=reset save.');
 }
 
 // ---------- Update loop ----------
@@ -680,7 +677,6 @@ class PlayerController {
     const dmg = Math.max(1, amount - this.def);
     this.hp -= dmg;
     this.stunUntil = this.scene.time.now + HIT_STUN_MS;
-    this.scene.cameras.main.shake(90, 0.004);
     spawnDamageNumber(this.scene, this.sprite.x, this.sprite.y - 20, dmg, 0xffffff);
     this.scene.tweens.add({
       targets: this.sprite,
@@ -975,7 +971,7 @@ function audio() {
   if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   return _audioCtx;
 }
-function _tone(freq, dur, type = 'sine', vol = 0.07, startOffset = 0) {
+function _tone(freq, dur, type = 'sine', vol = 0.07, startOffset = 0, endFreq = null) {
   try {
     const ctx = audio();
     if (ctx.state === 'suspended') ctx.resume();
@@ -984,20 +980,66 @@ function _tone(freq, dur, type = 'sine', vol = 0.07, startOffset = 0) {
     const gain = ctx.createGain();
     osc.type = type;
     osc.frequency.setValueAtTime(freq, t0);
+    if (endFreq !== null) osc.frequency.exponentialRampToValueAtTime(endFreq, t0 + dur);
     gain.gain.setValueAtTime(vol, t0);
-    gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     osc.connect(gain).connect(ctx.destination);
     osc.start(t0);
     osc.stop(t0 + dur);
   } catch (e) { /* audio not available */ }
 }
-function sfxHit()      { _tone(280, 0.08, 'square', 0.08); }
-function sfxCrit()     { _tone(540, 0.12, 'square', 0.1); _tone(800, 0.1, 'square', 0.08, 0.05); }
+
+// Short filtered noise burst for thump/swing texture.
+function _noise(dur, vol = 0.08, startOffset = 0, filterFreq = 1500) {
+  try {
+    const ctx = audio();
+    if (ctx.state === 'suspended') ctx.resume();
+    const t0 = ctx.currentTime + startOffset;
+    const bufSize = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = filterFreq;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(vol, t0);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.start(t0);
+    src.stop(t0 + dur);
+  } catch (e) { /* audio not available */ }
+}
+
+// Crunchy melee thwack: low thud + mid click + brief filtered noise burst.
+function sfxHit() {
+  _noise(0.06, 0.09, 0, 2200);
+  _tone(180, 0.07, 'square', 0.09, 0, 90);   // descending thud
+  _tone(420, 0.05, 'triangle', 0.06, 0.005);  // click overtone
+}
+
+// Satisfying critical: bright bell stack + power swoosh + bass impact.
+function sfxCrit() {
+  // Wide noise sweep
+  _noise(0.18, 0.11, 0, 4000);
+  // Bell-like upper harmonics
+  _tone(1320, 0.35, 'triangle', 0.09, 0);
+  _tone(1760, 0.32, 'triangle', 0.06, 0.01);
+  _tone(880,  0.4,  'sine',     0.08, 0);
+  _tone(659,  0.45, 'sine',     0.07, 0.02);
+  // Deep impact bass
+  _tone(110, 0.18, 'square', 0.1, 0, 55);
+  // Sparkle tail
+  _tone(2640, 0.22, 'sine', 0.04, 0.08);
+}
+
 function sfxMiss()     { _tone(180, 0.06, 'sawtooth', 0.04); }
 function sfxLevelUp()  { _tone(523, 0.12, 'triangle', 0.1); _tone(659, 0.12, 'triangle', 0.1, 0.12); _tone(784, 0.2, 'triangle', 0.1, 0.24); }
 function sfxPickup()   { _tone(880, 0.06, 'sine', 0.08); _tone(1320, 0.08, 'sine', 0.08, 0.06); }
-function sfxPlayerHit(){ _tone(180, 0.12, 'sawtooth', 0.07); }
-function sfxDeath()    { _tone(196, 0.4, 'sawtooth', 0.1); _tone(98, 0.5, 'sawtooth', 0.08, 0.2); }
+function sfxPlayerHit(){ _noise(0.08, 0.08, 0, 800); _tone(140, 0.12, 'sawtooth', 0.08); }
+function sfxDeath()    { _tone(196, 0.4, 'sawtooth', 0.1, 0, 60); _tone(98, 0.5, 'sawtooth', 0.08, 0.2); }
 
 // 8-direction sector picker. East = 0°, South = 90°, West = ±180°, North = -90°.
 function pickDirection(vx, vy) {
@@ -1382,18 +1424,6 @@ class UIManager {
       fontSize: '14px', color: '#ffd24a', stroke: '#000', strokeThickness: 3,
     }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10003);
 
-    // Character stat panel (toggled with C). Hidden by default.
-    this.statPanelBg = scene.add.rectangle(GAME_W / 2, GAME_H / 2, 320, 220, 0x111122, 0.92)
-      .setOrigin(0.5).setScrollFactor(0).setDepth(10020)
-      .setStrokeStyle(2, 0xffffff, 0.7);
-    this.statPanelText = scene.add.text(GAME_W / 2, GAME_H / 2, '', {
-      fontSize: '14px', color: '#ffffff', align: 'left',
-      lineSpacing: 4,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10021);
-    this.statPanelBg.setVisible(false);
-    this.statPanelText.setVisible(false);
-    this.statPanelOpen = false;
-
     // Skill cooldown chips above EXP bar.
     const skillStyle = { fontSize: '12px', color: '#ffffff', stroke: '#000', strokeThickness: 3 };
     this.qSkillText = scene.add.text(GAME_W / 2 - 80, GAME_H - 64, '', skillStyle)
@@ -1419,31 +1449,6 @@ class UIManager {
     this.chatText = scene.add.text(18, GAME_H - 215, '', {
       fontSize: '12px', color: '#ffffff', wordWrap: { width: 300 },
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10001);
-  }
-
-  toggleStatPanel() {
-    this.statPanelOpen = !this.statPanelOpen;
-    this.statPanelBg.setVisible(this.statPanelOpen);
-    this.statPanelText.setVisible(this.statPanelOpen);
-  }
-
-  updateStatPanel() {
-    if (!this.statPanelOpen) return;
-    const txt = [
-      `=== Rookie ===`,
-      ``,
-      `Level:   ${player.level}`,
-      `EXP:     ${player.exp} / ${player.expNeeded()}`,
-      `HP:      ${player.hp} / ${player.maxHP}`,
-      `SP:      ${player.sp} / ${player.maxSP}`,
-      `ATK:     ${player.atk}`,
-      `DEF:     ${player.def}`,
-      `Zeny:    ${player.zeny}`,
-      `Kills:   ${player.kills}`,
-      ``,
-      `Press C to close.`,
-    ].join('\n');
-    this.statPanelText.setText(txt);
   }
 
   message(msg) {
@@ -1478,7 +1483,6 @@ class UIManager {
     this.wSkillText.setColor(player.sp < SELF_HEAL_SP_COST ? '#888888' : (wLeft > 0 ? '#cccc66' : '#ffffff'));
 
     this.drawMinimap();
-    this.updateStatPanel();
   }
 
   drawMinimap() {
