@@ -198,6 +198,17 @@ function create() {
   // RO camera reveals ~12-15 tiles wide — zoom out a touch.
   scene.cameras.main.setZoom(0.85);
 
+  // Hover cursor: crosshair when over a monster, default otherwise.
+  scene.input.on('pointermove', (pointer) => {
+    const wx = pointer.worldX, wy = pointer.worldY;
+    let over = false;
+    for (const b of bloblings) {
+      if (!b.alive) continue;
+      if (Math.hypot(wx - b.sprite.x, wy - b.sprite.y) < 40) { over = true; break; }
+    }
+    scene.input.setDefaultCursor(over ? 'crosshair' : 'default');
+  });
+
   // Pointer: click a Blobling to fight it; click ground to walk there.
   scene.input.on('pointerdown', (pointer) => {
     const wx = pointer.worldX;
@@ -379,6 +390,12 @@ class PlayerController {
       stroke: '#000000',
       strokeThickness: 3,
     }).setOrigin(0.5, 1);
+
+    // HP bar above the player (matches monster bars; only shows when wounded).
+    this.hpBarBg = scene.add.rectangle(x, y, 44, 5, 0x000000).setOrigin(0.5);
+    this.hpBar = scene.add.rectangle(x, y, 44, 5, 0x44ff66).setOrigin(0, 0.5);
+    this.hpBarBg.setVisible(false);
+    this.hpBar.setVisible(false);
   }
 
   expNeeded() { return this.level * 100; }
@@ -517,7 +534,17 @@ class PlayerController {
       }
     }
 
-    this.nameTag.setPosition(this.sprite.x, this.sprite.y - this.sprite.displayHeight / 2);
+    const topY = this.sprite.y - this.sprite.displayHeight / 2;
+    this.nameTag.setPosition(this.sprite.x, topY);
+    // HP bar above player, only when not full.
+    const wounded = this.hp < this.maxHP;
+    this.hpBarBg.setVisible(wounded);
+    this.hpBar.setVisible(wounded);
+    if (wounded) {
+      this.hpBarBg.setPosition(this.sprite.x, topY + 6);
+      this.hpBar.setPosition(this.sprite.x - 22, topY + 6);
+      this.hpBar.width = 44 * Math.max(0, this.hp / this.maxHP);
+    }
   }
 
   takeDamage(amount) {
@@ -729,10 +756,15 @@ class MonsterController {
     this.typeId = typeId;
     const cfg = MONSTER_TYPES[typeId];
     this.cfg = cfg;
-    this.maxHP = cfg.maxHP;
-    this.hp = cfg.maxHP;
-    this.atk = cfg.atk;
-    this.expReward = cfg.expReward;
+    // Random level 1-3, weighted toward 1.
+    const lr = Math.random();
+    this.level = lr < 0.65 ? 1 : (lr < 0.92 ? 2 : 3);
+    const hpMult = 1 + 0.5 * (this.level - 1);
+    const atkMult = 1 + 0.3 * (this.level - 1);
+    this.maxHP = Math.round(cfg.maxHP * hpMult);
+    this.hp = this.maxHP;
+    this.atk = Math.round(cfg.atk * atkMult);
+    this.expReward = Math.round(cfg.expReward * this.level);
     this.speed = cfg.speed;
     this.alive = true;
     this.provoked = false;
@@ -747,7 +779,7 @@ class MonsterController {
     this.sprite.setScale(bScale);
     this.sprite.setCollideWorldBounds(true);
 
-    this.nameTag = scene.add.text(x, y, cfg.name, {
+    this.nameTag = scene.add.text(x, y, `${cfg.name} Lv.${this.level}`, {
       fontSize: '12px',
       color: cfg.nameColor,
       stroke: '#000000',
@@ -900,6 +932,20 @@ function spawnMonster(scene, typeId) {
     tries < 20
   );
   bloblings.push(new MonsterController(scene, x, y, typeId));
+  spawnPuff(scene, x, y);
+}
+
+// Brief expanding white ring — used on monster respawn.
+function spawnPuff(scene, x, y) {
+  const c = scene.add.circle(x, y, 20, 0xffffff, 0.6);
+  c.setDepth(y);
+  scene.tweens.add({
+    targets: c,
+    scale: 2.2,
+    alpha: 0,
+    duration: 450,
+    onComplete: () => c.destroy(),
+  });
 }
 
 function attemptPlayerAttack(scene, target) {
@@ -994,6 +1040,18 @@ class UIManager {
       fontSize: '14px', color: '#ffd24a', stroke: '#000', strokeThickness: 3,
     }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10003);
 
+    // Mini-map top-right.
+    this.miniW = 160;
+    this.miniH = 160;
+    this.miniX = GAME_W - this.miniW - 10;
+    this.miniY = 10;
+    this.miniBg = scene.add.rectangle(this.miniX, this.miniY, this.miniW, this.miniH, 0x000000, 0.55)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010);
+    this.miniBorder = scene.add.rectangle(this.miniX, this.miniY, this.miniW, this.miniH)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10012)
+      .setStrokeStyle(2, 0xffffff, 0.9).setFillStyle();
+    this.miniGfx = scene.add.graphics().setScrollFactor(0).setDepth(10011);
+
     // Chat box
     this.chatBg = scene.add.rectangle(10, GAME_H - 220, 320, 150, 0x000000, 0.5)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10000);
@@ -1019,5 +1077,34 @@ class UIManager {
 
     this.lvlText.setText(`Lv.${player.level}`);
     this.zenyText.setText(`Zeny: ${player.zeny}`);
+    this.drawMinimap();
+  }
+
+  drawMinimap() {
+    const g = this.miniGfx;
+    g.clear();
+    const sx = this.miniW / WORLD_W;
+    const sy = this.miniH / WORLD_H;
+    // Path cross (rough).
+    g.fillStyle(0xb38a4a, 0.6);
+    g.fillRect(this.miniX, this.miniY + this.miniH / 2 - 2, this.miniW, 4);
+    g.fillRect(this.miniX + this.miniW / 2 - 2, this.miniY, 4, this.miniH);
+    // Monsters.
+    for (const m of bloblings) {
+      if (!m.alive) continue;
+      const color = m.typeId === 'mooham' ? 0xffaa55 : 0xff5555;
+      g.fillStyle(color, 1);
+      g.fillCircle(this.miniX + m.sprite.x * sx, this.miniY + m.sprite.y * sy, 2);
+    }
+    // Loot.
+    g.fillStyle(0xffd24a, 1);
+    for (const l of loots) {
+      g.fillCircle(this.miniX + l.x * sx, this.miniY + l.y * sy, 2);
+    }
+    // Player on top.
+    g.lineStyle(2, 0x000000, 1);
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(this.miniX + player.sprite.x * sx, this.miniY + player.sprite.y * sy, 4);
+    g.strokeCircle(this.miniX + player.sprite.x * sx, this.miniY + player.sprite.y * sy, 4);
   }
 }
