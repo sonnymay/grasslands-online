@@ -57,6 +57,7 @@ const MONSTER_TYPES = {
   },
 };
 const ANIM_FRAME_MS = 180;
+const WALK_FRAME_MS = 120;
 const BOB_AMPLITUDE = 3;     // subtle lift; too much reads as bounce, not walking
 const STEP_SQUASH = 0.04;    // tiny squash so feet stay visually planted
 const ATTACK_RANGE = 100; // melee click-attack range
@@ -624,22 +625,21 @@ class PlayerController {
   // Pick which walk frame to show for the current step progress t∈[0,1].
   // The generated frame sets are inconsistent by direction, so choose only the
   // two frames that face the correct way for each direction.
-  _pickWalkFrame(t, dir) {
+  _pickWalkFrame(time, dir) {
     const cycleByDir = {
-      south: ['walk2', 'walk3'],
-      north: ['walk2', 'walk3'],
-      east: ['walk', 'walk2'],
-      west: ['walk', 'walk2'],
-      southeast: ['walk', 'walk2'],
-      southwest: ['walk', 'walk2'],
-      northeast: ['walk', 'walk2'],
-      northwest: ['walk', 'walk2'],
+      south: ['walk2', 'idle', 'walk3', 'idle'],
+      north: ['walk2', 'idle', 'walk3', 'idle'],
+      east: ['walk', 'idle', 'walk2', 'idle'],
+      west: ['walk', 'idle', 'walk2', 'idle'],
+      southeast: ['walk', 'idle', 'walk2', 'idle'],
+      southwest: ['walk', 'idle', 'walk2', 'idle'],
+      northeast: ['walk', 'idle', 'walk2', 'idle'],
+      northwest: ['walk', 'idle', 'walk2', 'idle'],
     };
     const cycle = cycleByDir[dir] || cycleByDir.south;
-    // Hold each pose for half a cell. This keeps the feet readable at MMO scale
-    // and avoids flashing mismatched direction frames.
-    const halfStep = t >= 0.55 ? 1 : 0;
-    const idx = (this.stepIndex + halfStep) % cycle.length;
+    // RO-like sprites use a timer-driven animation state. Keep animation timing
+    // independent of the 32px path cell, with idle as a pass pose between feet.
+    const idx = Math.floor(time / WALK_FRAME_MS) % cycle.length;
     return cycle[idx];
   }
 
@@ -680,7 +680,7 @@ class PlayerController {
       this.sprite.scaleY = this.basePScale * (1 - lift * STEP_SQUASH);
 
       // Frame cycle — direction-specific to avoid mixing front/back/side art.
-      this.frame = this._pickWalkFrame(t, this.dir);
+      this.frame = this._pickWalkFrame(time, this.dir);
 
       if (this.stepT >= 1) {
         this.sprite.x = this.stepToX;

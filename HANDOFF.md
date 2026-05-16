@@ -4,7 +4,7 @@
 > just opened a fresh Claude Code session, read top-to-bottom and follow §9
 > ("How to continue") at the bottom.
 >
-> Last updated: 2026-05-16 (session 5)
+> Last updated: 2026-05-16 (session 6)
 
 ---
 
@@ -48,7 +48,7 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 - 32 px cell grid (100×100) over the 3200×3200 world.
 - 8-direction A* pathfinding (`findPath`) with octile heuristic + diagonal squeeze guard.
 - Player position lerps cell-to-cell at `MS_PER_CELL = 170` ms. The slower cadence makes each footfall readable instead of sliding.
-- Walk animation uses direction-specific 2-frame cycles. South/north avoid the wrong-facing `walk` frames and use `walk2`/`walk3`; east/diagonals use `walk`/`walk2`. `walk4` assets remain loaded but unused because some have dark/spotlight backgrounds.
+- Walk animation uses direction-specific timer-driven cycles. South/north avoid the wrong-facing `walk` frames and use `walk2 → idle → walk3 → idle`; east/west/diagonals use `walk → idle → walk2 → idle`. `walk4` assets remain loaded but unused because some have dark/spotlight backgrounds.
 - Step-phase bob is subtle (3 px) with tiny squash (4%) so the character stays grounded.
 - 8-direction sprite art (`north/south/east/southeast/northeast`, plus mirrored `west/southwest/northwest`). No more head-spin on diagonals.
 - Hit stun (200 ms freeze) when damaged.
@@ -101,6 +101,19 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 ---
 
 ## 3. What we just did this session (latest first)
+
+### Session 6 — RO-reference walk timing pass
+1. **Looked up Ragnarok Online animation behavior** because the user explicitly asked to Google if needed. Ragnarok Research Lab documents RO sprite animations as timer/state-machine based rather than tied to movement distance, with ACT frame timing based around short fixed intervals.
+2. **Changed Rookie walk from cell-progress driven to time-driven.** `_pickWalkFrame()` now uses `Math.floor(time / WALK_FRAME_MS)` instead of switching based on `stepT` inside each 32 px path cell.
+3. **Added `WALK_FRAME_MS = 120`** so walking poses change at a readable animation cadence independent of `MS_PER_CELL=170`.
+4. **Inserted idle/pass frames between foot poses** to avoid the puppet-like snapping from alternating only extreme foot frames:
+   - `south/north`: `walk2`, `idle`, `walk3`, `idle`
+   - `east/west/diagonals`: `walk`, `idle`, `walk2`, `idle`
+5. **Kept direction-specific filtering** from Session 5 so bad/wrong-facing frames still stay out of the active walk cycle.
+6. **Updated cache bust**: `index.html` changed from `game.js?v=37` → `game.js?v=38`.
+7. **Verified in the in-app browser** after reload with horizontal and diagonal/northward walk samples. The first screenshot after reload can briefly show a green loading background while assets stream, then the game renders normally.
+8. **Verified no game console errors** in the in-app browser. `node -c project-grasslands/game.js` and `git diff --check` passed.
+9. **Remaining visual limitation**: this is now more RO-like in timing, but still only as good as generated art. True polish needs a single consistent sprite sheet where every frame shares feet baseline, scale, lighting, direction, and transparent alpha.
 
 ### Session 5 — Direction-specific walk frame fix
 1. **Tested in the in-app browser** at `http://localhost:8000/?verify=walk36` after the user said the walk still looked strange.
@@ -195,13 +208,13 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 ## 5. Known issues
 
 - `keyOutWhite()` strips any pure-white pixel — will damage future art with intentional whites. Regenerate with real alpha then remove this hack.
-- Rookie walk frames are inconsistent across directions. Code now works around this with direction-specific 2-frame cycles, but true RO-quality walking needs regenerated 4-frame art with consistent direction, scale, feet baseline, and transparent PNG alpha. `walk4` remains unused.
+- Rookie walk frames are inconsistent across directions. Code now works around this with direction-specific timer-driven cycles and idle/pass frames, but true RO-quality walking needs regenerated 4-frame art with consistent direction, scale, feet baseline, lighting, and transparent PNG alpha. `walk4` remains unused.
 - Tile seams: mitigated by 4 % inset crop + 2 px overdraw. Acceptable but visible at certain camera positions.
 - No world collisions beyond `setCollideWorldBounds`. Player walks through bloblings/moohams.
 - A* runs every repath; fine at 100×100 grid. Becomes expensive if grid grows. (max 8 000 iterations cap inside `findPath`).
 - Mini-map redraws every frame — cheap but allocates one graphics command list each tick.
 - Phaser banner spams the console on every reload. Cosmetic.
-- `?v=N` cache-bust in `index.html` — bump on every `game.js` change. Current: `?v=37`.
+- `?v=N` cache-bust in `index.html` — bump on every `game.js` change. Current: `?v=38`.
 
 ---
 
@@ -290,7 +303,7 @@ Stored in §9 of the older `~/Downloads/HANDOFF.md` and repeated for diagonals i
 5. Pick a task from §4 (or whatever the user asks for).
 6. **Every meaningful change:**
    - Edit code.
-   - Bump `?v=N` in `index.html` (next: `?v=38`).
+   - Bump `?v=N` in `index.html` (next: `?v=39`).
    - Reload preview, verify visually.
    - `git add` exact files, conventional-prefix commit, push.
 7. **End of session:**
