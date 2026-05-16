@@ -271,8 +271,13 @@ function update(time, delta) {
   if (player && !player.dead) {
     for (const l of loots) {
       if (l.tryPickup(player.sprite.x, player.sprite.y)) {
-        player.zeny += l.amount;
-        ui.message(`Picked up ${l.amount} zeny.`);
+        if (l.kind === 'heal') {
+          player.hp = Math.min(player.maxHP, player.hp + l.amount);
+          ui.message(`Healed +${l.amount} HP.`);
+        } else {
+          player.zeny += l.amount;
+          ui.message(`Picked up ${l.amount} zeny.`);
+        }
         sfxPickup();
       }
     }
@@ -597,6 +602,7 @@ class PlayerController {
     const dmg = Math.max(1, amount - this.def);
     this.hp -= dmg;
     this.stunUntil = this.scene.time.now + HIT_STUN_MS;
+    this.scene.cameras.main.shake(90, 0.004);
     spawnDamageNumber(this.scene, this.sprite.x, this.sprite.y - 20, dmg, 0xffffff);
     this.scene.tweens.add({
       targets: this.sprite,
@@ -1039,7 +1045,12 @@ class MonsterController {
 
     // Drop a small zeny pile — scaled to monster reward.
     const zenyDrop = Math.max(1, Math.round(this.expReward * Phaser.Math.FloatBetween(0.6, 1.6)));
-    loots.push(new LootDrop(this.scene, this.sprite.x, this.sprite.y + 10, zenyDrop));
+    loots.push(new LootDrop(this.scene, this.sprite.x, this.sprite.y + 10, zenyDrop, 'zeny'));
+    // 15% chance of a green healing herb on top of zeny.
+    if (Math.random() < 0.15) {
+      const healAmt = 20 + Math.floor(Math.random() * 15);
+      loots.push(new LootDrop(this.scene, this.sprite.x - 18, this.sprite.y + 14, healAmt, 'heal'));
+    }
 
     this.scene.time.delayedCall(1500, () => {
       this.sprite.destroy();
@@ -1056,14 +1067,16 @@ class MonsterController {
 
 // ---------- LootDrop ----------
 class LootDrop {
-  constructor(scene, x, y, amount) {
+  constructor(scene, x, y, amount, kind = 'zeny') {
     this.scene = scene;
     this.x = x; this.y = y;
     this.amount = amount;
+    this.kind = kind; // 'zeny' | 'heal'
     this.alive = true;
     this.bornAt = scene.time.now;
-    // Coin = yellow circle with dark rim. No PNG needed.
-    this.coin = scene.add.circle(x, y - 10, 8, 0xffd24a).setStrokeStyle(2, 0x7a5a00);
+    const fill = kind === 'heal' ? 0x55dd55 : 0xffd24a;
+    const rim  = kind === 'heal' ? 0x1b6b1b : 0x7a5a00;
+    this.coin = scene.add.circle(x, y - 10, 8, fill).setStrokeStyle(2, rim);
     this.coin.setDepth(y);
     // Drop bounce.
     scene.tweens.add({
