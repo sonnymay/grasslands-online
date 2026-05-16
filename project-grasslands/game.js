@@ -480,6 +480,7 @@ class PlayerController {
     this.lastSpRegen = 0;
     this.lastPowerStrike = 0;
     this.lastSelfHeal = 0;
+    this.kills = 0;
     this.level = 1;
     this.dead = false;
     this.dir = 'south';
@@ -931,6 +932,7 @@ function saveGame() {
       hp: player.hp, maxHP: player.maxHP,
       atk: player.atk, def: player.def, zeny: player.zeny,
       sp: player.sp, maxSP: player.maxSP,
+      kills: player.kills,
       cellCol: player.cellCol, cellRow: player.cellRow,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -956,6 +958,7 @@ function applySave() {
   player.zeny   = save.zeny   ?? 0;
   player.maxSP  = save.maxSP  ?? player.maxSP;
   player.sp     = Math.min(save.sp ?? player.maxSP, player.maxSP);
+  player.kills  = save.kills  ?? 0;
   if (Number.isInteger(save.cellCol) && Number.isInteger(save.cellRow)) {
     player.cellCol = save.cellCol;
     player.cellRow = save.cellRow;
@@ -1147,6 +1150,7 @@ class MonsterController {
     this.hpBarBg.setVisible(false);
     this.nameTag.setVisible(false);
     player.gainExp(this.expReward);
+    player.kills += 1;
     ui.message(`Killed ${this.cfg.name} (+${this.expReward} EXP)`);
     spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 30, `+${this.expReward} EXP`, 0x66ff66, { fontSize: '14px' });
 
@@ -1435,6 +1439,7 @@ class UIManager {
       `ATK:     ${player.atk}`,
       `DEF:     ${player.def}`,
       `Zeny:    ${player.zeny}`,
+      `Kills:   ${player.kills}`,
       ``,
       `Press C to close.`,
     ].join('\n');
