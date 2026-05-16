@@ -4,7 +4,7 @@
 > just opened a fresh Claude Code session, read top-to-bottom and follow §9
 > ("How to continue") at the bottom.
 >
-> Last updated: 2026-05-16 (session 3)
+> Last updated: 2026-05-16 (session 4)
 
 ---
 
@@ -35,12 +35,10 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 
 - Click ground → A* path → walk
 - Click monster → walk into range + auto-attack until dead
-- `1`/`Q` → Power Strike skill (10 SP, ~1.7× damage)
-- `2`/`W` → Self-Heal skill (15 SP, +30 HP base, 3 s cooldown)
 - `Tab` → target nearest live monster
-- `C` → toggle character stat panel
 - `Shift+R` → wipe save and reload
 - No WASD/arrows. RO is mouse-only.
+- No manual skill hotkeys right now. Combat is automatic after clicking a monster.
 
 ---
 
@@ -49,7 +47,9 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 ### Movement
 - 32 px cell grid (100×100) over the 3200×3200 world.
 - 8-direction A* pathfinding (`findPath`) with octile heuristic + diagonal squeeze guard.
-- Player position lerps cell-to-cell at `MS_PER_CELL = 160` ms. Step-phase bob (3 px) + slight squash gives RO-style walk feel.
+- Player position lerps cell-to-cell at `MS_PER_CELL = 170` ms. The slower cadence makes each footfall readable instead of sliding.
+- Walk animation intentionally uses the clean 2-frame cycle (`walk` + `walk2`) with each pose held for about half a cell. `walk3`/`walk4` assets are still loaded but not used because their poses/lighting/backgrounds currently make the player flicker/slide.
+- Step-phase bob is subtle (3 px) with tiny squash (4%) so the character stays grounded.
 - 8-direction sprite art (`north/south/east/southeast/northeast`, plus mirrored `west/southwest/northwest`). No more head-spin on diagonals.
 - Hit stun (200 ms freeze) when damaged.
 - Camera follows with smoothing; `setZoom(0.85)` for wider RO-like FOV.
@@ -57,16 +57,15 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 ### Combat
 - Click monster → walks adjacent → auto-attacks every 1 s until dead.
 - ±20% damage variance every hit.
-- 8% crit (2× dmg, yellow bigger floating text with `!`).
+- 3% crit (2× dmg, yellow bigger floating text with `!`).
 - 5% player miss / 10% monster miss → `MISS` floats up.
-- Player ATK 10 + Power Strike skill (`POWER_STRIKE_MULT = 1.7`, 10 SP, 1.5 s cooldown).
-- Camera shake on every player hit.
+- Player ATK starts at 10. No manual skill keys right now.
+- No camera shake on hit (removed because user disliked it).
 - Hover cursor changes to `crosshair` over monsters.
 
 ### Player stats + progression
 - HP regen: 2% maxHP every 3 s (paused for 200 ms after a hit via `stunUntil`).
-- SP regen: 4% maxSP every 3 s.
-- EXP scales `level × 100`. Level-up: +20 HP / +5 SP / +3 ATK / +1 DEF, full HP+SP, plays jingle.
+- EXP scales `level × 100`. Level-up: +20 HP / +3 ATK / +1 DEF, full HP, plays jingle.
 - DEF subtracts from incoming damage (min 1).
 - Death: lose 5% of current EXP requirement, respawn at world centre after 3 s.
 
@@ -79,7 +78,7 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 - Drop a yellow zeny coin (60–160 % of EXP reward). 15 % bonus chance of a green healing herb (+20–35 HP). Walk over to pick up.
 
 ### UI
-- Bottom bar: HP bar (red), SP bar (blue) on left; EXP bar (purple) centre; Lv + Zeny stacked right.
+- Bottom bar: HP bar (red) on left; EXP bar (purple) centre; Lv + Zeny stacked right.
 - Chat box bottom-left (10 latest messages).
 - Mini-map top-right (160×160, semi-transparent, shows player white, monsters red/orange dots, loot yellow dots, faint path cross).
 - Player HP bar above head when wounded.
@@ -88,7 +87,7 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 
 ### Persistence
 - Auto-saves to `localStorage[grasslands_save_v1]` every 3 s and on level-up.
-- Restored on page load (level / exp / HP / maxHP / SP / maxSP / ATK / DEF / zeny / cell position).
+- Restored on page load (level / exp / HP / maxHP / ATK / DEF / zeny / kills / cell position).
 - `Shift+R` wipes save and reloads for a fresh run.
 
 ### Audio
@@ -103,7 +102,22 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 
 ## 3. What we just did this session (latest first)
 
+### Session 4 — Walk feel fix after Claude Code limit
+1. **Reviewed live walk motion in Chrome** at `http://localhost:8000` after starting `python3 -m http.server 8000` from `project-grasslands/`.
+2. **Confirmed current cache-bust state**: `index.html` was already at `game.js?v=35` before edits, despite older handoff text saying `?v=28`.
+3. **Identified the sliding cause**: movement itself worked, but `MS_PER_CELL=130` plus `_pickWalkFrame()` cycling `['walk','walk2','walk3','walk4']` inside one short 32 px cell made the legs flicker too fast to read.
+4. **Audited walk art contact sheet** and found `walk3`/`walk4` are not production-ready: several frames have mismatched facing/pose/lighting, and some have dark background/spotlight artifacts. Using them made the player look less grounded.
+5. **Changed movement cadence**: `MS_PER_CELL` from `130` → `170` so grid steps feel closer to old MMO footfall timing.
+6. **Reduced body tweening**: `BOB_AMPLITUDE` from `6` → `3`, `STEP_SQUASH` from `0.10` → `0.04`, keeping the walk grounded instead of bouncy.
+7. **Disabled the bad 4-frame stride in code**: `_pickWalkFrame()` now intentionally uses only `['walk','walk2']` and holds each pose for roughly half a cell. `walk3`/`walk4` remain loaded assets but are not used until regenerated cleanly.
+8. **Updated cache bust**: `index.html` changed from `game.js?v=35` → `game.js?v=36`.
+9. **Removed stale code comment** that still mentioned Power Strike hotkeys even though combat is auto-click only.
+10. **Verified** with `node -c project-grasslands/game.js` and live browser click-to-walk on `http://localhost:8000/?verify=walk36`.
+11. **Observed verification caveat**: Chrome console showed MetaMask extension warnings/errors, not game errors. Game loaded and walk worked.
+
 ### Session 3 — RO feel pass
+> Historical note: several session 3 experiments were later removed after user feedback (manual skill hotkeys, SP UI, healer/stat panel, camera shake). §2 above is current truth.
+
 1. **Tile-grid + A* pathfinding** replacing free velocity (`MS_PER_CELL=160`, cell-to-cell lerp, walk/walk2 alternation per cell, RO-style cadence).
 2. **8-direction sprites** wired (NE/SE generated; SW/NW are mirrored). `pickDirection` returns 8 sectors.
 3. **Click marker** (green fading ring) on every move click.
@@ -151,30 +165,29 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 
 ## 4. Next steps — pick any
 
-1. **NPC stub** (healer in the spawn area). Generate one `npc_healer.png`. Click → if zeny ≥ 10, drain HP. Adds "world feels populated".
-2. **More monsters.** Add a third type via `MONSTER_TYPES` (e.g. `slime` green, low HP / fast / low EXP). Requires 3 new sprites.
-3. **Equipment slots.** A "Weapon" inventory slot. Start with `dagger` giving +2 ATK. Visual: just a UI slot for now.
-4. **Map zones.** Split world into 2–3 named zones (e.g. North Forest, South Plains). Different monster pools per zone. Lots of code.
-5. **Skill #2: Self-Heal.** Hotkey `2`, costs 15 SP, heals 30 HP, 3 s cooldown.
-6. **Touch-up walk cycle.** Maybe `walk3` frame for smoother loop.
-7. **Day/night overlay** — single full-screen tweened rectangle alpha sweeping a colour. 10 lines.
-8. **Inventory UI panel** (press `I`) with stub slots — sets up future loot/equipment work.
-9. **Quest stub** — kill 5 Bloblings, get reward zeny. Tracker in chat box.
-10. **Multiplayer (Phase 2)** — big jump: FastAPI WebSocket server + Vercel/Railway. Confirm scope first.
+1. **Regenerate clean 4-frame Rookie walk art** if user wants smoother RO-like walking. Prompt must require: same character, same direction, same scale, same feet baseline, transparent background PNG with alpha channel, no lighting/background changes. Replace `walk3`/`walk4`, then re-enable a 4-frame loop only after browser verification.
+2. **Add subtle ground shadow under Rookie** so foot contact reads better while walking.
+3. **Map variety pass.** Add biome patches/forest clusters using current tiles + decorations. Keep spawn/walkable protection intact.
+4. **Fantasy UI skin pass.** Replace debug black rectangles with warm brown/gold framed RO-inspired panels.
+5. **More monsters.** Add a third original monster via `MONSTER_TYPES`. Requires 3 new sprites.
+6. **Quest stub** — kill 5 Bloblings, get reward zeny. Tracker in chat box.
+7. **Inventory/equipment UI** only after user approves scope; keep game simple for now.
+8. **Multiplayer (Phase 2)** — big jump: FastAPI WebSocket server + Vercel/Railway. Confirm scope first.
 
-**Recommendation:** #5 (Self-Heal skill) is tiny + dovetails with existing SP/skill plumbing. Or #2 (third monster) if user is generating art.
+**Recommendation:** #1 only if new art is generated. Otherwise do #2 ground shadow + #4 UI skin next because look matters most.
 
 ---
 
 ## 5. Known issues
 
 - `keyOutWhite()` strips any pure-white pixel — will damage future art with intentional whites. Regenerate with real alpha then remove this hack.
+- `walk3`/`walk4` Rookie frames are loaded but intentionally disabled in `_pickWalkFrame()`. Current generated frames have mismatched poses/lighting/backgrounds and caused sliding/flicker. Regenerate before re-enabling 4-frame walk.
 - Tile seams: mitigated by 4 % inset crop + 2 px overdraw. Acceptable but visible at certain camera positions.
 - No world collisions beyond `setCollideWorldBounds`. Player walks through bloblings/moohams.
 - A* runs every repath; fine at 100×100 grid. Becomes expensive if grid grows. (max 8 000 iterations cap inside `findPath`).
 - Mini-map redraws every frame — cheap but allocates one graphics command list each tick.
 - Phaser banner spams the console on every reload. Cosmetic.
-- `?v=N` cache-bust in `index.html` — bump on every `game.js` change. Current: `?v=28`.
+- `?v=N` cache-bust in `index.html` — bump on every `game.js` change. Current: `?v=36`.
 
 ---
 
@@ -259,11 +272,11 @@ Stored in §9 of the older `~/Downloads/HANDOFF.md` and repeated for diagonals i
 3. Start preview server:
    - `cd project-grasslands && python3 -m http.server 8000`, or
    - `mcp__Claude_Preview__preview_start` name `grasslands` (port 8001).
-4. Open in browser, walk around, kill a Blobling, hit `1` to crit one, pick up a herb, watch HP/SP regen. Confirm §2 still holds.
+4. Open in browser, walk around, click a monster to auto-fight, pick up loot/herb, and confirm HP regen plus §2 still holds.
 5. Pick a task from §4 (or whatever the user asks for).
 6. **Every meaningful change:**
    - Edit code.
-   - Bump `?v=N` in `index.html` (next: `?v=29`).
+   - Bump `?v=N` in `index.html` (next: `?v=37`).
    - Reload preview, verify visually.
    - `git add` exact files, conventional-prefix commit, push.
 7. **End of session:**

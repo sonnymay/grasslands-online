@@ -13,7 +13,7 @@ const MAP_ROWS = Math.ceil(WORLD_H / TILE_SIZE);
 const CELL_SIZE = 32;
 const GRID_COLS = Math.floor(WORLD_W / CELL_SIZE);
 const GRID_ROWS = Math.floor(WORLD_H / CELL_SIZE);
-const MS_PER_CELL = 130; // snappier than RO's 150ms for crisper footfall.
+const MS_PER_CELL = 170; // RO-like: slower cell steps make footfalls readable.
 const MAX_PATH_LEN = 256;
 const HIT_STUN_MS = 200;
 const HP_REGEN_INTERVAL_MS = 3000;  // tick every 3s
@@ -57,9 +57,8 @@ const MONSTER_TYPES = {
   },
 };
 const ANIM_FRAME_MS = 180;
-const BOB_AMPLITUDE = 6;     // px the body lifts on each footfall
-const BOB_FREQ = 0.012;      // step phase per ms (legacy, unused now)
-const STEP_SQUASH = 0.10;    // vertical squash on foot-down
+const BOB_AMPLITUDE = 3;     // subtle lift; too much reads as bounce, not walking
+const STEP_SQUASH = 0.04;    // tiny squash so feet stay visually planted
 const ATTACK_RANGE = 100; // melee click-attack range
 const RESPAWN_MS = 5000;
 const PLAYER_RESPAWN_MS = 3000;
@@ -253,7 +252,6 @@ function create() {
   // RO camera reveals ~12-15 tiles wide — zoom out a touch.
   scene.cameras.main.setZoom(0.85);
 
-  // Skill hotkey: 1 or Q → Power Strike on current attack target.
   // Tab cycles to the nearest live monster as the new attack target.
   scene.input.keyboard.on('keydown-TAB', (e) => {
     if (e.preventDefault) e.preventDefault();
@@ -624,19 +622,17 @@ class PlayerController {
   }
 
   // Pick which walk frame to show for the current step progress t∈[0,1].
-  // Auto-uses 4-frame cycle when walk3/walk4 textures are loaded; falls back to 2 otherwise.
+  // Use the clean two-pose stride for now. The generated walk3/walk4 art has
+  // mismatched lighting/poses, so cycling it makes the player look like it slides.
   _pickWalkFrame(t) {
     if (!this._walkFrameSet) {
-      const has = (key) => this.scene.textures.exists(key);
-      // Sample the south set as a proxy — assume all 5 dirs ship together.
-      const has4 = has('rookie_walk3_south') && has('rookie_walk4_south');
-      this._walkFrameSet = has4
-        ? ['walk', 'walk2', 'walk3', 'walk4']
-        : ['walk', 'walk2'];
+      this._walkFrameSet = ['walk', 'walk2'];
     }
     const cycle = this._walkFrameSet;
-    // stepIndex shifts the starting frame each cell so the cycle keeps phase across cells.
-    const idx = (Math.floor(t * cycle.length) + this.stepIndex) % cycle.length;
+    // Hold each pose for half a cell. This keeps the feet readable at MMO scale
+    // instead of flashing every generated frame inside one short grid step.
+    const halfStep = t >= 0.55 ? 1 : 0;
+    const idx = (this.stepIndex + halfStep) % cycle.length;
     return cycle[idx];
   }
 
@@ -667,7 +663,8 @@ class PlayerController {
       const baseY = this.stepFromY + (this.stepToY - this.stepFromY) * t;
       this.sprite.x = baseX;
 
-      // Full sine wave per step → two footfalls per cell (lift, plant, lift, plant).
+      // Full sine wave per step. Keep it subtle: RO-like walking should feel
+      // grounded, not like a hopping tween.
       // Y-position bob (not origin shift) so the body genuinely lifts.
       const phase = t * Math.PI * 2;
       const lift = Math.abs(Math.sin(phase));
@@ -675,7 +672,8 @@ class PlayerController {
       this.sprite.setOrigin(0.5, 0.5);
       this.sprite.scaleY = this.basePScale * (1 - lift * STEP_SQUASH);
 
-      // Frame cycle — uses walk3/walk4 when those textures exist; falls back to walk/walk2.
+      // Frame cycle — intentionally prefers the clean 2-frame stride until the
+      // 4-frame art is regenerated with matching poses/backgrounds.
       this.frame = this._pickWalkFrame(t);
 
       if (this.stepT >= 1) {
