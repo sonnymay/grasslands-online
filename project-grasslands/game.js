@@ -117,6 +117,10 @@ function preload() {
   this.load.image('mooham_idle', 'assets/sprites/mooham_idle.png');
   this.load.image('mooham_hit', 'assets/sprites/mooham_hit.png');
   this.load.image('mooham_dead', 'assets/sprites/mooham_dead.png');
+  // Decorations
+  for (let i = 1; i <= 4; i++) this.load.image(`deco_flower_cluster_0${i}`, `assets/decorations/deco_flower_cluster_0${i}.png`);
+  for (let i = 1; i <= 3; i++) this.load.image(`deco_rock_0${i}`, `assets/decorations/deco_rock_0${i}.png`);
+  for (let i = 1; i <= 3; i++) this.load.image(`deco_tallgrass_0${i}`, `assets/decorations/deco_tallgrass_0${i}.png`);
   this.load.image('grass_tileset', 'assets/tiles/grass_tileset.png');
 }
 
@@ -132,6 +136,9 @@ function create() {
     'rookie_attack','rookie_dead',
     'blobling_idle','blobling_hit','blobling_dead',
     'mooham_idle','mooham_hit','mooham_dead',
+    'deco_flower_cluster_01','deco_flower_cluster_02','deco_flower_cluster_03','deco_flower_cluster_04',
+    'deco_rock_01','deco_rock_02','deco_rock_03',
+    'deco_tallgrass_01','deco_tallgrass_02','deco_tallgrass_03',
   ];
   for (const k of spriteKeys) keyOutWhite(scene, k);
 
@@ -158,6 +165,7 @@ function create() {
 
   // Build procedural map + walkable grid (every cell walkable for now).
   buildMap(scene);
+  buildDecorations(scene);
   walkable = [];
   for (let r = 0; r < GRID_ROWS; r++) {
     walkable.push(new Array(GRID_COLS).fill(true));
@@ -238,37 +246,76 @@ function keyOutWhite(scene, key) {
 }
 
 // ---------- Map ----------
-function buildMap(scene) {
-  // Path through center: horizontal across mid row, vertical down mid col
+// Center cross path. Everything else is plain grass; decorations scatter on top.
+function getCellType(r, c) {
   const midRow = Math.floor(MAP_ROWS / 2);
   const midCol = Math.floor(MAP_COLS / 2);
+  if (r === midRow && c === midCol) return 'path_cross';
+  if (r === midRow) return 'path_h';
+  if (c === midCol) return 'path_v';
+  return 'grass';
+}
 
+function buildMap(scene) {
   for (let r = 0; r < MAP_ROWS; r++) {
     for (let c = 0; c < MAP_COLS; c++) {
+      const type = getCellType(r, c);
       let idx;
-      const onEdge = (r <= 1 || r >= MAP_ROWS - 2 || c <= 1 || c >= MAP_COLS - 2);
-      const onPathH = (r === midRow);
-      const onPathV = (c === midCol);
-
-      if (onPathH && onPathV) idx = TILE.DIRT_OPEN;
-      else if (onPathH) idx = TILE.DIRT_H;
-      else if (onPathV) idx = TILE.DIRT_V;
-      else if (onEdge && Math.random() < 0.35) idx = (Math.random() < 0.5 ? TILE.ROCKS_SPARSE : TILE.ROCKS_DENSE);
+      if (type === 'path_cross') idx = TILE.DIRT_OPEN;
+      else if (type === 'path_h') idx = TILE.DIRT_H;
+      else if (type === 'path_v') idx = TILE.DIRT_V;
       else {
-        const roll = Math.random();
-        if (roll < 0.06) idx = TILE.FLOWERS_COLOR;
-        else if (roll < 0.14) idx = TILE.FLOWER;
-        else if (roll < 0.20) idx = TILE.TALL_GRASS;
-        else if (roll < 0.55) idx = TILE.THICK_GRASS;
-        else idx = TILE.GRASS;
+        // Plain grass base. Only two variants for low contrast.
+        idx = (Math.random() < 0.5) ? TILE.GRASS : TILE.THICK_GRASS;
       }
 
-      const img = scene.add.image(c * TILE_SIZE + TILE_SIZE / 2, r * TILE_SIZE + TILE_SIZE / 2, 'grass_tileset', `tile_${idx}`);
-      // Slight overdraw to hide subpixel seams between neighbors.
+      const img = scene.add.image(
+        c * TILE_SIZE + TILE_SIZE / 2,
+        r * TILE_SIZE + TILE_SIZE / 2,
+        'grass_tileset', `tile_${idx}`
+      );
       img.setDisplaySize(TILE_SIZE + 2, TILE_SIZE + 2);
+      // Random flip + 180° rotation break grid repetition for free.
+      if (type === 'grass') {
+        if (Math.random() < 0.5) img.setFlipX(true);
+        if (Math.random() < 0.5) img.setFlipY(true);
+      }
       img.setDepth(-1000);
     }
   }
+}
+
+// Scatter deco sprites at sub-cell offsets so vegetation reads organic, not grid.
+function buildDecorations(scene) {
+  const flowerKeys = ['deco_flower_cluster_01','deco_flower_cluster_02','deco_flower_cluster_03','deco_flower_cluster_04'];
+  const rockKeys = ['deco_rock_01','deco_rock_02','deco_rock_03'];
+  const grassKeys = ['deco_tallgrass_01','deco_tallgrass_02','deco_tallgrass_03'];
+
+  const place = (key, displayW, opts = {}) => {
+    const tile_r = Phaser.Math.Between(0, MAP_ROWS - 1);
+    const tile_c = Phaser.Math.Between(0, MAP_COLS - 1);
+    const type = getCellType(tile_r, tile_c);
+    // Skip paths so they stay readable.
+    if (type !== 'grass') return;
+    const jitterX = Phaser.Math.Between(-TILE_SIZE / 2 + 12, TILE_SIZE / 2 - 12);
+    const jitterY = Phaser.Math.Between(-TILE_SIZE / 2 + 12, TILE_SIZE / 2 - 12);
+    const x = tile_c * TILE_SIZE + TILE_SIZE / 2 + jitterX;
+    const y = tile_r * TILE_SIZE + TILE_SIZE / 2 + jitterY;
+    const img = scene.add.image(x, y, key);
+    const baseScale = displayW / img.width;
+    const scaleJitter = Phaser.Math.FloatBetween(0.8, 1.25);
+    img.setScale(baseScale * scaleJitter);
+    if (Math.random() < 0.5) img.setFlipX(true);
+    img.setAngle(Phaser.Math.Between(-15, 15));
+    // Below entities, above ground tiles.
+    img.setDepth(opts.depth ?? -500);
+    img.setAlpha(opts.alpha ?? 1);
+  };
+
+  // Density tuned for 25x25 map. Bump these to add more.
+  for (let i = 0; i < 220; i++) place(Phaser.Utils.Array.GetRandom(grassKeys), 56, { alpha: 0.95 });
+  for (let i = 0; i < 110; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys), 64);
+  for (let i = 0; i < 90; i++) place(Phaser.Utils.Array.GetRandom(rockKeys), 48);
 }
 
 // ---------- PlayerController ----------
