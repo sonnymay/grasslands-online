@@ -107,6 +107,8 @@ const game = new Phaser.Game(config);
 let player;
 let bloblings = [];
 let loots = [];
+let dayNightOverlay = null;
+const DAY_NIGHT_CYCLE_MS = 120000; // 2-minute day/night loop
 let lastSaveAt = 0;
 const SAVE_KEY = 'grasslands_save_v1';
 const SAVE_INTERVAL_MS = 3000;
@@ -262,6 +264,10 @@ function create() {
     }
   });
 
+  // Day/night overlay (drawn over the world, under UI).
+  dayNightOverlay = scene.add.rectangle(0, 0, GAME_W, GAME_H, 0x0a1a44, 0)
+    .setOrigin(0, 0).setScrollFactor(0).setDepth(9000);
+
   // UI
   ui = new UIManager(scene);
   // Apply saved progress (level / exp / zeny / position) if present.
@@ -297,6 +303,13 @@ function update(time, delta) {
     }
   }
   loots = loots.filter(l => l.alive);
+
+  // Day/night: cosine-driven darkness peaking at midnight.
+  if (dayNightOverlay) {
+    const t = (time % DAY_NIGHT_CYCLE_MS) / DAY_NIGHT_CYCLE_MS;
+    const darkness = (1 - Math.cos(t * Math.PI * 2)) / 2; // 0..1..0
+    dayNightOverlay.alpha = darkness * 0.45;
+  }
 
   // Auto-save progress every few seconds.
   if (time - lastSaveAt > SAVE_INTERVAL_MS) {
