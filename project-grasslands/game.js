@@ -9,7 +9,15 @@ const TILE_SIZE = 128;
 const MAP_COLS = Math.ceil(WORLD_W / TILE_SIZE); // 25
 const MAP_ROWS = Math.ceil(WORLD_H / TILE_SIZE);
 
-const PLAYER_SPEED = 200;
+// RO-style tile-grid movement. Cells are finer than tiles so paths feel smooth.
+const CELL_SIZE = 32;
+const GRID_COLS = Math.floor(WORLD_W / CELL_SIZE);
+const GRID_ROWS = Math.floor(WORLD_H / CELL_SIZE);
+const MS_PER_CELL = 160; // RO baseline is ~150ms per cell.
+const MAX_PATH_LEN = 256;
+const HIT_STUN_MS = 200;
+const HP_REGEN_INTERVAL_MS = 3000;  // tick every 3s
+const HP_REGEN_PCT = 0.02;          // 2% of maxHP per tick
 // Source PNGs are ~1254px tall; we display the player ~96px and bloblings ~64px.
 const PLAYER_DISPLAY_H = 96;
 const BLOBLING_DISPLAY_H = 64;
@@ -67,12 +75,11 @@ const game = new Phaser.Game(config);
 let player;
 let bloblings = [];
 let ui;
-let cursors;
-let wasd;
 let lastPlayerAttack = 0;
-let moveTarget = null; // {x,y} from click-to-move
 let tileSliceW = 0;
 let tileSliceH = 0;
+let walkable = null;   // [row][col] bool — true if a player can stand on it
+let clickMarker = null;
 
 // ---------- Preload ----------
 function preload() {
@@ -128,8 +135,17 @@ function create() {
   scene.physics.world.setBounds(0, 0, WORLD_W, WORLD_H);
   scene.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
 
-  // Build procedural map
+  // Build procedural map + walkable grid (every cell walkable for now).
   buildMap(scene);
+  walkable = [];
+  for (let r = 0; r < GRID_ROWS; r++) {
+    walkable.push(new Array(GRID_COLS).fill(true));
+  }
+
+  // Ground click marker (small green ring) — appears at the target cell.
+  clickMarker = scene.add.graphics();
+  clickMarker.setDepth(-500);
+  clickMarker.setVisible(false);
 
   // Player
   player = new PlayerController(scene, WORLD_W / 2, WORLD_H / 2);
@@ -142,39 +158,22 @@ function create() {
   // Camera follow
   scene.cameras.main.startFollow(player.sprite, true, 0.1, 0.1);
 
-  // Input
-  cursors = scene.input.keyboard.createCursorKeys();
-  wasd = scene.input.keyboard.addKeys({
-    up: Phaser.Input.Keyboard.KeyCodes.W,
-    down: Phaser.Input.Keyboard.KeyCodes.S,
-    left: Phaser.Input.Keyboard.KeyCodes.A,
-    right: Phaser.Input.Keyboard.KeyCodes.D,
-  });
-
-  // Pointer: click on blobling = attack; otherwise click-to-move
+  // Pointer: click a Blobling to fight it; click ground to walk there.
   scene.input.on('pointerdown', (pointer) => {
     const wx = pointer.worldX;
     const wy = pointer.worldY;
 
-    // Check clicked blobling
     let clicked = null;
     for (const b of bloblings) {
       if (!b.alive) continue;
-      const dx = wx - b.sprite.x;
-      const dy = wy - b.sprite.y;
-      if (Math.hypot(dx, dy) < 50) {
-        clicked = b;
-        break;
-      }
+      if (Math.hypot(wx - b.sprite.x, wy - b.sprite.y) < 50) { clicked = b; break; }
     }
+
     if (clicked) {
-      attemptPlayerAttack(scene, clicked);
-      // Move toward it if out of range
-      const d = Math.hypot(clicked.sprite.x - player.sprite.x, clicked.sprite.y - player.sprite.y);
-      if (d > ATTACK_RANGE) moveTarget = { x: clicked.sprite.x, y: clicked.sprite.y };
-      else moveTarget = null;
+      player.startAttacking(clicked);
     } else {
-      moveTarget = { x: wx, y: wy };
+      player.walkTo(wx, wy);
+      showClickMarker(scene, wx, wy);
     }
   });
 
@@ -261,16 +260,27 @@ class PlayerController {
     this.level = 1;
     this.dead = false;
     this.dir = 'south';
-    this.stepPhase = 0;
-    this.frame = 'idle'; // idle | walk | walk2
+    this.frame = 'idle';
     this.attackPoseUntil = 0;
+    this.stunUntil = 0;
+    this.lastRegen = 0;
 
-    this.sprite = scene.physics.add.sprite(x, y, 'rookie_idle_south');
+    // Tile-grid movement state.
+    this.cellCol = Math.floor(x / CELL_SIZE);
+    this.cellRow = Math.floor(y / CELL_SIZE);
+    this.path = [];          // queue of {col,row}
+    this.stepFromX = x;
+    this.stepFromY = y;
+    this.stepToX = x;
+    this.stepToY = y;
+    this.stepT = 1;          // 0..1, 1 = arrived
+    this.stepIndex = 0;      // alternates walk/walk2 across cells
+    this.attackTarget = null; // Blobling we're chasing
+
+    this.sprite = scene.add.sprite(x, y, 'rookie_idle_south');
     this.basePScale = PLAYER_DISPLAY_H / this.sprite.height;
     this.sprite.setScale(this.basePScale);
-    this.sprite.setCollideWorldBounds(true);
 
-    // Name tag
     this.nameTag = scene.add.text(x, y, 'Rookie', {
       fontSize: '14px',
       color: '#ffffff',
@@ -281,64 +291,105 @@ class PlayerController {
 
   expNeeded() { return this.level * 100; }
 
+  walkTo(worldX, worldY) {
+    if (this.dead) return;
+    this.attackTarget = null;
+    const goalCol = clampCell(Math.floor(worldX / CELL_SIZE), GRID_COLS);
+    const goalRow = clampCell(Math.floor(worldY / CELL_SIZE), GRID_ROWS);
+    this._setPathTo(goalCol, goalRow);
+  }
+
+  startAttacking(target) {
+    if (this.dead) return;
+    this.attackTarget = target;
+    this._repathToTarget();
+  }
+
+  _repathToTarget() {
+    if (!this.attackTarget || !this.attackTarget.alive) return;
+    // Walk to a cell adjacent to the target so we end up inside ATTACK_RANGE.
+    const tCol = Math.floor(this.attackTarget.sprite.x / CELL_SIZE);
+    const tRow = Math.floor(this.attackTarget.sprite.y / CELL_SIZE);
+    const adj = findAdjacentReachableCell(this.cellCol, this.cellRow, tCol, tRow);
+    if (adj) this._setPathTo(adj.col, adj.row);
+  }
+
+  _setPathTo(goalCol, goalRow) {
+    const path = findPath(this.cellCol, this.cellRow, goalCol, goalRow);
+    if (!path || path.length === 0) {
+      this.path = [];
+      return;
+    }
+    // Drop the first node (current cell) if present.
+    if (path[0].col === this.cellCol && path[0].row === this.cellRow) path.shift();
+    this.path = path.slice(0, MAX_PATH_LEN);
+    // Kick off the first step from current position if we're not already moving.
+    if (this.stepT >= 1) this._beginNextStep();
+  }
+
+  _beginNextStep() {
+    if (this.path.length === 0) return;
+    const next = this.path.shift();
+    this.stepFromX = cellCenterX(this.cellCol);
+    this.stepFromY = cellCenterY(this.cellRow);
+    this.stepToX = cellCenterX(next.col);
+    this.stepToY = cellCenterY(next.row);
+    this.cellCol = next.col;
+    this.cellRow = next.row;
+    this.stepT = 0;
+    this.stepIndex += 1;
+    this.dir = pickDirection(this.stepToX - this.stepFromX, this.stepToY - this.stepFromY);
+  }
+
   update(time, delta) {
     if (this.dead) {
       this.sprite.setTexture('rookie_dead');
       this.sprite.setFlipX(false);
+      this.sprite.setOrigin(0.5, 0.5);
+      this.sprite.scaleY = this.basePScale;
       this.nameTag.setPosition(this.sprite.x, this.sprite.y - this.sprite.displayHeight / 2);
       return;
     }
 
-    let vx = 0, vy = 0;
-    if (cursors.left.isDown || wasd.left.isDown) vx -= 1;
-    if (cursors.right.isDown || wasd.right.isDown) vx += 1;
-    if (cursors.up.isDown || wasd.up.isDown) vy -= 1;
-    if (cursors.down.isDown || wasd.down.isDown) vy += 1;
+    const stunned = time < this.stunUntil;
 
-    const usingKeys = (vx !== 0 || vy !== 0);
-    if (usingKeys) moveTarget = null;
+    // Slow passive HP regen. Pauses while stunned (in combat hit recently).
+    if (!stunned && this.hp < this.maxHP && time - this.lastRegen >= HP_REGEN_INTERVAL_MS) {
+      this.lastRegen = time;
+      const amount = Math.max(1, Math.floor(this.maxHP * HP_REGEN_PCT));
+      this.hp = Math.min(this.maxHP, this.hp + amount);
+    }
 
-    // Click-to-move
-    if (!usingKeys && moveTarget) {
-      const dx = moveTarget.x - this.sprite.x;
-      const dy = moveTarget.y - this.sprite.y;
-      const d = Math.hypot(dx, dy);
-      if (d < 6) {
-        moveTarget = null;
-      } else {
-        vx = dx / d;
-        vy = dy / d;
+    // Advance the current step.
+    if (!stunned && this.stepT < 1) {
+      this.stepT = Math.min(1, this.stepT + delta / MS_PER_CELL);
+      const t = this.stepT;
+      this.sprite.x = this.stepFromX + (this.stepToX - this.stepFromX) * t;
+      this.sprite.y = this.stepFromY + (this.stepToY - this.stepFromY) * t;
+
+      // Foot-fall bob + squash, one cycle per cell.
+      const phase = t * Math.PI;
+      const bob = Math.sin(phase) * BOB_AMPLITUDE;
+      this.sprite.setOrigin(0.5, 0.5 + bob / this.sprite.displayHeight);
+      this.sprite.scaleY = this.basePScale * (1 - Math.sin(phase) * STEP_SQUASH);
+      this.frame = (this.stepIndex % 2 === 0) ? 'walk' : 'walk2';
+
+      if (this.stepT >= 1) {
+        this.sprite.x = this.stepToX;
+        this.sprite.y = this.stepToY;
+        // Snap origin / scale back so idle / attack pose draws upright.
+        this.sprite.setOrigin(0.5, 0.5);
+        this.sprite.scaleY = this.basePScale;
+        // Start the next queued step if we have one.
+        if (this.path.length > 0) this._beginNextStep();
       }
     }
 
-    // Normalize keyboard diagonals
-    if (usingKeys) {
-      const mag = Math.hypot(vx, vy);
-      if (mag > 0) { vx /= mag; vy /= mag; }
-    }
-
-    this.sprite.setVelocity(vx * PLAYER_SPEED, vy * PLAYER_SPEED);
-
-    const moving = (vx !== 0 || vy !== 0);
+    const moving = this.stepT < 1;
     const showingAttack = time < this.attackPoseUntil;
-    if (moving) {
-      this.dir = pickDirection(vx, vy);
-      // Step phase drives the foot-fall bob and the 2-frame walk cycle.
-      this.stepPhase += delta * BOB_FREQ;
-      const bob = Math.abs(Math.sin(this.stepPhase)) * BOB_AMPLITUDE;
-      const lift = bob / this.sprite.displayHeight;
-      this.sprite.setOrigin(0.5, 0.5 + lift);
-      const squash = 1 - Math.abs(Math.sin(this.stepPhase)) * STEP_SQUASH;
-      this.sprite.scaleY = this.basePScale * squash;
-      // Alternate walk1 / walk2 each half step so feet read as actual footfall.
-      const halfStep = Math.floor(this.stepPhase / Math.PI);
-      this.frame = (halfStep % 2 === 0) ? 'walk' : 'walk2';
-    } else {
-      this.stepPhase = 0;
-      this.sprite.setOrigin(0.5, 0.5);
-      this.sprite.scaleY = this.basePScale;
-      this.frame = 'idle';
-    }
+
+    if (!moving) this.frame = 'idle';
+
     if (showingAttack) {
       this.sprite.setTexture('rookie_attack');
       this.sprite.setFlipX(this.dir === 'west');
@@ -346,13 +397,35 @@ class PlayerController {
       applyRookieTexture(this.sprite, this.dir, this.frame);
     }
 
-    // Name tag follows
+    // Pursue / auto-attack a clicked target.
+    if (this.attackTarget) {
+      if (!this.attackTarget.alive) {
+        this.attackTarget = null;
+      } else if (!moving) {
+        const d = Math.hypot(
+          this.attackTarget.sprite.x - this.sprite.x,
+          this.attackTarget.sprite.y - this.sprite.y
+        );
+        if (d <= ATTACK_RANGE) {
+          // Face the target while attacking.
+          this.dir = pickDirection(
+            this.attackTarget.sprite.x - this.sprite.x,
+            this.attackTarget.sprite.y - this.sprite.y
+          );
+          attemptPlayerAttack(this.scene, this.attackTarget);
+        } else {
+          this._repathToTarget();
+        }
+      }
+    }
+
     this.nameTag.setPosition(this.sprite.x, this.sprite.y - this.sprite.displayHeight / 2);
   }
 
   takeDamage(amount) {
     if (this.dead) return;
     this.hp -= amount;
+    this.stunUntil = this.scene.time.now + HIT_STUN_MS;
     spawnDamageNumber(this.scene, this.sprite.x, this.sprite.y - 20, amount, 0xffffff);
     this.scene.tweens.add({
       targets: this.sprite,
@@ -368,12 +441,20 @@ class PlayerController {
 
   die() {
     this.dead = true;
-    this.sprite.setVelocity(0, 0);
+    this.path = [];
+    this.stepT = 1;
+    this.attackTarget = null;
     this.sprite.setOrigin(0.5, 0.5);
     this.sprite.scaleY = this.basePScale;
     ui.message('You died.');
     this.scene.time.delayedCall(PLAYER_RESPAWN_MS, () => {
-      this.sprite.setPosition(WORLD_W / 2, WORLD_H / 2);
+      const cx = Math.floor(GRID_COLS / 2);
+      const cy = Math.floor(GRID_ROWS / 2);
+      this.cellCol = cx;
+      this.cellRow = cy;
+      this.sprite.setPosition(cellCenterX(cx), cellCenterY(cy));
+      this.stepFromX = this.stepToX = this.sprite.x;
+      this.stepFromY = this.stepToY = this.sprite.y;
       this.hp = this.maxHP;
       this.dead = false;
     });
@@ -409,6 +490,110 @@ class PlayerController {
       onComplete: () => txt.destroy(),
     });
   }
+}
+
+// ---------- Cell grid helpers ----------
+function clampCell(v, max) { return Math.max(0, Math.min(max - 1, v)); }
+function cellCenterX(col) { return col * CELL_SIZE + CELL_SIZE / 2; }
+function cellCenterY(row) { return row * CELL_SIZE + CELL_SIZE / 2; }
+function isWalkable(col, row) {
+  if (col < 0 || row < 0 || col >= GRID_COLS || row >= GRID_ROWS) return false;
+  return walkable[row][col];
+}
+
+// 8-direction A* from (sCol,sRow) → (gCol,gRow). Returns [{col,row}] including goal.
+function findPath(sCol, sRow, gCol, gRow) {
+  if (!isWalkable(gCol, gRow)) return null;
+  if (sCol === gCol && sRow === gRow) return [{ col: sCol, row: sRow }];
+
+  const key = (c, r) => r * GRID_COLS + c;
+  const open = new Map();   // key → node
+  const closed = new Set();
+  const start = { col: sCol, row: sRow, g: 0, f: heuristic(sCol, sRow, gCol, gRow), parent: null };
+  open.set(key(sCol, sRow), start);
+
+  const dirs = [
+    [1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1],
+    [1, 1, Math.SQRT2], [1, -1, Math.SQRT2], [-1, 1, Math.SQRT2], [-1, -1, Math.SQRT2],
+  ];
+
+  let iterations = 0;
+  const maxIterations = 8000;
+  while (open.size > 0 && iterations++ < maxIterations) {
+    // Pop the node with the lowest f.
+    let bestKey = null, bestNode = null;
+    for (const [k, n] of open) {
+      if (!bestNode || n.f < bestNode.f) { bestKey = k; bestNode = n; }
+    }
+    open.delete(bestKey);
+    closed.add(bestKey);
+
+    if (bestNode.col === gCol && bestNode.row === gRow) {
+      // Reconstruct.
+      const path = [];
+      let cur = bestNode;
+      while (cur) { path.unshift({ col: cur.col, row: cur.row }); cur = cur.parent; }
+      return path;
+    }
+
+    for (const [dc, dr, cost] of dirs) {
+      const nc = bestNode.col + dc;
+      const nr = bestNode.row + dr;
+      if (!isWalkable(nc, nr)) continue;
+      // Block diagonal squeezes when both orthogonal neighbours are blocked.
+      if (dc !== 0 && dr !== 0) {
+        if (!isWalkable(bestNode.col + dc, bestNode.row) && !isWalkable(bestNode.col, bestNode.row + dr)) continue;
+      }
+      const k = key(nc, nr);
+      if (closed.has(k)) continue;
+      const g = bestNode.g + cost;
+      const existing = open.get(k);
+      if (!existing || g < existing.g) {
+        open.set(k, {
+          col: nc, row: nr,
+          g, f: g + heuristic(nc, nr, gCol, gRow),
+          parent: bestNode,
+        });
+      }
+    }
+  }
+  return null;
+}
+
+function heuristic(c1, r1, c2, r2) {
+  // Octile distance — admissible for 8-direction grids.
+  const dc = Math.abs(c1 - c2);
+  const dr = Math.abs(r1 - r2);
+  return (dc + dr) + (Math.SQRT2 - 2) * Math.min(dc, dr);
+}
+
+// Pick a cell adjacent to (tCol,tRow) that's walkable; prefer the one closest to start.
+function findAdjacentReachableCell(sCol, sRow, tCol, tRow) {
+  const offsets = [[0,0],[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+  let best = null, bestDist = Infinity;
+  for (const [dc, dr] of offsets) {
+    const c = tCol + dc, r = tRow + dr;
+    if (!isWalkable(c, r)) continue;
+    const d = Math.hypot(c - sCol, r - sRow);
+    if (d < bestDist) { bestDist = d; best = { col: c, row: r }; }
+  }
+  return best;
+}
+
+function showClickMarker(scene, wx, wy) {
+  if (!clickMarker) return;
+  clickMarker.clear();
+  clickMarker.lineStyle(3, 0x66ff66, 1);
+  clickMarker.strokeCircle(wx, wy, 12);
+  clickMarker.setAlpha(1);
+  clickMarker.setVisible(true);
+  scene.tweens.killTweensOf(clickMarker);
+  scene.tweens.add({
+    targets: clickMarker,
+    alpha: 0,
+    duration: 500,
+    onComplete: () => clickMarker.setVisible(false),
+  });
 }
 
 function pickDirection(vx, vy) {

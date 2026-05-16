@@ -36,9 +36,9 @@ Claude Code preview server is registered via
 
 ### Controls
 
-- WASD or arrow keys → move
-- Click ground → walk to that spot
-- Click a Blobling → walk into range, then attack (1 s cooldown)
+- Click ground → walk there (A* path through cells, ~160 ms per cell).
+- Click a Blobling → walk into range and auto-attack until it dies.
+- No keyboard movement (RO is mouse-only).
 
 ---
 
@@ -84,7 +84,30 @@ will damage any future sprite that intentionally has large pure-white areas.
 
 ---
 
-## 3. What we just did this session
+## 3. What we just did this session (latest first)
+
+### Session 2 — RO-style movement
+- Researched RO movement (Ragnarok Research Lab, iRO Wiki): tile grid,
+  ~150 ms per cell, click-only, server-authoritative path.
+- Added a 32 px cell grid (`CELL_SIZE`, `GRID_COLS`, `GRID_ROWS`) sitting on
+  top of the existing 128 px tile map. 100×100 cells over the 3200×3200
+  world. Every cell currently walkable.
+- Implemented 8-direction A* (`findPath`) with octile heuristic and
+  diagonal-squeeze guard, plus a helper (`findAdjacentReachableCell`) that
+  picks the cell next to a clicked Blobling.
+- Rewrote `PlayerController` for tile-grid traversal. Player no longer uses
+  Arcade Physics — sprite position is lerped between cell centres at
+  `MS_PER_CELL = 160` ms per cell. Walk/walk2 alternates once per cell
+  (true footfall), bob and squash run one full cycle per cell.
+- Click ground → A* path → walk. Click a Blobling → walk into range,
+  auto-attack on cooldown until target dies (no need to click again).
+- Removed WASD and arrow keys. RO is mouse-only and the keyboard branch
+  was fighting the path queue.
+- Added a fading green click-ring marker at the cursor target.
+- Added hit-stun: 200 ms freeze on player when damaged (`stunUntil`).
+- Bumped `index.html` cache buster to `?v=4`.
+
+### Session 1 — Phase 1 MVP
 
 1. Built `index.html` + `game.js` from scratch (Phaser 3 MVP).
 2. Found and fixed silent hang: missing `physics.arcade` config in
