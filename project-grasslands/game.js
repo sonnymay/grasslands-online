@@ -109,6 +109,7 @@ let bloblings = [];
 let loots = [];
 let dayNightOverlay = null;
 let targetRing = null;
+let healer = null;
 const DAY_NIGHT_CYCLE_MS = 120000; // 2-minute day/night loop
 let lastSaveAt = 0;
 const SAVE_KEY = 'grasslands_save_v1';
@@ -286,6 +287,9 @@ function create() {
     }
   });
 
+  // Healer NPC slightly NW of spawn so it's visible right away.
+  healer = new HealerNPC(scene, WORLD_W / 2 - 180, WORLD_H / 2 - 120);
+
   // Day/night overlay (drawn over the world, under UI).
   dayNightOverlay = scene.add.rectangle(0, 0, GAME_W, GAME_H, 0x0a1a44, 0)
     .setOrigin(0, 0).setScrollFactor(0).setDepth(9000);
@@ -308,6 +312,7 @@ function update(time, delta) {
   if (!player) return;
   player.update(time, delta);
   for (const b of bloblings) b.update(time, delta);
+  if (healer) healer.update(time);
 
   // Loot pickup: walk over a coin to grab it.
   if (player && !player.dead) {
@@ -1155,6 +1160,39 @@ class MonsterController {
     });
 
     this.scene.time.delayedCall(RESPAWN_MS, () => spawnMonster(this.scene, this.typeId));
+  }
+}
+
+// ---------- HealerNPC ----------
+// Static friendly NPC near spawn. Walk close to fully restore HP + SP.
+class HealerNPC {
+  constructor(scene, x, y) {
+    this.scene = scene;
+    this.x = x; this.y = y;
+    this.lastHeal = 0;
+    this.body = scene.add.circle(x, y, 18, 0x4488ff).setStrokeStyle(3, 0xffffff);
+    this.body.setDepth(y);
+    this.cross = scene.add.text(x, y, '+', { fontSize: '24px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+    this.cross.setDepth(y + 1);
+    this.label = scene.add.text(x, y - 28, 'Healer', {
+      fontSize: '12px', color: '#cce4ff', stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0.5);
+    this.label.setDepth(y + 2);
+  }
+
+  update(time) {
+    if (!player || player.dead) return;
+    if (time - this.lastHeal < 5000) return;
+    if (player.hp >= player.maxHP && player.sp >= player.maxSP) return;
+    const d = Math.hypot(player.sprite.x - this.x, player.sprite.y - this.y);
+    if (d < 50) {
+      this.lastHeal = time;
+      player.hp = player.maxHP;
+      player.sp = player.maxSP;
+      spawnFloatText(this.scene, player.sprite.x, player.sprite.y - 40, 'Restored!', 0x88ffaa, { fontSize: '14px' });
+      ui.message('Healer restored your strength.');
+      sfxLevelUp();
+    }
   }
 }
 
