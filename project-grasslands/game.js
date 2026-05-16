@@ -25,7 +25,24 @@ const PLAYER_ATTACK_COOLDOWN = 1000;
 const BLOBLING_ATTACK_COOLDOWN = 1500;
 const BLOBLING_AGGRO_RANGE = 200;
 const BLOBLING_ATTACK_RANGE = 80;
-const BLOBLING_COUNT = 25;
+const BLOBLING_COUNT = 15;
+const MOOHAM_COUNT = 10;
+
+// Monster type catalog. Add new monsters here; spawn loop reads `count`.
+const MONSTER_TYPES = {
+  blobling: {
+    name: 'Blobling',
+    idleKey: 'blobling_idle', hitKey: 'blobling_hit', deadKey: 'blobling_dead',
+    maxHP: 50, atk: 5, expReward: 10, speed: 80,
+    nameColor: '#ffcccc', count: BLOBLING_COUNT,
+  },
+  mooham: {
+    name: 'MooHam',
+    idleKey: 'mooham_idle', hitKey: 'mooham_hit', deadKey: 'mooham_dead',
+    maxHP: 80, atk: 8, expReward: 18, speed: 70,
+    nameColor: '#ffd9a8', count: MOOHAM_COUNT,
+  },
+};
 const ANIM_FRAME_MS = 180;
 const BOB_AMPLITUDE = 3;     // px the body lifts on each step
 const BOB_FREQ = 0.012;      // step phase per ms
@@ -97,6 +114,9 @@ function preload() {
   this.load.image('blobling_idle', 'assets/sprites/blobling_idle.png');
   this.load.image('blobling_hit', 'assets/sprites/blobling_hit.png');
   this.load.image('blobling_dead', 'assets/sprites/blobling_dead.png');
+  this.load.image('mooham_idle', 'assets/sprites/mooham_idle.png');
+  this.load.image('mooham_hit', 'assets/sprites/mooham_hit.png');
+  this.load.image('mooham_dead', 'assets/sprites/mooham_dead.png');
   this.load.image('grass_tileset', 'assets/tiles/grass_tileset.png');
 }
 
@@ -111,6 +131,7 @@ function create() {
     'rookie_idle_east','rookie_walk_east','rookie_walk2_east',
     'rookie_attack','rookie_dead',
     'blobling_idle','blobling_hit','blobling_dead',
+    'mooham_idle','mooham_hit','mooham_dead',
   ];
   for (const k of spriteKeys) keyOutWhite(scene, k);
 
@@ -151,8 +172,9 @@ function create() {
   player = new PlayerController(scene, WORLD_W / 2, WORLD_H / 2);
 
   // Bloblings
-  for (let i = 0; i < BLOBLING_COUNT; i++) {
-    spawnBlobling(scene);
+  for (const typeId of Object.keys(MONSTER_TYPES)) {
+    const cfg = MONSTER_TYPES[typeId];
+    for (let i = 0; i < cfg.count; i++) spawnMonster(scene, typeId);
   }
 
   // Camera follow
@@ -629,28 +651,36 @@ function applyRookieTexture(sprite, dir, frame) {
   sprite.setFlipX(dir === 'west');
 }
 
-// ---------- BloblingController ----------
-class BloblingController {
-  constructor(scene, x, y) {
+// ---------- MonsterController ----------
+// Passive AI: monsters only chase + attack the player after being hit
+// (provoked). Aggro lapses ~5s after the last damage tick.
+class MonsterController {
+  constructor(scene, x, y, typeId) {
     this.scene = scene;
-    this.maxHP = 50;
-    this.hp = 50;
-    this.atk = 5;
-    this.expReward = 10;
+    this.typeId = typeId;
+    const cfg = MONSTER_TYPES[typeId];
+    this.cfg = cfg;
+    this.maxHP = cfg.maxHP;
+    this.hp = cfg.maxHP;
+    this.atk = cfg.atk;
+    this.expReward = cfg.expReward;
+    this.speed = cfg.speed;
     this.alive = true;
+    this.provoked = false;
+    this.provokedUntil = 0;
     this.lastAttack = 0;
     this.wanderUntil = 0;
     this.wanderVx = 0;
     this.wanderVy = 0;
 
-    this.sprite = scene.physics.add.sprite(x, y, 'blobling_idle');
+    this.sprite = scene.physics.add.sprite(x, y, cfg.idleKey);
     const bScale = BLOBLING_DISPLAY_H / this.sprite.height;
     this.sprite.setScale(bScale);
     this.sprite.setCollideWorldBounds(true);
 
-    this.nameTag = scene.add.text(x, y, 'Blobling', {
+    this.nameTag = scene.add.text(x, y, cfg.name, {
       fontSize: '12px',
-      color: '#ffcccc',
+      color: cfg.nameColor,
       stroke: '#000000',
       strokeThickness: 3,
     }).setOrigin(0.5, 1);
@@ -666,12 +696,13 @@ class BloblingController {
     const dy = player.sprite.y - this.sprite.y;
     const dist = Math.hypot(dx, dy);
 
+    // Drop aggro after the cool-off window.
+    if (this.provoked && time > this.provokedUntil) this.provoked = false;
+
     const playerAlive = !player.dead;
-    if (playerAlive && dist < BLOBLING_AGGRO_RANGE) {
+    if (playerAlive && this.provoked) {
       if (dist > BLOBLING_ATTACK_RANGE) {
-        // Chase
-        const speed = 80;
-        this.sprite.setVelocity((dx / dist) * speed, (dy / dist) * speed);
+        this.sprite.setVelocity((dx / dist) * this.speed, (dy / dist) * this.speed);
       } else {
         this.sprite.setVelocity(0, 0);
         if (time - this.lastAttack > BLOBLING_ATTACK_COOLDOWN) {
@@ -680,12 +711,11 @@ class BloblingController {
         }
       }
     } else {
-      // Wander
+      // Passive wander.
       if (time > this.wanderUntil) {
         this.wanderUntil = time + 1500 + Math.random() * 1500;
         if (Math.random() < 0.4) {
-          this.wanderVx = 0;
-          this.wanderVy = 0;
+          this.wanderVx = 0; this.wanderVy = 0;
         } else {
           const ang = Math.random() * Math.PI * 2;
           this.wanderVx = Math.cos(ang) * 40;
@@ -695,7 +725,6 @@ class BloblingController {
       this.sprite.setVelocity(this.wanderVx, this.wanderVy);
     }
 
-    // Update UI elements
     const topY = this.sprite.y - this.sprite.displayHeight / 2;
     this.nameTag.setPosition(this.sprite.x, topY - 6);
     this.hpBarBg.setPosition(this.sprite.x, topY + 2);
@@ -706,11 +735,13 @@ class BloblingController {
   takeDamage(amount) {
     if (!this.alive) return;
     this.hp -= amount;
+    // Getting hit provokes the monster for 5s.
+    this.provoked = true;
+    this.provokedUntil = this.scene.time.now + 5000;
     spawnDamageNumber(this.scene, this.sprite.x, this.sprite.y - 20, amount, 0xff5555);
-    // Hit flash via swap texture briefly
-    this.sprite.setTexture('blobling_hit');
+    this.sprite.setTexture(this.cfg.hitKey);
     this.scene.time.delayedCall(120, () => {
-      if (this.alive) this.sprite.setTexture('blobling_idle');
+      if (this.alive) this.sprite.setTexture(this.cfg.idleKey);
     });
     if (this.hp <= 0) this.die();
   }
@@ -718,12 +749,12 @@ class BloblingController {
   die() {
     this.alive = false;
     this.sprite.setVelocity(0, 0);
-    this.sprite.setTexture('blobling_dead');
+    this.sprite.setTexture(this.cfg.deadKey);
     this.hpBar.setVisible(false);
     this.hpBarBg.setVisible(false);
     this.nameTag.setVisible(false);
     player.gainExp(this.expReward);
-    ui.message(`Killed Blobling (+${this.expReward} EXP)`);
+    ui.message(`Killed ${this.cfg.name} (+${this.expReward} EXP)`);
 
     this.scene.time.delayedCall(1500, () => {
       this.sprite.destroy();
@@ -734,13 +765,11 @@ class BloblingController {
       if (idx >= 0) bloblings.splice(idx, 1);
     });
 
-    // Respawn new one after delay
-    this.scene.time.delayedCall(RESPAWN_MS, () => spawnBlobling(this.scene));
+    this.scene.time.delayedCall(RESPAWN_MS, () => spawnMonster(this.scene, this.typeId));
   }
 }
 
-function spawnBlobling(scene) {
-  // Spawn at random spot at least 300px from player
+function spawnMonster(scene, typeId) {
   let x, y, tries = 0;
   do {
     x = 200 + Math.random() * (WORLD_W - 400);
@@ -751,7 +780,7 @@ function spawnBlobling(scene) {
     Math.hypot(x - player.sprite.x, y - player.sprite.y) < 300 &&
     tries < 20
   );
-  bloblings.push(new BloblingController(scene, x, y));
+  bloblings.push(new MonsterController(scene, x, y, typeId));
 }
 
 function attemptPlayerAttack(scene, target) {
