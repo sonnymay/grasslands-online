@@ -117,6 +117,12 @@ function preload() {
   this.load.image('rookie_walk2_south', 'assets/sprites/rookie_walk2_south.png');
   this.load.image('rookie_walk2_north', 'assets/sprites/rookie_walk2_north.png');
   this.load.image('rookie_walk2_east', 'assets/sprites/rookie_walk2_east.png');
+  this.load.image('rookie_idle_southeast', 'assets/sprites/rookie_idle_southeast.png');
+  this.load.image('rookie_walk_southeast', 'assets/sprites/rookie_walk_southeast.png');
+  this.load.image('rookie_walk2_southeast', 'assets/sprites/rookie_walk2_southeast.png');
+  this.load.image('rookie_idle_northeast', 'assets/sprites/rookie_idle_northeast.png');
+  this.load.image('rookie_walk_northeast', 'assets/sprites/rookie_walk_northeast.png');
+  this.load.image('rookie_walk2_northeast', 'assets/sprites/rookie_walk2_northeast.png');
   this.load.image('rookie_attack', 'assets/sprites/rookie_attack.png');
   this.load.image('rookie_dead', 'assets/sprites/rookie_dead.png');
   this.load.image('blobling_idle', 'assets/sprites/blobling_idle.png');
@@ -141,6 +147,8 @@ function create() {
     'rookie_idle_south','rookie_walk_south','rookie_walk2_south',
     'rookie_idle_north','rookie_walk_north','rookie_walk2_north',
     'rookie_idle_east','rookie_walk_east','rookie_walk2_east',
+    'rookie_idle_southeast','rookie_walk_southeast','rookie_walk2_southeast',
+    'rookie_idle_northeast','rookie_walk_northeast','rookie_walk2_northeast',
     'rookie_attack','rookie_dead',
     'blobling_idle','blobling_hit','blobling_dead',
     'mooham_idle','mooham_hit','mooham_dead',
@@ -724,27 +732,39 @@ function showClickMarker(scene, wx, wy) {
   });
 }
 
+// 8-direction sector picker. East = 0°, South = 90°, West = ±180°, North = -90°.
 function pickDirection(vx, vy) {
-  // Nearest cardinal from a velocity vector
-  if (Math.abs(vx) > Math.abs(vy)) {
-    return vx > 0 ? 'east' : 'west';
-  } else {
-    return vy > 0 ? 'south' : 'north';
-  }
+  if (vx === 0 && vy === 0) return 'south';
+  const deg = Math.atan2(vy, vx) * 180 / Math.PI;
+  if (deg >= -22.5 && deg < 22.5)  return 'east';
+  if (deg >=  22.5 && deg < 67.5)  return 'southeast';
+  if (deg >=  67.5 && deg < 112.5) return 'south';
+  if (deg >= 112.5 && deg < 157.5) return 'southwest';
+  if (deg >= 157.5 || deg < -157.5) return 'west';
+  if (deg >= -157.5 && deg < -112.5) return 'northwest';
+  if (deg >= -112.5 && deg < -67.5)  return 'north';
+  return 'northeast';
 }
 
-function applyRookieTexture(sprite, dir, frame) {
-  // West = flipped east. Each direction has idle + walk + walk2 frames.
-  const base = (dir === 'north') ? 'north'
-            : (dir === 'south') ? 'south'
-            : 'east';
-  let key;
-  if (frame === 'walk') key = `rookie_walk_${base}`;
-  else if (frame === 'walk2') key = `rookie_walk2_${base}`;
-  else key = `rookie_idle_${base}`;
+// Map 8 directions → texture key + horizontal flip. West/SW/NW reuse E/SE/NE flipped.
+const DIR_TEXTURE = {
+  north:     { base: 'north',     flip: false },
+  south:     { base: 'south',     flip: false },
+  east:      { base: 'east',      flip: false },
+  west:      { base: 'east',      flip: true  },
+  southeast: { base: 'southeast', flip: false },
+  southwest: { base: 'southeast', flip: true  },
+  northeast: { base: 'northeast', flip: false },
+  northwest: { base: 'northeast', flip: true  },
+};
 
-  sprite.setTexture(key);
-  sprite.setFlipX(dir === 'west');
+function applyRookieTexture(sprite, dir, frame) {
+  const info = DIR_TEXTURE[dir] || DIR_TEXTURE.south;
+  const prefix = (frame === 'walk') ? 'rookie_walk_'
+              : (frame === 'walk2') ? 'rookie_walk2_'
+              : 'rookie_idle_';
+  sprite.setTexture(prefix + info.base);
+  sprite.setFlipX(info.flip);
 }
 
 // ---------- MonsterController ----------
