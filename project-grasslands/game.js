@@ -23,6 +23,9 @@ const SP_REGEN_PCT = 0.04;          // SP regens faster than HP
 const POWER_STRIKE_SP_COST = 10;
 const POWER_STRIKE_MULT = 1.7;
 const POWER_STRIKE_COOLDOWN = 1500;
+const SELF_HEAL_SP_COST = 15;
+const SELF_HEAL_AMOUNT_BASE = 30;
+const SELF_HEAL_COOLDOWN = 3000;
 // Source PNGs are ~1254px tall; we display the player ~96px and bloblings ~64px.
 const PLAYER_DISPLAY_H = 96;
 const BLOBLING_DISPLAY_H = 64;
@@ -217,6 +220,8 @@ function create() {
   // Skill hotkey: 1 or Q → Power Strike on current attack target.
   scene.input.keyboard.on('keydown-ONE', () => player && player.powerStrike());
   scene.input.keyboard.on('keydown-Q',   () => player && player.powerStrike());
+  scene.input.keyboard.on('keydown-TWO', () => player && player.selfHeal());
+  scene.input.keyboard.on('keydown-W',   () => player && player.selfHeal());
 
   // Shift+R wipes localStorage save and reloads (for testing / new run).
   scene.input.keyboard.on('keydown-R', (e) => {
@@ -267,7 +272,7 @@ function create() {
     ui.message('Welcome to Grasslands Online!');
   }
   ui.message('Click monsters to attack. Click ground to walk.');
-  ui.message('Hotkey 1 or Q = Power Strike (costs SP).');
+  ui.message('Skills: 1/Q=Power Strike, 2/W=Self-Heal. Shift+R=reset save.');
 }
 
 // ---------- Update loop ----------
@@ -412,6 +417,7 @@ class PlayerController {
     this.sp = 50;
     this.lastSpRegen = 0;
     this.lastPowerStrike = 0;
+    this.lastSelfHeal = 0;
     this.level = 1;
     this.dead = false;
     this.dir = 'south';
@@ -693,6 +699,31 @@ class PlayerController {
     spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 50, 'Power Strike!', 0x88ccff, { fontSize: '14px' });
     // Tiny blue flash on player.
     this.scene.tweens.add({ targets: this.sprite, tint: 0x88ccff, duration: 80, yoyo: true,
+      onComplete: () => this.sprite.clearTint() });
+  }
+
+  selfHeal() {
+    if (this.dead) return;
+    if (this.sp < SELF_HEAL_SP_COST) {
+      ui.message('Not enough SP.');
+      sfxMiss();
+      return;
+    }
+    const now = this.scene.time.now;
+    if (now - this.lastSelfHeal < SELF_HEAL_COOLDOWN) return;
+    if (this.hp >= this.maxHP) {
+      ui.message('Already at full HP.');
+      return;
+    }
+    this.lastSelfHeal = now;
+    this.sp -= SELF_HEAL_SP_COST;
+    // Scales slightly with level.
+    const amt = SELF_HEAL_AMOUNT_BASE + (this.level - 1) * 5;
+    this.hp = Math.min(this.maxHP, this.hp + amt);
+    spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 50, `+${amt}`, 0x66ffaa, { fontSize: '16px' });
+    sfxPickup();
+    // Green flash on player.
+    this.scene.tweens.add({ targets: this.sprite, tint: 0x66ffaa, duration: 120, yoyo: true,
       onComplete: () => this.sprite.clearTint() });
   }
 
