@@ -1493,9 +1493,17 @@ class UIManager {
     // Monsters.
     for (const m of bloblings) {
       if (!m.alive) continue;
-      const color = m.typeId === 'mooham' ? 0xffaa55 : 0xff5555;
+      let color = 0xff5555;
+      let r = 2;
+      if (m.typeId === 'mooham') color = 0xffaa55;
+      else if (m.typeId === 'boss_mooham') { color = 0xffff44; r = 4; }
       g.fillStyle(color, 1);
-      g.fillCircle(this.miniX + m.sprite.x * sx, this.miniY + m.sprite.y * sy, 2);
+      g.fillCircle(this.miniX + m.sprite.x * sx, this.miniY + m.sprite.y * sy, r);
+    }
+    // Healer NPC.
+    if (healer) {
+      g.fillStyle(0x66ccff, 1);
+      g.fillCircle(this.miniX + healer.x * sx, this.miniY + healer.y * sy, 3);
     }
     // Loot.
     g.fillStyle(0xffd24a, 1);
