@@ -156,6 +156,15 @@ function preload() {
   for (let i = 1; i <= 4; i++) this.load.image(`deco_flower_cluster_0${i}`, `assets/decorations/deco_flower_cluster_0${i}.png`);
   for (let i = 1; i <= 3; i++) this.load.image(`deco_rock_0${i}`, `assets/decorations/deco_rock_0${i}.png`);
   for (let i = 1; i <= 3; i++) this.load.image(`deco_tallgrass_0${i}`, `assets/decorations/deco_tallgrass_0${i}.png`);
+  // Larger props
+  this.load.image('tree_oak_01',   'assets/decorations/tree_oak_01.png');
+  this.load.image('tree_pine_02',  'assets/decorations/tree_pine_02.png');
+  this.load.image('tree_round_03', 'assets/decorations/tree_round_03.png');
+  this.load.image('bush_01', 'assets/decorations/bush_01.png');
+  this.load.image('bush_02', 'assets/decorations/bush_02.png');
+  this.load.image('mushroom_red_01',   'assets/decorations/mushroom_red_01.png');
+  this.load.image('mushroom_brown_02', 'assets/decorations/mushroom_brown_02.png');
+  this.load.image('pond_01', 'assets/decorations/pond_01.png');
   this.load.image('grass_tileset', 'assets/tiles/grass_tileset.png');
 }
 
@@ -176,6 +185,10 @@ function create() {
     'deco_flower_cluster_01','deco_flower_cluster_02','deco_flower_cluster_03','deco_flower_cluster_04',
     'deco_rock_01','deco_rock_02','deco_rock_03',
     'deco_tallgrass_01','deco_tallgrass_02','deco_tallgrass_03',
+    'tree_oak_01','tree_pine_02','tree_round_03',
+    'bush_01','bush_02',
+    'mushroom_red_01','mushroom_brown_02',
+    'pond_01',
   ];
   for (const k of spriteKeys) keyOutWhite(scene, k);
 
@@ -202,11 +215,12 @@ function create() {
 
   // Build procedural map + walkable grid (every cell walkable for now).
   buildMap(scene);
-  buildDecorations(scene);
   walkable = [];
   for (let r = 0; r < GRID_ROWS; r++) {
     walkable.push(new Array(GRID_COLS).fill(true));
   }
+  // Now that walkable exists, scatter decorations (some block cells).
+  buildDecorations(scene);
 
   // Ground click marker (small green ring) — appears at the target cell.
   clickMarker = scene.add.graphics();
@@ -432,34 +446,80 @@ function buildMap(scene) {
 // Scatter deco sprites at sub-cell offsets so vegetation reads organic, not grid.
 function buildDecorations(scene) {
   const flowerKeys = ['deco_flower_cluster_01','deco_flower_cluster_02','deco_flower_cluster_03','deco_flower_cluster_04'];
-  const rockKeys = ['deco_rock_01','deco_rock_02','deco_rock_03'];
-  const grassKeys = ['deco_tallgrass_01','deco_tallgrass_02','deco_tallgrass_03'];
+  const grassKeys  = ['deco_tallgrass_01','deco_tallgrass_02','deco_tallgrass_03'];
+  const bushKeys   = ['bush_01','bush_02'];
+  const mushroomKeys = ['mushroom_red_01','mushroom_brown_02'];
+  const treeKeys   = ['tree_oak_01','tree_pine_02','tree_round_03'];
 
-  const place = (key, displayW, opts = {}) => {
+  // Block a disk of cells around (worldX, worldY) so A* routes around it.
+  const blockCells = (worldX, worldY, cellRadius) => {
+    if (!walkable) return;
+    const cx = Math.floor(worldX / CELL_SIZE);
+    const cy = Math.floor(worldY / CELL_SIZE);
+    for (let dy = -cellRadius; dy <= cellRadius; dy++) {
+      for (let dx = -cellRadius; dx <= cellRadius; dx++) {
+        if (Math.hypot(dx, dy) > cellRadius + 0.3) continue;
+        const r = cy + dy, c = cx + dx;
+        if (r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS) walkable[r][c] = false;
+      }
+    }
+  };
+
+  // Generic scatter. By default decorations are flat overlays under entities.
+  // `alignBottom` lets us anchor the base of a sprite (trees/bushes/pond) so the
+  // depth-sort plays nicely with the player and the visual sits on the ground.
+  const place = (key, displayH, opts = {}) => {
     const tile_r = Phaser.Math.Between(0, MAP_ROWS - 1);
     const tile_c = Phaser.Math.Between(0, MAP_COLS - 1);
-    const type = getCellType(tile_r, tile_c);
-    // Skip paths so they stay readable.
-    if (type !== 'grass') return;
+    if (getCellType(tile_r, tile_c) !== 'grass') return null;
     const jitterX = Phaser.Math.Between(-TILE_SIZE / 2 + 12, TILE_SIZE / 2 - 12);
     const jitterY = Phaser.Math.Between(-TILE_SIZE / 2 + 12, TILE_SIZE / 2 - 12);
     const x = tile_c * TILE_SIZE + TILE_SIZE / 2 + jitterX;
     const y = tile_r * TILE_SIZE + TILE_SIZE / 2 + jitterY;
+
+    // Skip if the spot is already blocked (e.g. another tree).
+    const cx = Math.floor(x / CELL_SIZE);
+    const cy = Math.floor(y / CELL_SIZE);
+    if (walkable && walkable[cy] && walkable[cy][cx] === false) return null;
+
     const img = scene.add.image(x, y, key);
-    const baseScale = displayW / img.width;
-    const scaleJitter = Phaser.Math.FloatBetween(0.8, 1.25);
+    const baseScale = displayH / img.height;
+    const scaleJitter = opts.noJitter ? 1 : Phaser.Math.FloatBetween(0.85, 1.15);
     img.setScale(baseScale * scaleJitter);
-    if (Math.random() < 0.5) img.setFlipX(true);
-    img.setAngle(Phaser.Math.Between(-15, 15));
-    // Below entities, above ground tiles.
-    img.setDepth(opts.depth ?? -500);
+    if (opts.allowFlip !== false && Math.random() < 0.5) img.setFlipX(true);
+    img.setAngle(opts.maxAngle ? Phaser.Math.Between(-opts.maxAngle, opts.maxAngle) : 0);
+
+    if (opts.alignBottom) {
+      img.setOrigin(0.5, 0.95);
+      // Y-sort: the base of the sprite is what we sort against.
+      img.setDepth(y);
+    } else {
+      img.setDepth(opts.depth ?? -500);
+    }
     img.setAlpha(opts.alpha ?? 1);
+
+    if (opts.blockRadius) blockCells(x, y, opts.blockRadius);
+    return img;
   };
 
-  // Density tuned for 25x25 map. Bump these to add more.
-  for (let i = 0; i < 220; i++) place(Phaser.Utils.Array.GetRandom(grassKeys), 56, { alpha: 0.95 });
-  for (let i = 0; i < 110; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys), 64);
-  // Rocks removed for now (looked out of place).
+  // Density tuned for 25×25 map.
+  for (let i = 0; i < 220; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     52, { alpha: 0.95, maxAngle: 18 });
+  for (let i = 0; i < 110; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),    60, { maxAngle: 15 });
+  for (let i = 0; i <  90; i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  44, { maxAngle: 10 });
+  for (let i = 0; i <  70; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      72, { maxAngle:  8, alignBottom: true, blockRadius: 1 });
+  for (let i = 0; i <  35; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2 });
+  for (let i = 0; i <   3; i++) place('pond_01',                                  220, { maxAngle:  0, alignBottom: true, blockRadius: 3, allowFlip: false });
+
+  // Always keep the player spawn cell + Healer cell walkable.
+  const protect = (wx, wy) => {
+    const cx = Math.floor(wx / CELL_SIZE), cy = Math.floor(wy / CELL_SIZE);
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const r = cy + dy, c = cx + dx;
+      if (r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS) walkable[r][c] = true;
+    }
+  };
+  protect(WORLD_W / 2, WORLD_H / 2);                  // spawn
+  protect(WORLD_W / 2 - 180, WORLD_H / 2 - 120);      // healer
 }
 
 // ---------- PlayerController ----------
@@ -959,9 +1019,15 @@ function applySave() {
   player.sp     = Math.min(save.sp ?? player.maxSP, player.maxSP);
   player.kills  = save.kills  ?? 0;
   if (Number.isInteger(save.cellCol) && Number.isInteger(save.cellRow)) {
-    player.cellCol = save.cellCol;
-    player.cellRow = save.cellRow;
-    player.sprite.setPosition(cellCenterX(player.cellCol), cellCenterY(player.cellRow));
+    let col = save.cellCol, row = save.cellRow;
+    // If the saved cell got blocked by new decorations, fall back to spawn.
+    if (walkable && walkable[row] && walkable[row][col] === false) {
+      col = Math.floor(GRID_COLS / 2);
+      row = Math.floor(GRID_ROWS / 2);
+    }
+    player.cellCol = col;
+    player.cellRow = row;
+    player.sprite.setPosition(cellCenterX(col), cellCenterY(row));
     player.stepFromX = player.stepToX = player.sprite.x;
     player.stepFromY = player.stepToY = player.sprite.y;
   }
