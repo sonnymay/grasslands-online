@@ -256,6 +256,7 @@ class PlayerController {
     this.maxHP = 100;
     this.hp = 100;
     this.atk = 10;
+    this.def = 0;
     this.exp = 0;
     this.level = 1;
     this.dead = false;
@@ -424,9 +425,11 @@ class PlayerController {
 
   takeDamage(amount) {
     if (this.dead) return;
-    this.hp -= amount;
+    // Defense scales with level — min 1 dmg so combat never stalls.
+    const dmg = Math.max(1, amount - this.def);
+    this.hp -= dmg;
     this.stunUntil = this.scene.time.now + HIT_STUN_MS;
-    spawnDamageNumber(this.scene, this.sprite.x, this.sprite.y - 20, amount, 0xffffff);
+    spawnDamageNumber(this.scene, this.sprite.x, this.sprite.y - 20, dmg, 0xffffff);
     this.scene.tweens.add({
       targets: this.sprite,
       alpha: 0.3,
@@ -473,8 +476,9 @@ class PlayerController {
     this.level += 1;
     this.maxHP += 20;
     this.atk += 3;
+    this.def += 1;
     this.hp = this.maxHP;
-    ui.message(`LEVEL UP! Now Lv.${this.level}`);
+    ui.message(`LEVEL UP! Now Lv.${this.level} (+ATK +DEF)`);
     const txt = this.scene.add.text(this.sprite.x, this.sprite.y - 40, 'LEVEL UP!', {
       fontSize: '20px',
       color: '#ffff66',
