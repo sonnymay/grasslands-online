@@ -99,6 +99,9 @@ const game = new Phaser.Game(config);
 let player;
 let bloblings = [];
 let loots = [];
+let lastSaveAt = 0;
+const SAVE_KEY = 'grasslands_save_v1';
+const SAVE_INTERVAL_MS = 3000;
 let ui;
 let lastPlayerAttack = 0;
 let tileSliceW = 0;
@@ -238,8 +241,14 @@ function create() {
 
   // UI
   ui = new UIManager(scene);
-  ui.message('Welcome to Grasslands Online!');
-  ui.message('Click Bloblings to attack. WASD/Arrows to move.');
+  // Apply saved progress (level / exp / zeny / position) if present.
+  const loaded = applySave();
+  if (loaded) {
+    ui.message(`Welcome back — Lv.${player.level}, ${player.zeny} zeny.`);
+  } else {
+    ui.message('Welcome to Grasslands Online!');
+  }
+  ui.message('Click monsters to attack. Click ground to walk.');
 }
 
 // ---------- Update loop ----------
@@ -254,10 +263,17 @@ function update(time, delta) {
       if (l.tryPickup(player.sprite.x, player.sprite.y)) {
         player.zeny += l.amount;
         ui.message(`Picked up ${l.amount} zeny.`);
+        sfxPickup();
       }
     }
   }
   loots = loots.filter(l => l.alive);
+
+  // Auto-save progress every few seconds.
+  if (time - lastSaveAt > SAVE_INTERVAL_MS) {
+    saveGame();
+    lastSaveAt = time;
+  }
   ui.update();
 
   // Y-sort: depth follows y position
@@ -582,6 +598,7 @@ class PlayerController {
     this.sprite.setOrigin(0.5, 0.5);
     this.sprite.scaleY = this.basePScale;
     ui.message('You died.');
+    sfxDeath();
     this.scene.time.delayedCall(PLAYER_RESPAWN_MS, () => {
       const cx = Math.floor(GRID_COLS / 2);
       const cy = Math.floor(GRID_ROWS / 2);
@@ -611,6 +628,8 @@ class PlayerController {
     this.def += 1;
     this.hp = this.maxHP;
     ui.message(`LEVEL UP! Now Lv.${this.level} (+ATK +DEF)`);
+    sfxLevelUp();
+    saveGame();
     const txt = this.scene.add.text(this.sprite.x, this.sprite.y - 40, 'LEVEL UP!', {
       fontSize: '20px',
       color: '#ffff66',
@@ -732,6 +751,77 @@ function showClickMarker(scene, wx, wy) {
   });
 }
 
+// ---------- Persistence (localStorage) ----------
+function saveGame() {
+  if (!player || player.dead) return;
+  try {
+    const data = {
+      level: player.level, exp: player.exp,
+      hp: player.hp, maxHP: player.maxHP,
+      atk: player.atk, def: player.def, zeny: player.zeny,
+      cellCol: player.cellCol, cellRow: player.cellRow,
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+  } catch (e) { /* localStorage full or disabled — ignore */ }
+}
+
+function loadGameSave() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+function applySave() {
+  const save = loadGameSave();
+  if (!save) return false;
+  player.level  = save.level  ?? player.level;
+  player.exp    = save.exp    ?? 0;
+  player.maxHP  = save.maxHP  ?? player.maxHP;
+  player.hp     = Math.min(save.hp ?? player.maxHP, player.maxHP);
+  player.atk    = save.atk    ?? player.atk;
+  player.def    = save.def    ?? player.def;
+  player.zeny   = save.zeny   ?? 0;
+  if (Number.isInteger(save.cellCol) && Number.isInteger(save.cellRow)) {
+    player.cellCol = save.cellCol;
+    player.cellRow = save.cellRow;
+    player.sprite.setPosition(cellCenterX(player.cellCol), cellCenterY(player.cellRow));
+    player.stepFromX = player.stepToX = player.sprite.x;
+    player.stepFromY = player.stepToY = player.sprite.y;
+  }
+  return true;
+}
+
+// ---------- WebAudio SFX (no audio assets) ----------
+let _audioCtx = null;
+function audio() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return _audioCtx;
+}
+function _tone(freq, dur, type = 'sine', vol = 0.07, startOffset = 0) {
+  try {
+    const ctx = audio();
+    if (ctx.state === 'suspended') ctx.resume();
+    const t0 = ctx.currentTime + startOffset;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(vol, t0);
+    gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur);
+  } catch (e) { /* audio not available */ }
+}
+function sfxHit()      { _tone(280, 0.08, 'square', 0.08); }
+function sfxCrit()     { _tone(540, 0.12, 'square', 0.1); _tone(800, 0.1, 'square', 0.08, 0.05); }
+function sfxMiss()     { _tone(180, 0.06, 'sawtooth', 0.04); }
+function sfxLevelUp()  { _tone(523, 0.12, 'triangle', 0.1); _tone(659, 0.12, 'triangle', 0.1, 0.12); _tone(784, 0.2, 'triangle', 0.1, 0.24); }
+function sfxPickup()   { _tone(880, 0.06, 'sine', 0.08); _tone(1320, 0.08, 'sine', 0.08, 0.06); }
+function sfxPlayerHit(){ _tone(180, 0.12, 'sawtooth', 0.07); }
+function sfxDeath()    { _tone(196, 0.4, 'sawtooth', 0.1); _tone(98, 0.5, 'sawtooth', 0.08, 0.2); }
+
 // 8-direction sector picker. East = 0°, South = 90°, West = ±180°, North = -90°.
 function pickDirection(vx, vy) {
   if (vx === 0 && vy === 0) return 'south';
@@ -831,8 +921,10 @@ class MonsterController {
           const hit = rollMonsterHit(this.atk);
           if (hit.miss) {
             spawnFloatText(this.scene, player.sprite.x, player.sprite.y - 20, 'MISS', 0xcccccc);
+            sfxMiss();
           } else {
             player.takeDamage(hit.amount);
+            sfxPlayerHit();
           }
         }
       }
@@ -980,12 +1072,14 @@ function attemptPlayerAttack(scene, target) {
   // Roll: miss → crit → normal.
   if (Math.random() < PLAYER_MISS_CHANCE) {
     spawnFloatText(scene, target.sprite.x, target.sprite.y - 20, 'MISS', 0xcccccc);
+    sfxMiss();
     return;
   }
   const crit = Math.random() < PLAYER_CRIT_CHANCE;
   const variance = 1 + (Math.random() * 2 - 1) * DAMAGE_VARIANCE;
   let dmg = Math.max(1, Math.round(player.atk * variance * (crit ? CRIT_MULTIPLIER : 1)));
   target.takeDamage(dmg, { crit });
+  if (crit) sfxCrit(); else sfxHit();
 }
 
 // Roll monster damage on the player. No crits for monsters, only variance + miss.
