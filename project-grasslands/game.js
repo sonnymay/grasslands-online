@@ -238,6 +238,9 @@ function create() {
   scene.input.keyboard.on('keydown-TWO', () => player && player.selfHeal());
   scene.input.keyboard.on('keydown-W',   () => player && player.selfHeal());
 
+  // C toggles the character stat panel.
+  scene.input.keyboard.on('keydown-C', () => ui && ui.toggleStatPanel());
+
   // Tab cycles to the nearest live monster as the new attack target.
   scene.input.keyboard.on('keydown-TAB', (e) => {
     if (e.preventDefault) e.preventDefault();
@@ -310,7 +313,7 @@ function create() {
     ui.message('Welcome to Grasslands Online!');
   }
   ui.message('Click monsters to attack. Click ground to walk.');
-  ui.message('Skills: 1/Q=Power Strike, 2/W=Self-Heal. Tab=target nearest. Shift+R=reset save.');
+  ui.message('Skills: 1/Q, 2/W. Tab=target. C=stats. Shift+R=reset save.');
 }
 
 // ---------- Update loop ----------
@@ -1375,6 +1378,18 @@ class UIManager {
       fontSize: '14px', color: '#ffd24a', stroke: '#000', strokeThickness: 3,
     }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10003);
 
+    // Character stat panel (toggled with C). Hidden by default.
+    this.statPanelBg = scene.add.rectangle(GAME_W / 2, GAME_H / 2, 320, 220, 0x111122, 0.92)
+      .setOrigin(0.5).setScrollFactor(0).setDepth(10020)
+      .setStrokeStyle(2, 0xffffff, 0.7);
+    this.statPanelText = scene.add.text(GAME_W / 2, GAME_H / 2, '', {
+      fontSize: '14px', color: '#ffffff', align: 'left',
+      lineSpacing: 4,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10021);
+    this.statPanelBg.setVisible(false);
+    this.statPanelText.setVisible(false);
+    this.statPanelOpen = false;
+
     // Skill cooldown chips above EXP bar.
     const skillStyle = { fontSize: '12px', color: '#ffffff', stroke: '#000', strokeThickness: 3 };
     this.qSkillText = scene.add.text(GAME_W / 2 - 80, GAME_H - 64, '', skillStyle)
@@ -1400,6 +1415,30 @@ class UIManager {
     this.chatText = scene.add.text(18, GAME_H - 215, '', {
       fontSize: '12px', color: '#ffffff', wordWrap: { width: 300 },
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10001);
+  }
+
+  toggleStatPanel() {
+    this.statPanelOpen = !this.statPanelOpen;
+    this.statPanelBg.setVisible(this.statPanelOpen);
+    this.statPanelText.setVisible(this.statPanelOpen);
+  }
+
+  updateStatPanel() {
+    if (!this.statPanelOpen) return;
+    const txt = [
+      `=== Rookie ===`,
+      ``,
+      `Level:   ${player.level}`,
+      `EXP:     ${player.exp} / ${player.expNeeded()}`,
+      `HP:      ${player.hp} / ${player.maxHP}`,
+      `SP:      ${player.sp} / ${player.maxSP}`,
+      `ATK:     ${player.atk}`,
+      `DEF:     ${player.def}`,
+      `Zeny:    ${player.zeny}`,
+      ``,
+      `Press C to close.`,
+    ].join('\n');
+    this.statPanelText.setText(txt);
   }
 
   message(msg) {
@@ -1434,6 +1473,7 @@ class UIManager {
     this.wSkillText.setColor(player.sp < SELF_HEAL_SP_COST ? '#888888' : (wLeft > 0 ? '#cccc66' : '#ffffff'));
 
     this.drawMinimap();
+    this.updateStatPanel();
   }
 
   drawMinimap() {
