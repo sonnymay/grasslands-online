@@ -315,7 +315,7 @@ function buildDecorations(scene) {
   // Density tuned for 25x25 map. Bump these to add more.
   for (let i = 0; i < 220; i++) place(Phaser.Utils.Array.GetRandom(grassKeys), 56, { alpha: 0.95 });
   for (let i = 0; i < 110; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys), 64);
-  for (let i = 0; i < 90; i++) place(Phaser.Utils.Array.GetRandom(rockKeys), 48);
+  // Rocks removed for now (looked out of place).
 }
 
 // ---------- PlayerController ----------
