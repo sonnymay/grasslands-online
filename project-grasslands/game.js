@@ -108,6 +108,7 @@ let player;
 let bloblings = [];
 let loots = [];
 let dayNightOverlay = null;
+let targetRing = null;
 const DAY_NIGHT_CYCLE_MS = 120000; // 2-minute day/night loop
 let lastSaveAt = 0;
 const SAVE_KEY = 'grasslands_save_v1';
@@ -205,6 +206,11 @@ function create() {
   clickMarker.setDepth(-500);
   clickMarker.setVisible(false);
 
+  // Persistent ring around the current attack target.
+  targetRing = scene.add.graphics();
+  targetRing.setDepth(-100);
+  targetRing.setVisible(false);
+
   // Player
   player = new PlayerController(scene, WORLD_W / 2, WORLD_H / 2);
 
@@ -224,6 +230,22 @@ function create() {
   scene.input.keyboard.on('keydown-Q',   () => player && player.powerStrike());
   scene.input.keyboard.on('keydown-TWO', () => player && player.selfHeal());
   scene.input.keyboard.on('keydown-W',   () => player && player.selfHeal());
+
+  // Tab cycles to the nearest live monster as the new attack target.
+  scene.input.keyboard.on('keydown-TAB', (e) => {
+    if (e.preventDefault) e.preventDefault();
+    if (!player || player.dead) return;
+    let best = null, bestDist = Infinity;
+    for (const m of bloblings) {
+      if (!m.alive || m === player.attackTarget) continue;
+      const d = Math.hypot(m.sprite.x - player.sprite.x, m.sprite.y - player.sprite.y);
+      if (d < bestDist) { bestDist = d; best = m; }
+    }
+    if (best) {
+      player.startAttacking(best);
+      ui.message(`Target: ${best.cfg.name} Lv.${best.level}`);
+    }
+  });
 
   // Shift+R wipes localStorage save and reloads (for testing / new run).
   scene.input.keyboard.on('keydown-R', (e) => {
@@ -278,7 +300,7 @@ function create() {
     ui.message('Welcome to Grasslands Online!');
   }
   ui.message('Click monsters to attack. Click ground to walk.');
-  ui.message('Skills: 1/Q=Power Strike, 2/W=Self-Heal. Shift+R=reset save.');
+  ui.message('Skills: 1/Q=Power Strike, 2/W=Self-Heal. Tab=target nearest. Shift+R=reset save.');
 }
 
 // ---------- Update loop ----------
@@ -303,6 +325,19 @@ function update(time, delta) {
     }
   }
   loots = loots.filter(l => l.alive);
+
+  // Target ring follows current attack target.
+  if (targetRing) {
+    if (player && !player.dead && player.attackTarget && player.attackTarget.alive) {
+      const t = player.attackTarget;
+      targetRing.clear();
+      targetRing.lineStyle(2, 0xff5555, 0.9);
+      targetRing.strokeEllipse(t.sprite.x, t.sprite.y + 8, t.sprite.displayWidth * 1.1, t.sprite.displayHeight * 0.45);
+      targetRing.setVisible(true);
+    } else {
+      targetRing.setVisible(false);
+    }
+  }
 
   // Day/night: cosine-driven darkness peaking at midnight.
   if (dayNightOverlay) {
