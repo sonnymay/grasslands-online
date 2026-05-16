@@ -622,15 +622,22 @@ class PlayerController {
   }
 
   // Pick which walk frame to show for the current step progress t∈[0,1].
-  // Use the clean two-pose stride for now. The generated walk3/walk4 art has
-  // mismatched lighting/poses, so cycling it makes the player look like it slides.
-  _pickWalkFrame(t) {
-    if (!this._walkFrameSet) {
-      this._walkFrameSet = ['walk', 'walk2'];
-    }
-    const cycle = this._walkFrameSet;
+  // The generated frame sets are inconsistent by direction, so choose only the
+  // two frames that face the correct way for each direction.
+  _pickWalkFrame(t, dir) {
+    const cycleByDir = {
+      south: ['walk2', 'walk3'],
+      north: ['walk2', 'walk3'],
+      east: ['walk', 'walk2'],
+      west: ['walk', 'walk2'],
+      southeast: ['walk', 'walk2'],
+      southwest: ['walk', 'walk2'],
+      northeast: ['walk', 'walk2'],
+      northwest: ['walk', 'walk2'],
+    };
+    const cycle = cycleByDir[dir] || cycleByDir.south;
     // Hold each pose for half a cell. This keeps the feet readable at MMO scale
-    // instead of flashing every generated frame inside one short grid step.
+    // and avoids flashing mismatched direction frames.
     const halfStep = t >= 0.55 ? 1 : 0;
     const idx = (this.stepIndex + halfStep) % cycle.length;
     return cycle[idx];
@@ -672,9 +679,8 @@ class PlayerController {
       this.sprite.setOrigin(0.5, 0.5);
       this.sprite.scaleY = this.basePScale * (1 - lift * STEP_SQUASH);
 
-      // Frame cycle — intentionally prefers the clean 2-frame stride until the
-      // 4-frame art is regenerated with matching poses/backgrounds.
-      this.frame = this._pickWalkFrame(t);
+      // Frame cycle — direction-specific to avoid mixing front/back/side art.
+      this.frame = this._pickWalkFrame(t, this.dir);
 
       if (this.stepT >= 1) {
         this.sprite.x = this.stepToX;
