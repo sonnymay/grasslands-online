@@ -18,14 +18,6 @@ const MAX_PATH_LEN = 256;
 const HIT_STUN_MS = 200;
 const HP_REGEN_INTERVAL_MS = 3000;  // tick every 3s
 const HP_REGEN_PCT = 0.02;          // 2% of maxHP per tick
-const SP_REGEN_INTERVAL_MS = 3000;
-const SP_REGEN_PCT = 0.04;          // SP regens faster than HP
-const POWER_STRIKE_SP_COST = 10;
-const POWER_STRIKE_MULT = 1.7;
-const POWER_STRIKE_COOLDOWN = 1500;
-const SELF_HEAL_SP_COST = 15;
-const SELF_HEAL_AMOUNT_BASE = 30;
-const SELF_HEAL_COOLDOWN = 3000;
 // Source PNGs are ~1254px tall; we display the player ~96px and bloblings ~64px.
 const PLAYER_DISPLAY_H = 96;
 const BLOBLING_DISPLAY_H = 64;
@@ -115,7 +107,6 @@ let bloblings = [];
 let loots = [];
 let dayNightOverlay = null;
 let targetRing = null;
-let healer = null;
 const DAY_NIGHT_CYCLE_MS = 120000; // 2-minute day/night loop
 let lastSaveAt = 0;
 const SAVE_KEY = 'grasslands_save_v1';
@@ -247,11 +238,6 @@ function create() {
   scene.cameras.main.setZoom(0.85);
 
   // Skill hotkey: 1 or Q → Power Strike on current attack target.
-  scene.input.keyboard.on('keydown-ONE', () => player && player.powerStrike());
-  scene.input.keyboard.on('keydown-Q',   () => player && player.powerStrike());
-  scene.input.keyboard.on('keydown-TWO', () => player && player.selfHeal());
-  scene.input.keyboard.on('keydown-W',   () => player && player.selfHeal());
-
   // Tab cycles to the nearest live monster as the new attack target.
   scene.input.keyboard.on('keydown-TAB', (e) => {
     if (e.preventDefault) e.preventDefault();
@@ -307,9 +293,6 @@ function create() {
     }
   });
 
-  // Healer NPC slightly NW of spawn so it's visible right away.
-  healer = new HealerNPC(scene, WORLD_W / 2 - 180, WORLD_H / 2 - 120);
-
   // Day/night overlay (drawn over the world, under UI).
   dayNightOverlay = scene.add.rectangle(0, 0, GAME_W, GAME_H, 0x0a1a44, 0)
     .setOrigin(0, 0).setScrollFactor(0).setDepth(9000);
@@ -324,7 +307,7 @@ function create() {
     ui.message('Welcome to Grasslands Online!');
   }
   ui.message('Click monsters to attack. Click ground to walk.');
-  ui.message('Skills: 1/Q, 2/W. Tab=target. Shift+R=reset save.');
+  ui.message('Click monsters to auto-fight. Tab targets nearest. Shift+R resets save.');
 }
 
 // ---------- Update loop ----------
@@ -332,7 +315,6 @@ function update(time, delta) {
   if (!player) return;
   player.update(time, delta);
   for (const b of bloblings) b.update(time, delta);
-  if (healer) healer.update(time);
 
   // Loot pickup: walk over a coin to grab it.
   if (player && !player.dead) {
@@ -519,7 +501,6 @@ function buildDecorations(scene) {
     }
   };
   protect(WORLD_W / 2, WORLD_H / 2);                  // spawn
-  protect(WORLD_W / 2 - 180, WORLD_H / 2 - 120);      // healer
 }
 
 // ---------- PlayerController ----------
@@ -532,11 +513,6 @@ class PlayerController {
     this.def = 0;
     this.exp = 0;
     this.zeny = 0;
-    this.maxSP = 50;
-    this.sp = 50;
-    this.lastSpRegen = 0;
-    this.lastPowerStrike = 0;
-    this.lastSelfHeal = 0;
     this.kills = 0;
     this.level = 1;
     this.dead = false;
@@ -645,12 +621,6 @@ class PlayerController {
       this.lastRegen = time;
       const amount = Math.max(1, Math.floor(this.maxHP * HP_REGEN_PCT));
       this.hp = Math.min(this.maxHP, this.hp + amount);
-    }
-    // SP regen — same rule, slightly faster %.
-    if (!stunned && this.sp < this.maxSP && time - this.lastSpRegen >= SP_REGEN_INTERVAL_MS) {
-      this.lastSpRegen = time;
-      const amount = Math.max(1, Math.floor(this.maxSP * SP_REGEN_PCT));
-      this.sp = Math.min(this.maxSP, this.sp + amount);
     }
 
     // Advance the current step.
@@ -774,7 +744,6 @@ class PlayerController {
       this.stepFromX = this.stepToX = this.sprite.x;
       this.stepFromY = this.stepToY = this.sprite.y;
       this.hp = this.maxHP;
-      this.sp = this.maxSP;
       this.dead = false;
     });
   }
@@ -788,76 +757,12 @@ class PlayerController {
     }
   }
 
-  powerStrike() {
-    if (this.dead) return;
-    if (!this.attackTarget || !this.attackTarget.alive) {
-      ui.message('No target.');
-      return;
-    }
-    if (this.sp < POWER_STRIKE_SP_COST) {
-      ui.message('Not enough SP.');
-      sfxMiss();
-      return;
-    }
-    const now = this.scene.time.now;
-    if (now - this.lastPowerStrike < POWER_STRIKE_COOLDOWN) return;
-    const t = this.attackTarget;
-    const dx = t.sprite.x - this.sprite.x;
-    const dy = t.sprite.y - this.sprite.y;
-    if (Math.hypot(dx, dy) > ATTACK_RANGE) {
-      ui.message('Too far.');
-      return;
-    }
-    this.lastPowerStrike = now;
-    this.sp -= POWER_STRIKE_SP_COST;
-    this.attackPoseUntil = now + 350;
-    this.dir = pickDirection(dx, dy);
-
-    // Always hits; can still crit.
-    const crit = Math.random() < PLAYER_CRIT_CHANCE;
-    const variance = 1 + (Math.random() * 2 - 1) * DAMAGE_VARIANCE;
-    const dmg = Math.max(1, Math.round(this.atk * POWER_STRIKE_MULT * variance * (crit ? CRIT_MULTIPLIER : 1)));
-    t.takeDamage(dmg, { crit });
-    if (crit) sfxCrit(); else sfxHit();
-    spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 50, 'Power Strike!', 0x88ccff, { fontSize: '14px' });
-    // Tiny blue flash on player.
-    this.scene.tweens.add({ targets: this.sprite, tint: 0x88ccff, duration: 80, yoyo: true,
-      onComplete: () => this.sprite.clearTint() });
-  }
-
-  selfHeal() {
-    if (this.dead) return;
-    if (this.sp < SELF_HEAL_SP_COST) {
-      ui.message('Not enough SP.');
-      sfxMiss();
-      return;
-    }
-    const now = this.scene.time.now;
-    if (now - this.lastSelfHeal < SELF_HEAL_COOLDOWN) return;
-    if (this.hp >= this.maxHP) {
-      ui.message('Already at full HP.');
-      return;
-    }
-    this.lastSelfHeal = now;
-    this.sp -= SELF_HEAL_SP_COST;
-    // Scales slightly with level.
-    const amt = SELF_HEAL_AMOUNT_BASE + (this.level - 1) * 5;
-    this.hp = Math.min(this.maxHP, this.hp + amt);
-    spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 50, `+${amt}`, 0x66ffaa, { fontSize: '16px' });
-    sfxPickup();
-    // Green flash on player.
-    this.scene.tweens.add({ targets: this.sprite, tint: 0x66ffaa, duration: 120, yoyo: true,
-      onComplete: () => this.sprite.clearTint() });
-  }
-
   levelUp() {
     this.level += 1;
     this.maxHP += 20;
-    this.maxSP += 5;
     this.atk += 3;
     this.def += 1;
     this.hp = this.maxHP;
-    this.sp = this.maxSP;
     ui.message(`LEVEL UP! Now Lv.${this.level} (+ATK +DEF)`);
     sfxLevelUp();
     saveGame();
@@ -990,7 +895,6 @@ function saveGame() {
       level: player.level, exp: player.exp,
       hp: player.hp, maxHP: player.maxHP,
       atk: player.atk, def: player.def, zeny: player.zeny,
-      sp: player.sp, maxSP: player.maxSP,
       kills: player.kills,
       cellCol: player.cellCol, cellRow: player.cellRow,
     };
@@ -1015,8 +919,6 @@ function applySave() {
   player.atk    = save.atk    ?? player.atk;
   player.def    = save.def    ?? player.def;
   player.zeny   = save.zeny   ?? 0;
-  player.maxSP  = save.maxSP  ?? player.maxSP;
-  player.sp     = Math.min(save.sp ?? player.maxSP, player.maxSP);
   player.kills  = save.kills  ?? 0;
   if (Number.isInteger(save.cellCol) && Number.isInteger(save.cellRow)) {
     let col = save.cellCol, row = save.cellRow;
@@ -1287,39 +1189,6 @@ class MonsterController {
   }
 }
 
-// ---------- HealerNPC ----------
-// Static friendly NPC near spawn. Walk close to fully restore HP + SP.
-class HealerNPC {
-  constructor(scene, x, y) {
-    this.scene = scene;
-    this.x = x; this.y = y;
-    this.lastHeal = 0;
-    this.body = scene.add.circle(x, y, 18, 0x4488ff).setStrokeStyle(3, 0xffffff);
-    this.body.setDepth(y);
-    this.cross = scene.add.text(x, y, '+', { fontSize: '24px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
-    this.cross.setDepth(y + 1);
-    this.label = scene.add.text(x, y - 28, 'Healer', {
-      fontSize: '12px', color: '#cce4ff', stroke: '#000', strokeThickness: 3,
-    }).setOrigin(0.5);
-    this.label.setDepth(y + 2);
-  }
-
-  update(time) {
-    if (!player || player.dead) return;
-    if (time - this.lastHeal < 5000) return;
-    if (player.hp >= player.maxHP && player.sp >= player.maxSP) return;
-    const d = Math.hypot(player.sprite.x - this.x, player.sprite.y - this.y);
-    if (d < 50) {
-      this.lastHeal = time;
-      player.hp = player.maxHP;
-      player.sp = player.maxSP;
-      spawnFloatText(this.scene, player.sprite.x, player.sprite.y - 40, 'Restored!', 0x88ffaa, { fontSize: '14px' });
-      ui.message('Healer restored your strength.');
-      sfxLevelUp();
-    }
-  }
-}
-
 // ---------- LootDrop ----------
 class LootDrop {
   constructor(scene, x, y, amount, kind = 'zeny') {
@@ -1465,15 +1334,6 @@ class UIManager {
       fontSize: '12px', color: '#ffffff', stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10003);
 
-    // SP bar (left bottom, under HP)
-    this.spBg = scene.add.rectangle(20, GAME_H - 28, 200, 14, 0x333333)
-      .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10001);
-    this.spFill = scene.add.rectangle(20, GAME_H - 28, 200, 14, 0x3388ff)
-      .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10002);
-    this.spText = scene.add.text(120, GAME_H - 28, '', {
-      fontSize: '12px', color: '#ffffff', stroke: '#000', strokeThickness: 3,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10003);
-
     // EXP bar (center)
     this.expBg = scene.add.rectangle(GAME_W / 2 - 150, GAME_H - 40, 300, 20, 0x333333)
       .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10001);
@@ -1492,13 +1352,6 @@ class UIManager {
     this.zenyText = scene.add.text(GAME_W - 20, GAME_H - 8, 'Zeny: 0', {
       fontSize: '14px', color: '#ffd24a', stroke: '#000', strokeThickness: 3,
     }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10003);
-
-    // Skill cooldown chips above EXP bar.
-    const skillStyle = { fontSize: '12px', color: '#ffffff', stroke: '#000', strokeThickness: 3 };
-    this.qSkillText = scene.add.text(GAME_W / 2 - 80, GAME_H - 64, '', skillStyle)
-      .setOrigin(0.5).setScrollFactor(0).setDepth(10003);
-    this.wSkillText = scene.add.text(GAME_W / 2 + 80, GAME_H - 64, '', skillStyle)
-      .setOrigin(0.5).setScrollFactor(0).setDepth(10003);
 
     // Mini-map top-right.
     this.miniW = 160;
@@ -1531,25 +1384,12 @@ class UIManager {
     this.hpFill.width = 200 * hpPct;
     this.hpText.setText(`HP ${player.hp}/${player.maxHP}`);
 
-    const spPct = Math.max(0, player.sp / player.maxSP);
-    this.spFill.width = 200 * spPct;
-    this.spText.setText(`SP ${player.sp}/${player.maxSP}`);
-
     const expPct = Math.max(0, Math.min(1, player.exp / player.expNeeded()));
     this.expFill.width = 300 * expPct;
     this.expText.setText(`EXP ${player.exp}/${player.expNeeded()}`);
 
     this.lvlText.setText(`Lv.${player.level}`);
     this.zenyText.setText(`Zeny: ${player.zeny}`);
-
-    // Skill cooldown chips.
-    const now = this.scene.time.now;
-    const qLeft = Math.max(0, POWER_STRIKE_COOLDOWN - (now - player.lastPowerStrike));
-    const wLeft = Math.max(0, SELF_HEAL_COOLDOWN    - (now - player.lastSelfHeal));
-    this.qSkillText.setText(qLeft > 0 ? `[Q] ${(qLeft / 1000).toFixed(1)}s` : `[Q] Power Strike  ${POWER_STRIKE_SP_COST} SP`);
-    this.qSkillText.setColor(player.sp < POWER_STRIKE_SP_COST ? '#888888' : (qLeft > 0 ? '#cccc66' : '#ffffff'));
-    this.wSkillText.setText(wLeft > 0 ? `[W] ${(wLeft / 1000).toFixed(1)}s` : `[W] Self-Heal  ${SELF_HEAL_SP_COST} SP`);
-    this.wSkillText.setColor(player.sp < SELF_HEAL_SP_COST ? '#888888' : (wLeft > 0 ? '#cccc66' : '#ffffff'));
 
     this.drawMinimap();
   }
@@ -1572,11 +1412,6 @@ class UIManager {
       else if (m.typeId === 'boss_mooham') { color = 0xffff44; r = 4; }
       g.fillStyle(color, 1);
       g.fillCircle(this.miniX + m.sprite.x * sx, this.miniY + m.sprite.y * sy, r);
-    }
-    // Healer NPC.
-    if (healer) {
-      g.fillStyle(0x66ccff, 1);
-      g.fillCircle(this.miniX + healer.x * sx, this.miniY + healer.y * sy, 3);
     }
     // Loot.
     g.fillStyle(0xffd24a, 1);
