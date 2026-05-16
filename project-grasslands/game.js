@@ -57,6 +57,12 @@ const MONSTER_TYPES = {
     maxHP: 80, atk: 8, expReward: 18, speed: 70,
     nameColor: '#ffd9a8', count: MOOHAM_COUNT,
   },
+  boss_mooham: {
+    name: 'Boss MooHam',
+    idleKey: 'mooham_idle', hitKey: 'mooham_hit', deadKey: 'mooham_dead',
+    maxHP: 240, atk: 16, expReward: 90, speed: 55,
+    nameColor: '#ff9933', count: 1, scaleMult: 1.9,
+  },
 };
 const ANIM_FRAME_MS = 180;
 const BOB_AMPLITUDE = 3;     // px the body lifts on each step
@@ -1050,7 +1056,7 @@ class MonsterController {
     this.wanderVy = 0;
 
     this.sprite = scene.physics.add.sprite(x, y, cfg.idleKey);
-    const bScale = BLOBLING_DISPLAY_H / this.sprite.height;
+    const bScale = (BLOBLING_DISPLAY_H / this.sprite.height) * (cfg.scaleMult || 1);
     this.sprite.setScale(bScale);
     this.sprite.setCollideWorldBounds(true);
 
