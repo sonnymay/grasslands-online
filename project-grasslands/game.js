@@ -402,19 +402,25 @@ class PlayerController {
     if (this.attackTarget) {
       if (!this.attackTarget.alive) {
         this.attackTarget = null;
-      } else if (!moving) {
-        const d = Math.hypot(
-          this.attackTarget.sprite.x - this.sprite.x,
-          this.attackTarget.sprite.y - this.sprite.y
-        );
+      } else {
+        const dx = this.attackTarget.sprite.x - this.sprite.x;
+        const dy = this.attackTarget.sprite.y - this.sprite.y;
+        const d = Math.hypot(dx, dy);
         if (d <= ATTACK_RANGE) {
-          // Face the target while attacking.
-          this.dir = pickDirection(
-            this.attackTarget.sprite.x - this.sprite.x,
-            this.attackTarget.sprite.y - this.sprite.y
-          );
+          // In range: stop walking, face target, swing on cooldown.
+          this.path = [];
+          if (this.stepT < 1) {
+            // Snap to current step's destination so we settle on a cell.
+            this.sprite.x = this.stepToX;
+            this.sprite.y = this.stepToY;
+            this.stepT = 1;
+            this.sprite.setOrigin(0.5, 0.5);
+            this.sprite.scaleY = this.basePScale;
+          }
+          this.dir = pickDirection(dx, dy);
           attemptPlayerAttack(this.scene, this.attackTarget);
-        } else {
+        } else if (this.stepT >= 1) {
+          // Out of range, idle → repath toward target.
           this._repathToTarget();
         }
       }
