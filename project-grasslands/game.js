@@ -22,6 +22,13 @@ const HP_REGEN_PCT = 0.02;          // 2% of maxHP per tick
 const PLAYER_DISPLAY_H = 96;
 const BLOBLING_DISPLAY_H = 64;
 const PLAYER_ATTACK_COOLDOWN = 1000;
+// Combat randomness — RO-style feel.
+const DAMAGE_VARIANCE = 0.2;       // ±20% on every hit
+const PLAYER_CRIT_CHANCE = 0.08;   // 8% crit
+const CRIT_MULTIPLIER = 2;
+const PLAYER_MISS_CHANCE = 0.05;   // 5% whiff
+const MONSTER_MISS_CHANCE = 0.10;  // 10% monsters miss player
+const LOOT_PICKUP_RADIUS = 28;
 const BLOBLING_ATTACK_COOLDOWN = 1500;
 const BLOBLING_AGGRO_RANGE = 200;
 const BLOBLING_ATTACK_RANGE = 80;
@@ -91,6 +98,7 @@ const game = new Phaser.Game(config);
 // Globals carried by scene (kept on `this` where possible)
 let player;
 let bloblings = [];
+let loots = [];
 let ui;
 let lastPlayerAttack = 0;
 let tileSliceW = 0;
@@ -187,6 +195,8 @@ function create() {
 
   // Camera follow
   scene.cameras.main.startFollow(player.sprite, true, 0.1, 0.1);
+  // RO camera reveals ~12-15 tiles wide — zoom out a touch.
+  scene.cameras.main.setZoom(0.85);
 
   // Pointer: click a Blobling to fight it; click ground to walk there.
   scene.input.on('pointerdown', (pointer) => {
@@ -218,6 +228,17 @@ function update(time, delta) {
   if (!player) return;
   player.update(time, delta);
   for (const b of bloblings) b.update(time, delta);
+
+  // Loot pickup: walk over a coin to grab it.
+  if (player && !player.dead) {
+    for (const l of loots) {
+      if (l.tryPickup(player.sprite.x, player.sprite.y)) {
+        player.zeny += l.amount;
+        ui.message(`Picked up ${l.amount} zeny.`);
+      }
+    }
+  }
+  loots = loots.filter(l => l.alive);
   ui.update();
 
   // Y-sort: depth follows y position
@@ -327,6 +348,7 @@ class PlayerController {
     this.atk = 10;
     this.def = 0;
     this.exp = 0;
+    this.zeny = 0;
     this.level = 1;
     this.dead = false;
     this.dir = 'south';
@@ -754,7 +776,12 @@ class MonsterController {
         this.sprite.setVelocity(0, 0);
         if (time - this.lastAttack > BLOBLING_ATTACK_COOLDOWN) {
           this.lastAttack = time;
-          player.takeDamage(this.atk);
+          const hit = rollMonsterHit(this.atk);
+          if (hit.miss) {
+            spawnFloatText(this.scene, player.sprite.x, player.sprite.y - 20, 'MISS', 0xcccccc);
+          } else {
+            player.takeDamage(hit.amount);
+          }
         }
       }
     } else {
@@ -779,13 +806,14 @@ class MonsterController {
     this.hpBar.width = 40 * Math.max(0, this.hp / this.maxHP);
   }
 
-  takeDamage(amount) {
+  takeDamage(amount, opts = {}) {
     if (!this.alive) return;
     this.hp -= amount;
     // Getting hit provokes the monster for 5s.
     this.provoked = true;
     this.provokedUntil = this.scene.time.now + 5000;
-    spawnDamageNumber(this.scene, this.sprite.x, this.sprite.y - 20, amount, 0xff5555);
+    const color = opts.crit ? 0xffe14a : 0xff5555;
+    spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 20, amount, color, { crit: !!opts.crit });
     this.sprite.setTexture(this.cfg.hitKey);
     this.scene.time.delayedCall(120, () => {
       if (this.alive) this.sprite.setTexture(this.cfg.idleKey);
@@ -803,6 +831,10 @@ class MonsterController {
     player.gainExp(this.expReward);
     ui.message(`Killed ${this.cfg.name} (+${this.expReward} EXP)`);
 
+    // Drop a small zeny pile — scaled to monster reward.
+    const zenyDrop = Math.max(1, Math.round(this.expReward * Phaser.Math.FloatBetween(0.6, 1.6)));
+    loots.push(new LootDrop(this.scene, this.sprite.x, this.sprite.y + 10, zenyDrop));
+
     this.scene.time.delayedCall(1500, () => {
       this.sprite.destroy();
       this.nameTag.destroy();
@@ -813,6 +845,46 @@ class MonsterController {
     });
 
     this.scene.time.delayedCall(RESPAWN_MS, () => spawnMonster(this.scene, this.typeId));
+  }
+}
+
+// ---------- LootDrop ----------
+class LootDrop {
+  constructor(scene, x, y, amount) {
+    this.scene = scene;
+    this.x = x; this.y = y;
+    this.amount = amount;
+    this.alive = true;
+    this.bornAt = scene.time.now;
+    // Coin = yellow circle with dark rim. No PNG needed.
+    this.coin = scene.add.circle(x, y - 10, 8, 0xffd24a).setStrokeStyle(2, 0x7a5a00);
+    this.coin.setDepth(y);
+    // Drop bounce.
+    scene.tweens.add({
+      targets: this.coin, y: y, duration: 250,
+      ease: 'Bounce.easeOut',
+    });
+    // Subtle pulse so it's visible in grass.
+    scene.tweens.add({
+      targets: this.coin, scale: 1.15,
+      duration: 600, yoyo: true, repeat: -1,
+    });
+  }
+
+  tryPickup(px, py) {
+    if (!this.alive) return false;
+    // Brief grace so it doesn't snap into pickup mid-bounce.
+    if (this.scene.time.now - this.bornAt < 250) return false;
+    if (Math.hypot(this.x - px, this.y - py) <= LOOT_PICKUP_RADIUS) {
+      this.alive = false;
+      this.scene.tweens.killTweensOf(this.coin);
+      this.scene.tweens.add({
+        targets: this.coin, alpha: 0, y: this.y - 20, duration: 200,
+        onComplete: () => this.coin.destroy(),
+      });
+      return true;
+    }
+    return false;
   }
 }
 
@@ -835,28 +907,53 @@ function attemptPlayerAttack(scene, target) {
   const now = scene.time.now;
   if (now - lastPlayerAttack < PLAYER_ATTACK_COOLDOWN) return;
   const d = Math.hypot(target.sprite.x - player.sprite.x, target.sprite.y - player.sprite.y);
-  if (d > ATTACK_RANGE) return; // too far; player will walk closer
+  if (d > ATTACK_RANGE) return;
   lastPlayerAttack = now;
   player.attackPoseUntil = now + 250;
-  target.takeDamage(player.atk);
+
+  // Roll: miss → crit → normal.
+  if (Math.random() < PLAYER_MISS_CHANCE) {
+    spawnFloatText(scene, target.sprite.x, target.sprite.y - 20, 'MISS', 0xcccccc);
+    return;
+  }
+  const crit = Math.random() < PLAYER_CRIT_CHANCE;
+  const variance = 1 + (Math.random() * 2 - 1) * DAMAGE_VARIANCE;
+  let dmg = Math.max(1, Math.round(player.atk * variance * (crit ? CRIT_MULTIPLIER : 1)));
+  target.takeDamage(dmg, { crit });
 }
 
-function spawnDamageNumber(scene, x, y, amount, color) {
+// Roll monster damage on the player. No crits for monsters, only variance + miss.
+function rollMonsterHit(monsterAtk) {
+  if (Math.random() < MONSTER_MISS_CHANCE) return { miss: true, amount: 0 };
+  const variance = 1 + (Math.random() * 2 - 1) * DAMAGE_VARIANCE;
+  return { miss: false, amount: Math.max(1, Math.round(monsterAtk * variance)) };
+}
+
+// Generic floating text. Accepts a number or string. Crit bumps size + adds "!".
+function spawnFloatText(scene, x, y, text, color, opts = {}) {
   const hex = '#' + color.toString(16).padStart(6, '0');
-  const txt = scene.add.text(x, y, `-${amount}`, {
-    fontSize: '16px',
+  const fontSize = opts.crit ? '22px' : (opts.fontSize || '16px');
+  const display = (typeof text === 'number') ? `-${text}${opts.crit ? '!' : ''}` : text;
+  const txt = scene.add.text(x, y, display, {
+    fontSize,
     color: hex,
     stroke: '#000000',
-    strokeThickness: 3,
+    strokeThickness: opts.crit ? 4 : 3,
+    fontStyle: opts.crit ? 'bold' : 'normal',
   }).setOrigin(0.5);
   txt.setDepth(99999);
   scene.tweens.add({
     targets: txt,
-    y: y - 30,
+    y: y - (opts.crit ? 40 : 30),
     alpha: 0,
-    duration: 800,
+    duration: opts.crit ? 1000 : 800,
     onComplete: () => txt.destroy(),
   });
+}
+
+// Back-compat wrapper used by older call sites.
+function spawnDamageNumber(scene, x, y, amount, color) {
+  spawnFloatText(scene, x, y, amount, color);
 }
 
 // ---------- UIManager ----------
@@ -888,8 +985,13 @@ class UIManager {
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10003);
 
     // Level (right)
-    this.lvlText = scene.add.text(GAME_W - 20, GAME_H - 40, 'Lv.1', {
-      fontSize: '20px', color: '#ffff88', stroke: '#000', strokeThickness: 3,
+    this.lvlText = scene.add.text(GAME_W - 20, GAME_H - 28, 'Lv.1', {
+      fontSize: '18px', color: '#ffff88', stroke: '#000', strokeThickness: 3,
+    }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10003);
+
+    // Zeny (right, under level)
+    this.zenyText = scene.add.text(GAME_W - 20, GAME_H - 8, 'Zeny: 0', {
+      fontSize: '14px', color: '#ffd24a', stroke: '#000', strokeThickness: 3,
     }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10003);
 
     // Chat box
@@ -916,5 +1018,6 @@ class UIManager {
     this.expText.setText(`EXP ${player.exp}/${player.expNeeded()}`);
 
     this.lvlText.setText(`Lv.${player.level}`);
+    this.zenyText.setText(`Zeny: ${player.zeny}`);
   }
 }
