@@ -13,7 +13,7 @@ const MAP_ROWS = Math.ceil(WORLD_H / TILE_SIZE);
 const CELL_SIZE = 32;
 const GRID_COLS = Math.floor(WORLD_W / CELL_SIZE);
 const GRID_ROWS = Math.floor(WORLD_H / CELL_SIZE);
-const MS_PER_CELL = 160; // RO baseline is ~150ms per cell.
+const MS_PER_CELL = 130; // snappier than RO's 150ms for crisper footfall.
 const MAX_PATH_LEN = 256;
 const HIT_STUN_MS = 200;
 const HP_REGEN_INTERVAL_MS = 3000;  // tick every 3s
@@ -57,9 +57,9 @@ const MONSTER_TYPES = {
   },
 };
 const ANIM_FRAME_MS = 180;
-const BOB_AMPLITUDE = 3;     // px the body lifts on each step
-const BOB_FREQ = 0.012;      // step phase per ms
-const STEP_SQUASH = 0.06;    // horizontal squash on foot-down
+const BOB_AMPLITUDE = 6;     // px the body lifts on each footfall
+const BOB_FREQ = 0.012;      // step phase per ms (legacy, unused now)
+const STEP_SQUASH = 0.10;    // vertical squash on foot-down
 const ATTACK_RANGE = 100; // melee click-attack range
 const RESPAWN_MS = 5000;
 const PLAYER_RESPAWN_MS = 3000;
@@ -129,6 +129,17 @@ function preload() {
   this.load.image('rookie_walk2_south', 'assets/sprites/rookie_walk2_south.png');
   this.load.image('rookie_walk2_north', 'assets/sprites/rookie_walk2_north.png');
   this.load.image('rookie_walk2_east', 'assets/sprites/rookie_walk2_east.png');
+  // Optional 4-frame stride — silently skipped if files don't exist.
+  this.load.on('loaderror', (file) => {
+    if (file && file.key && /^rookie_(walk3|walk4)_/.test(file.key)) {
+      // expected when art hasn't been generated yet — no-op
+    }
+  });
+  for (const d of ['south', 'north', 'east', 'southeast', 'northeast']) {
+    for (const n of ['walk3', 'walk4']) {
+      this.load.image(`rookie_${n}_${d}`, `assets/sprites/rookie_${n}_${d}.png`);
+    }
+  }
   this.load.image('rookie_idle_southeast', 'assets/sprites/rookie_idle_southeast.png');
   this.load.image('rookie_walk_southeast', 'assets/sprites/rookie_walk_southeast.png');
   this.load.image('rookie_walk2_southeast', 'assets/sprites/rookie_walk2_southeast.png');
@@ -170,6 +181,11 @@ function create() {
     'rookie_idle_east','rookie_walk_east','rookie_walk2_east',
     'rookie_idle_southeast','rookie_walk_southeast','rookie_walk2_southeast',
     'rookie_idle_northeast','rookie_walk_northeast','rookie_walk2_northeast',
+    'rookie_walk3_south','rookie_walk4_south',
+    'rookie_walk3_north','rookie_walk4_north',
+    'rookie_walk3_east','rookie_walk4_east',
+    'rookie_walk3_southeast','rookie_walk4_southeast',
+    'rookie_walk3_northeast','rookie_walk4_northeast',
     'rookie_attack','rookie_dead',
     'blobling_idle','blobling_hit','blobling_dead',
     'mooham_idle','mooham_hit','mooham_dead',
@@ -369,7 +385,9 @@ function update(time, delta) {
 
 // Replace near-white pixels with alpha=0 so sprites read as transparent.
 function keyOutWhite(scene, key) {
+  if (!scene.textures.exists(key)) return; // file not present — skip silently
   const src = scene.textures.get(key).getSourceImage();
+  if (!src) return;
   const canvas = document.createElement('canvas');
   canvas.width = src.width;
   canvas.height = src.height;
@@ -602,6 +620,24 @@ class PlayerController {
     this.stepT = 0;
     this.stepIndex += 1;
     this.dir = pickDirection(this.stepToX - this.stepFromX, this.stepToY - this.stepFromY);
+    sfxFootstep();
+  }
+
+  // Pick which walk frame to show for the current step progress t∈[0,1].
+  // Auto-uses 4-frame cycle when walk3/walk4 textures are loaded; falls back to 2 otherwise.
+  _pickWalkFrame(t) {
+    if (!this._walkFrameSet) {
+      const has = (key) => this.scene.textures.exists(key);
+      // Sample the south set as a proxy — assume all 5 dirs ship together.
+      const has4 = has('rookie_walk3_south') && has('rookie_walk4_south');
+      this._walkFrameSet = has4
+        ? ['walk', 'walk2', 'walk3', 'walk4']
+        : ['walk', 'walk2'];
+    }
+    const cycle = this._walkFrameSet;
+    // stepIndex shifts the starting frame each cell so the cycle keeps phase across cells.
+    const idx = (Math.floor(t * cycle.length) + this.stepIndex) % cycle.length;
+    return cycle[idx];
   }
 
   update(time, delta) {
@@ -627,24 +663,24 @@ class PlayerController {
     if (!stunned && this.stepT < 1) {
       this.stepT = Math.min(1, this.stepT + delta / MS_PER_CELL);
       const t = this.stepT;
-      this.sprite.x = this.stepFromX + (this.stepToX - this.stepFromX) * t;
-      this.sprite.y = this.stepFromY + (this.stepToY - this.stepFromY) * t;
+      const baseX = this.stepFromX + (this.stepToX - this.stepFromX) * t;
+      const baseY = this.stepFromY + (this.stepToY - this.stepFromY) * t;
+      this.sprite.x = baseX;
 
-      // Foot-fall bob + squash, one cycle per cell.
-      const phase = t * Math.PI;
-      const bob = Math.sin(phase) * BOB_AMPLITUDE;
-      this.sprite.setOrigin(0.5, 0.5 + bob / this.sprite.displayHeight);
-      this.sprite.scaleY = this.basePScale * (1 - Math.sin(phase) * STEP_SQUASH);
-      // Swap legs mid-cell: walk (first half) → walk2 (second half) of every step,
-      // with the starting leg alternating per step so the cycle reads as L,R,L,R.
-      const half = t < 0.5 ? 0 : 1;
-      this.frame = ((this.stepIndex + half) % 2 === 0) ? 'walk' : 'walk2';
+      // Full sine wave per step → two footfalls per cell (lift, plant, lift, plant).
+      // Y-position bob (not origin shift) so the body genuinely lifts.
+      const phase = t * Math.PI * 2;
+      const lift = Math.abs(Math.sin(phase));
+      this.sprite.y = baseY - lift * BOB_AMPLITUDE;
+      this.sprite.setOrigin(0.5, 0.5);
+      this.sprite.scaleY = this.basePScale * (1 - lift * STEP_SQUASH);
+
+      // Frame cycle — uses walk3/walk4 when those textures exist; falls back to walk/walk2.
+      this.frame = this._pickWalkFrame(t);
 
       if (this.stepT >= 1) {
         this.sprite.x = this.stepToX;
         this.sprite.y = this.stepToY;
-        // Snap origin / scale back so idle / attack pose draws upright.
-        this.sprite.setOrigin(0.5, 0.5);
         this.sprite.scaleY = this.basePScale;
         // Start the next queued step if we have one.
         if (this.path.length > 0) this._beginNextStep();
@@ -1011,6 +1047,8 @@ function sfxLevelUp()  { _tone(523, 0.12, 'triangle', 0.1); _tone(659, 0.12, 'tr
 function sfxPickup()   { _tone(880, 0.06, 'sine', 0.08); _tone(1320, 0.08, 'sine', 0.08, 0.06); }
 function sfxPlayerHit(){ _noise(0.08, 0.08, 0, 800); _tone(140, 0.12, 'sawtooth', 0.08); }
 function sfxDeath()    { _tone(196, 0.4, 'sawtooth', 0.1, 0, 60); _tone(98, 0.5, 'sawtooth', 0.08, 0.2); }
+// Subtle grass scuff per cell — adds groundedness.
+function sfxFootstep() { _noise(0.04, 0.025, 0, 600); }
 
 // 8-direction sector picker. East = 0°, South = 90°, West = ±180°, North = -90°.
 function pickDirection(vx, vy) {
@@ -1040,8 +1078,10 @@ const DIR_TEXTURE = {
 
 function applyRookieTexture(sprite, dir, frame) {
   const info = DIR_TEXTURE[dir] || DIR_TEXTURE.south;
-  const prefix = (frame === 'walk') ? 'rookie_walk_'
+  const prefix = (frame === 'walk')  ? 'rookie_walk_'
               : (frame === 'walk2') ? 'rookie_walk2_'
+              : (frame === 'walk3') ? 'rookie_walk3_'
+              : (frame === 'walk4') ? 'rookie_walk4_'
               : 'rookie_idle_';
   sprite.setTexture(prefix + info.base);
   sprite.setFlipX(info.flip);
