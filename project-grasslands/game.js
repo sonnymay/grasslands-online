@@ -605,7 +605,10 @@ class PlayerController {
       const bob = Math.sin(phase) * BOB_AMPLITUDE;
       this.sprite.setOrigin(0.5, 0.5 + bob / this.sprite.displayHeight);
       this.sprite.scaleY = this.basePScale * (1 - Math.sin(phase) * STEP_SQUASH);
-      this.frame = (this.stepIndex % 2 === 0) ? 'walk' : 'walk2';
+      // Swap legs mid-cell: walk (first half) → walk2 (second half) of every step,
+      // with the starting leg alternating per step so the cycle reads as L,R,L,R.
+      const half = t < 0.5 ? 0 : 1;
+      this.frame = ((this.stepIndex + half) % 2 === 0) ? 'walk' : 'walk2';
 
       if (this.stepT >= 1) {
         this.sprite.x = this.stepToX;
