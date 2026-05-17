@@ -40,6 +40,7 @@ const MOOHAM_COUNT = 20;
 const MOOWAAN_COUNT = 15;
 const DUNE_BLOB_COUNT = 12;
 const BIGFOOT_COUNT = 1;
+const BIOME_BOSS_COUNT = 1;
 
 // Monster type catalog. Add new monsters here; spawn loop reads `count`.
 const MONSTER_TYPES = {
@@ -97,7 +98,28 @@ const MONSTER_TYPES = {
     idleKey: 'mooham_idle', hitKey: 'mooham_hit', deadKey: 'mooham_dead',
     maxHP: 240, atk: 16, expReward: 90, speed: 55,
     nameColor: '#ff9933', count: 1, scaleMult: 1.9,
-    zones: ['desert'],
+    zones: ['desert'], boss: true,
+  },
+  king_blobling: {
+    name: 'King Blobling',
+    idleKey: 'blobling_idle', hitKey: 'blobling_hit', deadKey: 'blobling_dead',
+    maxHP: 180, atk: 14, expReward: 80, speed: 62,
+    nameColor: '#ff99dd', count: BIOME_BOSS_COUNT, scaleMult: 1.7,
+    tint: 0xff88cc, zones: ['grasslands'], minSpawnDistance: 700, boss: true,
+  },
+  ruin_golem: {
+    name: 'Ruin Golem',
+    idleKey: 'mooham_idle', hitKey: 'mooham_hit', deadKey: 'mooham_dead',
+    maxHP: 360, atk: 28, expReward: 150, speed: 42,
+    nameColor: '#c8c0aa', count: BIOME_BOSS_COUNT, scaleMult: 2.0,
+    tint: 0xaaa088, zones: ['ruins'], minSpawnDistance: 1600, boss: true,
+  },
+  river_warden: {
+    name: 'River Warden',
+    idleKey: 'moowaan_idle', hitKey: 'moowaan_hit', deadKey: 'moowaan_dead',
+    maxHP: 300, atk: 24, expReward: 135, speed: 58,
+    nameColor: '#88ddff', count: BIOME_BOSS_COUNT, scaleMult: 1.8,
+    tint: 0x77ccff, zones: ['riverside'], minSpawnDistance: 1400, boss: true,
   },
   bigfoot: {
     name: 'Bigfoot',
@@ -108,7 +130,16 @@ const MONSTER_TYPES = {
     fixedLevel: 50, noLevelScaling: true, aggressive: true, aggroRange: 520, oneShotBelowLevel: 50,
     zones: ['forest'],
     minSpawnDistance: 2400, // keep him in far forest so new players don't walk into a one-shot
+    boss: true,
   },
+};
+
+const EQUIPMENT_DROPS = {
+  king_blobling: { slot: 'armor', name: 'Gelatin Buckler', def: 4 },
+  boss_mooham:  { slot: 'weapon', name: 'Ham Hammer', atk: 5 },
+  ruin_golem:   { slot: 'armor', name: 'Ruin Plate', def: 8 },
+  river_warden: { slot: 'weapon', name: 'Reed Spear', atk: 8 },
+  bigfoot:      { slot: 'armor', name: 'Fur Guard', def: 10 },
 };
 
 // Zones partition the world into themed regions. Each zone gets its own tile
@@ -227,16 +258,25 @@ let autopilotOn = false;
 let autopilotLastScan = 0;
 let classSelectOpen = false;
 let shopOpen = false;
-let activeQuest = null; // { monsterTypeId, monsterName, target, count, reward }
+let activeQuests = []; // [{ monsterTypeId, monsterName, target, count, reward }]
+let questChain = 0;
+let bossRespawns = {};
 
 const QUEST_MONSTER_POOL = ['blobling', 'mooham', 'moowaan', 'cactling'];
 
 // Compact thousands-separator. Used wherever zeny is printed.
 function fmt(n) { return Math.floor(n).toLocaleString('en-US'); }
+function colorValue(color, fallback = 0xffffff) {
+  if (typeof color === 'number') return color;
+  const parsed = parseInt(String(color).replace('#', ''), 16);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function isBossCfg(cfg) { return !!(cfg && (cfg.boss || cfg.aggressive || cfg.expReward >= 90)); }
 
 function scaledMonsterExp(monster) {
   const cfg = monster.cfg || {};
-  if (cfg.aggressive || cfg.expReward >= 90 || cfg.levelsAward) return monster.expReward;
+  if (isBossCfg(cfg) || cfg.levelsAward) return monster.expReward;
   const typicalLevel = monster.level || 1;
   const levelsOver = Math.max(0, player.level - typicalLevel);
   const mult = Math.max(0.3, Math.pow(0.7, levelsOver));
@@ -275,7 +315,7 @@ function rollNewQuest() {
   const cfg = MONSTER_TYPES[id];
   const target = 10;
   const reward = Math.round((cfg.expReward || 10) * target * 1.5);
-  activeQuest = { monsterTypeId: id, monsterName: cfg.name, target, count: 0, reward };
+  activeQuests.push({ monsterTypeId: id, monsterName: cfg.name, target, count: 0, reward });
   if (typeof ui !== 'undefined' && ui) {
     ui.message(`New quest: slay ${target} ${cfg.name} (${fmt(reward)} zeny).`);
   }
@@ -283,19 +323,62 @@ function rollNewQuest() {
 }
 
 function onMonsterKilledForQuest(typeId) {
-  if (!activeQuest) return;
-  if (activeQuest.monsterTypeId !== typeId) return;
-  activeQuest.count += 1;
-  if (activeQuest.count >= activeQuest.target) {
-    const reward = activeQuest.reward;
-    const name = activeQuest.monsterName;
+  if (!activeQuests.length) return;
+  let completed = false;
+  for (const q of activeQuests) {
+    if (q.monsterTypeId !== typeId) continue;
+    q.count += 1;
+    if (q.count < q.target) continue;
+    const reward = q.reward;
+    const name = q.monsterName;
     player.zeny += reward;
-    ui.message(`✓ Quest complete! Slayed ${activeQuest.target} ${name} (+${fmt(reward)} zeny)`);
+    questChain += 1;
+    ui.message(`✓ Quest complete! Slayed ${q.target} ${name} (+${fmt(reward)} zeny)`);
     spawnFloatText(player.scene, player.sprite.x, player.sprite.y - 42, `+${fmt(reward)}z`, 0xffd24a, { fontSize: '18px' });
+    if (questChain % 3 === 0) {
+      const chainBonus = Math.max(75, Math.round(reward * 0.75));
+      player.zeny += chainBonus;
+      const label = `QUEST STREAK x${questChain}! +${fmt(chainBonus)}z`;
+      spawnFloatText(player.scene, player.sprite.x, player.sprite.y - 72, label, 0xffe066, { fontSize: '22px' });
+      const banner = player.scene.add.text(GAME_W / 2, 145, label, {
+        fontSize: '30px', fontStyle: 'bold', color: '#ffe066',
+        stroke: '#5a3a00', strokeThickness: 5,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(19000).setAlpha(0);
+      player.scene.tweens.add({ targets: banner, alpha: 1, duration: 220, yoyo: true,
+        hold: 1100, onComplete: () => banner.destroy() });
+    }
     sfxLevelUp();
-    activeQuest = null;
-    rollNewQuest();
+    completed = true;
+    q.done = true;
   }
+  if (!completed) return;
+  activeQuests = activeQuests.filter(q => !q.done).slice(0, 2);
+  while (activeQuests.length < 2) rollNewQuest();
+}
+
+function ensureQuestSlots() {
+  while (activeQuests.length < 2) rollNewQuest();
+}
+
+function tryEquipDrop(monster) {
+  const item = EQUIPMENT_DROPS[monster.typeId];
+  if (!item || !player || player.dead) return;
+  const current = player.equipment[item.slot];
+  const stat = item.atk ? 'atk' : 'def';
+  const value = item[stat] || 0;
+  const currentValue = current ? (current[stat] || 0) : 0;
+  if (current && currentValue >= value) {
+    spawnFloatText(monster.scene, monster.sprite.x, monster.sprite.y - 58, `${item.name} dropped`, 0xcccccc, { fontSize: '13px' });
+    ui.message(`${item.name} dropped, but your ${current.name} is better.`);
+    return;
+  }
+  if (current) player[stat] -= currentValue;
+  player[stat] += value;
+  player.equipment[item.slot] = item;
+  spawnFloatText(monster.scene, player.sprite.x, player.sprite.y - 86, `Equipped ${item.name}`, 0x88ddff, { fontSize: '18px' });
+  ui.message(`Equipped ${item.name} (+${value} ${stat.toUpperCase()}).`);
+  sfxLevelUp();
+  saveGame();
 }
 
 // Shop items. price = base * 1.5^bought.
@@ -627,7 +710,7 @@ function create() {
     ui.message('Click monsters to attack. Click ground to walk.');
     ui.message('Click monsters to auto-fight. Tab targets nearest. Shift+R resets save.');
   }
-  if (!activeQuest) rollNewQuest();
+  ensureQuestSlots();
 }
 
 // ---------- Update loop ----------
@@ -662,7 +745,7 @@ function update(time, delta) {
       if (!m.alive) return false;
       const cfg = m.cfg || {};
       if (cfg.aggressive) return false;
-      if (cfg.expReward >= 90) return false;
+      if (isBossCfg(cfg)) return false;
       if (m.maxHP > safeCap) return false;
       return true;
     };
@@ -670,7 +753,7 @@ function update(time, delta) {
       if (!safe(m)) continue;
       const d = Math.hypot(m.sprite.x - player.sprite.x, m.sprite.y - player.sprite.y);
       // Prefer the active quest target — gives autopilot a real goal.
-      const isQuestTarget = activeQuest && activeQuest.monsterTypeId === m.typeId;
+      const isQuestTarget = activeQuests.some(q => q.monsterTypeId === m.typeId);
       let neighbors = 0;
       for (const n of bloblings) {
         if (n === m || !safe(n)) continue;
@@ -950,6 +1033,7 @@ class PlayerController {
     this.zeny = 0;
     this.kills = 0;
     this.hotStreak = 0;
+    this.equipment = { weapon: null, armor: null };
     this.classId = null;   // 'swordsman' | 'mage' | 'archer'
     this.classTier = 0;    // 0 = unselected, 1..4 once chosen
     this.shopBought = { hp: 0, atk: 0, def: 0, pot: 0 };
@@ -1463,7 +1547,9 @@ function saveGame() {
       kills: player.kills, hotStreak: player.hotStreak,
       classId: player.classId, classTier: player.classTier,
       shopBought: player.shopBought,
-      activeQuest: activeQuest,
+      activeQuests: activeQuests, activeQuest: activeQuests[0] || null,
+      questChain: questChain,
+      equipment: player.equipment,
       cellCol: player.cellCol, cellRow: player.cellRow,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -1489,10 +1575,12 @@ function applySave() {
   player.zeny   = save.zeny   ?? 0;
   player.kills  = save.kills  ?? 0;
   player.hotStreak = save.hotStreak ?? 0;
+  player.equipment = Object.assign({ weapon: null, armor: null }, save.equipment || {});
   player.classId   = save.classId   ?? null;
   player.classTier = save.classTier ?? 0;
   player.shopBought = Object.assign({ hp:0, atk:0, def:0, pot:0 }, save.shopBought || {});
-  activeQuest = save.activeQuest || null;
+  activeQuests = Array.isArray(save.activeQuests) ? save.activeQuests.slice(0, 2) : (save.activeQuest ? [save.activeQuest] : []);
+  questChain = save.questChain ?? 0;
   // Reapply class tint on sprite + refresh name tag color/title.
   if (player.classId && CLASS_DEFS[player.classId]) {
     player.sprite.setTint(CLASS_DEFS[player.classId].tint);
@@ -1703,6 +1791,7 @@ class MonsterController {
     this.provoked = false;
     this.provokedUntil = 0;
     this.lastAttack = 0;
+    this.telegraphing = false;
     this.wanderUntil = 0;
     this.wanderVx = 0;
     this.wanderVy = 0;
@@ -1798,19 +1887,21 @@ class MonsterController {
       } else {
         this.sprite.setVelocity(0, 0);
         if (this.cfg.aggroKey) this._setTex(this.cfg.aggroKey);
-        if (time - this.lastAttack > BLOBLING_ATTACK_COOLDOWN) {
+        if (time - this.lastAttack > BLOBLING_ATTACK_COOLDOWN && !this.telegraphing) {
           this.lastAttack = time;
-          const hit = rollMonsterHit(this.atk);
-          if (hit.miss) {
-            spawnFloatText(this.scene, player.sprite.x, player.sprite.y - 20, 'MISS', 0xcccccc);
-            sfxMiss();
+          if (isBossCfg(this.cfg)) {
+            this.telegraphing = true;
+            spawnBossTelegraph(this.scene, player.sprite.x, player.sprite.y, this.cfg.nameColor || '#ff5555');
+            this.scene.time.delayedCall(450, () => {
+              this.telegraphing = false;
+              if (!this.alive || player.dead || !this.provoked) return;
+              const ddx = player.sprite.x - this.sprite.x;
+              const ddy = player.sprite.y - this.sprite.y;
+              if (Math.hypot(ddx, ddy) > BLOBLING_ATTACK_RANGE + 18) return;
+              this._swingAtPlayer();
+            });
           } else {
-            if (this.cfg.attackKey) this._setTex(this.cfg.attackKey);
-            if (this.cfg.oneShotBelowLevel && player.level < this.cfg.oneShotBelowLevel) {
-              hit.amount = player.hp + player.def;
-            }
-            player.takeDamage(hit.amount);
-            sfxPlayerHit();
+            this._swingAtPlayer();
           }
         }
       }
@@ -1861,7 +1952,7 @@ class MonsterController {
     this.hpBar.setVisible(false);
     this.hpBarBg.setVisible(false);
     this.nameTag.setVisible(false);
-    spawnDeathBurst(this.scene, this.sprite.x, this.sprite.y + 8, this.cfg.tint || this.cfg.nameColor || 0xffffff);
+    spawnDeathBurst(this.scene, this.sprite.x, this.sprite.y + 8, colorValue(this.cfg.tint || this.cfg.nameColor, 0xffffff));
     // Rare variant: grant N levels worth of EXP in one shot + huge fanfare.
     const earnedExp = this.cfg.levelsAward ? this.expReward : scaledMonsterExp(this);
     if (this.cfg.levelsAward) {
@@ -1884,10 +1975,11 @@ class MonsterController {
     if (this.auraRing) { this.scene.tweens.killTweensOf(this.auraRing); this.auraRing.destroy(); this.auraRing = null; }
     player.kills += 1;
     awardHotStreak(this, earnedExp);
+    tryEquipDrop(this);
     onMonsterKilledForQuest(this.typeId);
     // Center-screen banner when a boss-tier monster (or aggressive) dies.
     const cfg = this.cfg || {};
-    if (cfg.aggressive || cfg.expReward >= 90) {
+    if (isBossCfg(cfg)) {
       const banner = this.scene.add.text(GAME_W / 2, 200, `${cfg.name} slain!`, {
         fontSize: '40px', fontStyle: 'bold', color: '#ffe066',
         stroke: '#5a3a00', strokeThickness: 6,
@@ -1898,7 +1990,7 @@ class MonsterController {
     }
     // Heal on kill: 8% of maxHP, scaled up for bosses (expReward >= 90)
     // and rare kills (always full heal).
-    const healPct = this.cfg.levelsAward ? 1.0 : (this.expReward >= 90 ? 0.30 : 0.08);
+    const healPct = this.cfg.levelsAward ? 1.0 : (isBossCfg(this.cfg) ? 0.30 : 0.08);
     const healAmt = Math.max(1, Math.round(player.maxHP * healPct));
     if (!player.dead && player.hp < player.maxHP) {
       player.hp = Math.min(player.maxHP, player.hp + healAmt);
@@ -1927,7 +2019,23 @@ class MonsterController {
       if (idx >= 0) bloblings.splice(idx, 1);
     });
 
+    if (isBossCfg(this.cfg)) bossRespawns[this.typeId] = this.scene.time.now + RESPAWN_MS;
     this.scene.time.delayedCall(RESPAWN_MS, () => spawnMonster(this.scene, this.typeId));
+  }
+
+  _swingAtPlayer() {
+    const hit = rollMonsterHit(this.atk);
+    if (hit.miss) {
+      spawnFloatText(this.scene, player.sprite.x, player.sprite.y - 20, 'MISS', 0xcccccc);
+      sfxMiss();
+      return;
+    }
+    if (this.cfg.attackKey) this._setTex(this.cfg.attackKey);
+    if (this.cfg.oneShotBelowLevel && player.level < this.cfg.oneShotBelowLevel) {
+      hit.amount = player.hp + player.def;
+    }
+    player.takeDamage(hit.amount);
+    sfxPlayerHit();
   }
 }
 
@@ -2313,6 +2421,7 @@ function spawnMonster(scene, typeId) {
     ok = true;
   }
   bloblings.push(new MonsterController(scene, x, y, typeId));
+  delete bossRespawns[typeId];
   spawnPuff(scene, x, y);
 }
 
@@ -2363,6 +2472,22 @@ function spawnDeathBurst(scene, x, y, color) {
       onComplete: () => dot.destroy(),
     });
   }
+}
+
+function spawnBossTelegraph(scene, x, y, color) {
+  const c = colorValue(color, 0xff3333);
+  const ring = scene.add.circle(x, y + 8, 44)
+    .setStrokeStyle(4, c, 0.95)
+    .setFillStyle(0xff0000, 0.12)
+    .setDepth(y + 50);
+  scene.tweens.add({
+    targets: ring,
+    scale: 1.25,
+    alpha: 0.15,
+    duration: 430,
+    ease: 'Quad.in',
+    onComplete: () => ring.destroy(),
+  });
 }
 
 function attemptPlayerAttack(scene, target) {
@@ -2746,12 +2871,13 @@ class UIManager {
     addTip(this.shBg, 'Spend zeny on upgrades', btnX, shY + btnH / 2);
 
     // Quest tracker — top-left badge.
-    this.questBg = scene.add.rectangle(10, 10, 300, 32, 0x000000, 0.65)
+    this.questBg = scene.add.rectangle(10, 10, 330, 54, 0x000000, 0.65)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
       .setStrokeStyle(2, 0xffe066, 0.9);
-    this.questText = scene.add.text(20, 26, '', {
-      fontSize: '14px', color: '#ffffff', stroke: '#000', strokeThickness: 3,
-    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(10006);
+    this.questText = scene.add.text(20, 18, '', {
+      fontSize: '13px', color: '#ffffff', stroke: '#000', strokeThickness: 3,
+      lineSpacing: 2,
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
     this.questBg.setVisible(false);
     this.questText.setVisible(false);
 
@@ -2771,6 +2897,9 @@ class UIManager {
     this.bossBg.setVisible(false);
     this.bossFill.setVisible(false);
     this.bossText.setVisible(false);
+    this.bossTimerText = scene.add.text(GAME_W / 2, bbY + bbH + 18, '', {
+      fontSize: '13px', color: '#ffe066', stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10007).setVisible(false);
 
     // Chat box
     this.chatBg = scene.add.rectangle(10, GAME_H - 220, 320, 150, 0x000000, 0.5)
@@ -2806,8 +2935,8 @@ class UIManager {
     if (this.clText.text !== wantedLbl) this.clText.setText(wantedLbl);
 
     // Quest tracker badge.
-    if (activeQuest) {
-      const txt = `Quest: ${activeQuest.count}/${activeQuest.target} ${activeQuest.monsterName}`;
+    if (activeQuests.length) {
+      const txt = activeQuests.map((q, i) => `Quest ${i + 1}: ${q.count}/${q.target} ${q.monsterName}`).join('\n');
       if (this.questText.text !== txt) this.questText.setText(txt);
       this.questBg.setVisible(true);
       this.questText.setVisible(true);
@@ -2822,7 +2951,7 @@ class UIManager {
     for (const m of bloblings) {
       if (!m.alive) continue;
       const cfg = m.cfg || {};
-      if (!cfg.aggressive && cfg.expReward < 90) continue;
+      if (!isBossCfg(cfg)) continue;
       const d = Math.hypot(m.sprite.x - player.sprite.x, m.sprite.y - player.sprite.y);
       if (d < bossD) { bossD = d; boss = m; }
     }
@@ -2834,10 +2963,22 @@ class UIManager {
       this.bossBg.setVisible(true);
       this.bossFill.setVisible(true);
       this.bossText.setVisible(true);
+      this.bossTimerText.setVisible(false);
     } else {
       this.bossBg.setVisible(false);
       this.bossFill.setVisible(false);
       this.bossText.setVisible(false);
+      let nextId = null, nextAt = Infinity;
+      for (const [typeId, at] of Object.entries(bossRespawns)) {
+        if (at < nextAt) { nextAt = at; nextId = typeId; }
+      }
+      if (nextId) {
+        const secs = Math.max(0, Math.ceil((nextAt - this.scene.time.now) / 1000));
+        this.bossTimerText.setText(`${MONSTER_TYPES[nextId].name} respawns in ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`);
+        this.bossTimerText.setVisible(true);
+      } else {
+        this.bossTimerText.setVisible(false);
+      }
     }
 
     this.drawMinimap();
@@ -2883,9 +3024,9 @@ class UIManager {
       else if (m.typeId === 'moowaan') color = 0x55ff88;
       else if (m.typeId === 'cactling') color = 0xbce86a;
       else if (m.typeId === 'rare_mooham') { color = 0xffe066; r = 4; outline = 0xffffff; }
-      else if (m.typeId === 'rare_moowaan') { color = 0x7cffb0; r = 4; outline = 0xffffff; }
-      else if (m.typeId === 'boss_mooham') { color = 0xffff44; r = 4; }
       else if (m.typeId === 'bigfoot') { color = 0xff2222; r = 5; outline = 0x000000; }
+      else if (m.typeId === 'rare_moowaan') { color = 0x7cffb0; r = 4; outline = 0xffffff; }
+      else if (isBossCfg(m.cfg)) { color = m.cfg.tint || 0xffff44; r = 4; outline = 0x000000; }
       g.fillStyle(color, 1);
       g.fillCircle(this.miniX + m.sprite.x * sx, this.miniY + m.sprite.y * sy, r);
       if (outline !== null) {

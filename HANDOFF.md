@@ -1,8 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 1:12pm CDT (post session 11,
-> feel-good loop pass: special glow and hot streaks).
+> coding sessions. Last refresh: 2026-05-17 1:21pm CDT (post session 12,
+> boss/quest/equipment expansion pass).
 
 ---
 
@@ -186,7 +186,64 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 11 (latest, in order)
+## 3. What we did in session 12 (latest, in order)
+
+User said to do all non-NPC suggestions. Cache now at **`?v=73`**.
+
+1. **Boss respawn timer broadcast** added. When a boss-tier monster dies,
+   `bossRespawns[typeId]` records the next spawn time. UI shows a top
+   message like `Bigfoot respawns in 0:05` when no nearby boss HP bar is
+   active.
+2. **Boss danger telegraph** added. Boss-tier monsters show a red ground
+   warning ring and delay their swing by ~450 ms. If the player leaves
+   melee range during the windup, the hit whiffs by positioning.
+3. **Multiple simultaneous quests** shipped. `activeQuest` migrated to
+   `activeQuests` (2 slots), with save compatibility for old single-quest
+   saves. Quest UI now lists both active objectives, and autopilot treats
+   either quest target as preferred.
+4. **Quest completion chain bonus** added. Every 3 completed quests grants
+   bonus zeny plus a `QUEST STREAK xN!` float/banner.
+5. **Equipment-lite boss drops** added. Boss drops auto-equip if stronger:
+   - King Blobling → `Gelatin Buckler` (+4 DEF)
+   - Boss MooHam → `Ham Hammer` (+5 ATK)
+   - Ruin Golem → `Ruin Plate` (+8 DEF)
+   - River Warden → `Reed Spear` (+8 ATK)
+   - Bigfoot → `Fur Guard` (+10 DEF)
+   Equipment persists in save and replaces weaker gear by subtracting the
+   old bonus and applying the new one.
+6. **Biome boss roster** added using existing art/tints, no new assets:
+   - `king_blobling` in grasslands (pink Blobling boss)
+   - `ruin_golem` in ruins (grey MooHam reuse)
+   - `river_warden` in riverside (blue MooWaan reuse)
+   Desert already has Boss MooHam and forest already has Bigfoot.
+7. **Boss classification helper** `isBossCfg(cfg)` now drives boss EXP
+   scaling exemption, autopilot avoidance, boss HP bar, kill banner,
+   heal multiplier, minimap outline, respawn timer, and telegraph behavior.
+8. **Cache bust bumped** in `project-grasslands/index.html` from `?v=72`
+   to `?v=73`.
+9. **Verification**:
+   - `node -c project-grasslands/game.js` exited 0.
+   - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
+   - Served `index.html` references `game.js?v=73`.
+
+## 4. Suggestions / next best ROI
+
+NPC merchant is intentionally skipped per user request.
+
+Recommended next batch:
+
+1. **Boss balance pass** — with 5 bosses now live, tune HP/ATK/EXP/gear
+   rewards after a short play loop. Highest value before adding more systems.
+2. **Quest target variety** — add boss-slay or zone-specific quest variants
+   now that `activeQuests[]` exists.
+3. **Equipment HUD line** — show current weapon/armor in a small character
+   readout or shop panel so boss drops feel less hidden.
+4. **Biome identity polish** — unique recolored minimap icons/banners for
+   each boss and zone.
+5. **Boss respawn longer cadence** — if 5 seconds feels too arcade, move
+   bosses to 60-180 seconds and keep normal mobs at 5 seconds.
+
+## 5. (legacy) What we did in session 11 (in order)
 
 Followed the suggested next ROI order. Cache now at **`?v=72`**.
 
@@ -207,7 +264,7 @@ Followed the suggested next ROI order. Cache now at **`?v=72`**.
    - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
    - Served `index.html` references `game.js?v=72`.
 
-## 4. Suggestions / next best ROI
+## 6. Previous suggestions
 
 Recommended next batch:
 
@@ -223,7 +280,7 @@ Recommended next batch:
 5. **Mini-boss per biome** — strong content expansion, but needs either
    new art or careful recolor/reuse choices to avoid feeling cheap.
 
-## 5. (legacy) What we did in session 10 (in order)
+## 7. (legacy) What we did in session 10 (in order)
 
 Follow-up from the user's ranked ROI list. Cache now at **`?v=71`**.
 
@@ -249,7 +306,7 @@ Follow-up from the user's ranked ROI list. Cache now at **`?v=71`**.
    - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
    - Served `index.html` references `game.js?v=71`.
 
-## 6. Previous suggestions
+## 8. Previous suggestions
 
 Recommended next batch:
 
@@ -266,7 +323,7 @@ Recommended next batch:
 5. **Equipment drops** — biggest gameplay upside, but touches saves,
    loot, UI, balance, and shop design. Do after merchant or streak.
 
-## 7. (legacy) What we did in session 9 (in order)
+## 9. (legacy) What we did in session 9 (in order)
 
 Quick follow-up to the session 8 RO-polish batch. Cache now at **`?v=70`**.
 
@@ -293,7 +350,7 @@ Quick follow-up to the session 8 RO-polish batch. Cache now at **`?v=70`**.
      the bundled `browser-client` path as untrusted, so no screenshot was
      captured in this session.
 
-## 8. Next steps (remaining older list)
+## 10. Next steps (remaining older list)
 
 The user invited Codex to continue this batch. Quick wins #1, #2, and #5
 from the previous list are now done.
@@ -344,7 +401,7 @@ from the previous list are now done.
     is 512 × 512 with 7 irregular props. Needs manual frame coords
     per prop, then a placement pass in the desert decoration block.
 
-## 9. (legacy) What we did in session 8 (in order)
+## 11. (legacy) What we did in session 8 (in order)
 
 Big push focused on user feedback + RO-feel polish. Cache now at
 **`?v=69`**.
@@ -437,7 +494,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
       +200/+60 HP/ATK on hitting Lv 30 / 60 / 100. Tier 4 floats
       `LEGENDARY CLASS!` above the player.
 
-## 10. (legacy) What we did in session 7 (in order)
+## 12. (legacy) What we did in session 7 (in order)
 
 1. **Class selection system added.** New `CLASS_DEFS` table for
    `swordsman` / `mage` / `archer`, each with a 4-tier name ladder, tint
@@ -485,7 +542,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
     back to spawn, clears path/target.
 14. Cache bumped to **`?v=52`**.
 
-## 11. (legacy) What we did in session 6 (in order)
+## 13. (legacy) What we did in session 6 (in order)
 
 1. **Wired real desert art** — `sand_tileset.png` loaded + sliced
    identically to grass tileset; `buildMap` picks `sand_tileset` for
@@ -507,7 +564,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
    512×512 sheet) is **still untracked-wired** — layout is irregular,
    needs hand-tuned per-prop frame coords. Noted in §4.
 
-## 12. (legacy) What we did in session 5 (in order)
+## 14. (legacy) What we did in session 5 (in order)
 
 1. **World doubled** to 6400×6400 (200×200 cells, 50×50 tiles). A* iter
    cap 8 000 → 32 000.
@@ -547,7 +604,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 
 ---
 
-## 13. Known issues / quirks
+## 15. Known issues / quirks
 
 - **Asset weight** — now **~34 MB** of PNGs (down from 96 MB after
   sips downscale in session 5). Acceptable on broadband; mobile / slow
@@ -574,13 +631,13 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=72`**. Next change should use `?v=73`.
+  change. Current: **`?v=73`**. Next change should use `?v=74`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
 ---
 
-## 14. File structure
+## 16. File structure
 
 ```
 Grasslands Online/                                  ← git repo root
@@ -639,7 +696,7 @@ Grasslands Online/                                  ← git repo root
 
 ---
 
-## 15. Assets
+## 17. Assets
 
 ### Sprites — `project-grasslands/assets/sprites/`
 
@@ -691,13 +748,13 @@ Always include `transparent background PNG with alpha channel`. The
 
 ---
 
-## 16. GitHub + Vercel workflow (enforced)
+## 18. GitHub + Vercel workflow (enforced)
 
 - Commit **after every meaningful change**.
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=72`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=73`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.
@@ -705,7 +762,7 @@ Always include `transparent background PNG with alpha channel`. The
 
 ---
 
-## 17. How to continue (do this first in a new session)
+## 19. How to continue (do this first in a new session)
 
 1. **Read this file in full.** No skimming.
 2. From repo root run `git status` and `git log --oneline -10` to confirm
@@ -725,7 +782,7 @@ Always include `transparent background PNG with alpha channel`. The
 
 ---
 
-## 18. Constraints (do NOT re-add)
+## 20. Constraints (do NOT re-add)
 
 The user has explicitly cut these features. Re-adding them is regressive:
 
