@@ -249,6 +249,8 @@ let player;
 let bloblings = [];
 let loots = [];
 let dayNightOverlay = null;
+let worldDarkness = 0;      // 0 = high noon, 1 = midnight
+let _nightAnnounced = false; // once-per-cycle "Night falls" announce
 let targetRing = null;
 const DAY_NIGHT_CYCLE_MS = 120000; // 2-minute day/night loop
 let lastSaveAt = 0;
@@ -897,7 +899,16 @@ function update(time, delta) {
   if (dayNightOverlay) {
     const t = (time % DAY_NIGHT_CYCLE_MS) / DAY_NIGHT_CYCLE_MS;
     const darkness = (1 - Math.cos(t * Math.PI * 2)) / 2; // 0..1..0
+    worldDarkness = darkness;
     dayNightOverlay.alpha = darkness * 0.45;
+    // Once-per-cycle chat callouts at the dusk + dawn thresholds.
+    if (!_nightAnnounced && darkness > 0.65) {
+      _nightAnnounced = true;
+      if (typeof ui !== 'undefined' && ui) ui.message('🌙 Night falls. Fireflies stir.');
+    } else if (_nightAnnounced && darkness < 0.15) {
+      _nightAnnounced = false;
+      if (typeof ui !== 'undefined' && ui) ui.message('🌅 Dawn breaks.');
+    }
   }
 
   // Auto-save progress every few seconds.
@@ -2327,27 +2338,45 @@ const AMBIENCE_STYLE = {
 function tickAmbience(scene, time, delta) {
   const zone = currentZone;
   if (!zone) return;
+  // Base zone particle.
   const rate = AMBIENCE_RATE_PER_SEC[zone] || 0.5;
-  if (Math.random() > rate * (delta / 1000)) return;
-  const style = AMBIENCE_STYLE[zone];
-  const cam = scene.cameras.main;
-  const margin = 80;
-  const x = cam.scrollX + Math.random() * cam.width;
-  const y = cam.scrollY + Math.random() * cam.height;
-  const obj = (style.shape === 'leaf')
-    ? scene.add.rectangle(x, y, style.size + 2, style.size, style.color, 0.7)
-        .setAngle(Math.random() * 360)
-    : scene.add.circle(x, y, style.size, style.color, 0.7);
-  obj.setDepth(15500);
-  scene.tweens.add({
-    targets: obj,
-    x: x + style.drift.x + (Math.random() * 20 - 10),
-    y: y + style.drift.y + (Math.random() * 10),
-    alpha: 0,
-    angle: (style.shape === 'leaf') ? (Math.random() * 360 - 180) : 0,
-    duration: 1800 + Math.random() * 800,
-    onComplete: () => obj.destroy(),
-  });
+  // Night doubles the spawn rate + halves alpha for "darker air" feel.
+  const nightBoost = 1 + worldDarkness * 1.5;
+  if (Math.random() <= rate * nightBoost * (delta / 1000)) {
+    const style = AMBIENCE_STYLE[zone];
+    const cam = scene.cameras.main;
+    const x = cam.scrollX + Math.random() * cam.width;
+    const y = cam.scrollY + Math.random() * cam.height;
+    const obj = (style.shape === 'leaf')
+      ? scene.add.rectangle(x, y, style.size + 2, style.size, style.color, 0.7)
+          .setAngle(Math.random() * 360)
+      : scene.add.circle(x, y, style.size, style.color, 0.7);
+    obj.setDepth(15500);
+    scene.tweens.add({
+      targets: obj,
+      x: x + style.drift.x + (Math.random() * 20 - 10),
+      y: y + style.drift.y + (Math.random() * 10),
+      alpha: 0,
+      angle: (style.shape === 'leaf') ? (Math.random() * 360 - 180) : 0,
+      duration: 1800 + Math.random() * 800,
+      onComplete: () => obj.destroy(),
+    });
+  }
+  // Night fireflies — spawn on top of any biome when darkness > 0.4.
+  if (worldDarkness > 0.4 && Math.random() < (worldDarkness - 0.3) * (delta / 1000) * 3) {
+    const cam = scene.cameras.main;
+    const x = cam.scrollX + Math.random() * cam.width;
+    const y = cam.scrollY + Math.random() * cam.height;
+    const fly = scene.add.circle(x, y, 2, 0xfff2a0, 0.95).setDepth(15600);
+    scene.tweens.add({
+      targets: fly,
+      x: x + (Math.random() * 60 - 30),
+      y: y + (Math.random() * 40 - 20),
+      alpha: 0, scale: 1.6,
+      duration: 1500 + Math.random() * 1500,
+      onComplete: () => fly.destroy(),
+    });
+  }
 }
 
 class LootDrop {
