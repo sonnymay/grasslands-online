@@ -226,6 +226,15 @@ let ui;
 let autopilotOn = false;
 let autopilotLastScan = 0;
 let classSelectOpen = false;
+let shopOpen = false;
+
+// Shop items. price = base * 1.5^bought.
+const SHOP_ITEMS = [
+  { id: 'hp',  label: '+20 Max HP',  base:  80, apply: (p) => { p.maxHP += 20; p.hp = p.maxHP; } },
+  { id: 'atk', label: '+5 ATK',      base: 150, apply: (p) => { p.atk += 5; } },
+  { id: 'def', label: '+1 DEF',      base: 200, apply: (p) => { p.def += 1; } },
+  { id: 'pot', label: 'Full Heal',   base:  50, flat: true, apply: (p) => { p.hp = p.maxHP; } },
+];
 let currentZone = null;
 const ZONE_LABELS = {
   grasslands: 'Grasslands',
@@ -501,8 +510,8 @@ function create() {
 
   // Pointer: click a Blobling to fight it; click ground to walk there.
   scene.input.on('pointerdown', (pointer) => {
-    // Block world clicks while the class overlay is up.
-    if (classSelectOpen) return;
+    // Block world clicks while any modal overlay is up.
+    if (classSelectOpen || shopOpen) return;
     // Ignore clicks that landed on a UI button (mute / autopilot / return /
     // class cards). Phaser's scene-level pointerdown fires regardless of
     // which interactive object was hit, so we check the hit list ourselves.
@@ -849,6 +858,7 @@ class PlayerController {
     this.kills = 0;
     this.classId = null;   // 'swordsman' | 'mage' | 'archer'
     this.classTier = 0;    // 0 = unselected, 1..4 once chosen
+    this.shopBought = { hp: 0, atk: 0, def: 0, pot: 0 };
     this.level = 1;
     this.dead = false;
     this.dir = 'south';
@@ -1319,6 +1329,7 @@ function saveGame() {
       atk: player.atk, def: player.def, zeny: player.zeny,
       kills: player.kills,
       classId: player.classId, classTier: player.classTier,
+      shopBought: player.shopBought,
       cellCol: player.cellCol, cellRow: player.cellRow,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -1345,6 +1356,7 @@ function applySave() {
   player.kills  = save.kills  ?? 0;
   player.classId   = save.classId   ?? null;
   player.classTier = save.classTier ?? 0;
+  player.shopBought = Object.assign({ hp:0, atk:0, def:0, pot:0 }, save.shopBought || {});
   // Reapply class tint on sprite + refresh name tag color/title.
   if (player.classId && CLASS_DEFS[player.classId]) {
     player.sprite.setTint(CLASS_DEFS[player.classId].tint);
@@ -1992,6 +2004,103 @@ function selectClass(scene, id, container) {
   saveGame();
 }
 
+function shopItemPrice(item, bought) {
+  if (item.flat) return item.base;
+  return Math.round(item.base * Math.pow(1.5, bought));
+}
+
+function showShop(scene) {
+  if (shopOpen) return;
+  shopOpen = true;
+  const cont = scene.add.container(0, 0).setScrollFactor(0).setDepth(20000);
+
+  const bg = scene.add.rectangle(0, 0, GAME_W, GAME_H, 0x000000, 0.78)
+    .setOrigin(0, 0).setScrollFactor(0).setInteractive();
+  bg.on('pointerdown', (p, lx, ly, ev) => { ev && ev.stopPropagation && ev.stopPropagation(); });
+  cont.add(bg);
+
+  const title = scene.add.text(GAME_W / 2, 60, '⚒ TRADER', {
+    fontSize: '36px', fontStyle: 'bold', color: '#ffe066',
+    stroke: '#5a3a00', strokeThickness: 5,
+  }).setOrigin(0.5).setScrollFactor(0);
+  cont.add(title);
+
+  // Live zeny display.
+  const zenyTxt = scene.add.text(GAME_W / 2, 110, `Zeny: ${player.zeny}`, {
+    fontSize: '20px', color: '#ffd24a', stroke: '#000', strokeThickness: 4,
+  }).setOrigin(0.5).setScrollFactor(0);
+  cont.add(zenyTxt);
+
+  // Close X.
+  const closeBtn = scene.add.text(GAME_W - 40, 30, '✕', {
+    fontSize: '32px', fontStyle: 'bold', color: '#ffffff',
+    stroke: '#000', strokeThickness: 4,
+  }).setOrigin(0.5).setScrollFactor(0);
+  closeBtn.setInteractive(
+    new Phaser.Geom.Rectangle(-22, -22, 44, 44),
+    Phaser.Geom.Rectangle.Contains
+  );
+  closeBtn.input.cursor = 'pointer';
+  closeBtn.on('pointerover', () => closeBtn.setColor('#ffe066'));
+  closeBtn.on('pointerout',  () => closeBtn.setColor('#ffffff'));
+  closeBtn.on('pointerdown', () => { cont.destroy(); shopOpen = false; });
+  cont.add(closeBtn);
+
+  const rowH = 60;
+  const rowW = 460;
+  const startY = 160;
+  const rows = [];
+  SHOP_ITEMS.forEach((item, i) => {
+    const ry = startY + i * (rowH + 12);
+    const rx = (GAME_W - rowW) / 2;
+    const card = scene.add.rectangle(rx + rowW/2, ry + rowH/2, rowW, rowH, 0x442200, 0.92)
+      .setStrokeStyle(2, 0xffe066, 0.9).setScrollFactor(0);
+    card.setInteractive(
+      new Phaser.Geom.Rectangle(-rowW/2, -rowH/2, rowW, rowH),
+      Phaser.Geom.Rectangle.Contains
+    );
+    card.input.cursor = 'pointer';
+
+    const bought = player.shopBought[item.id] || 0;
+    const price = shopItemPrice(item, bought);
+    const labelText = scene.add.text(rx + 20, ry + rowH/2, item.label, {
+      fontSize: '18px', fontStyle: 'bold', color: '#ffffff',
+      stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0, 0.5).setScrollFactor(0);
+    const priceText = scene.add.text(rx + rowW - 20, ry + rowH/2,
+      `${price} zeny${item.flat ? '' : `   (bought ${bought})`}`, {
+      fontSize: '16px', color: '#ffd24a',
+      stroke: '#000', strokeThickness: 3,
+    }).setOrigin(1, 0.5).setScrollFactor(0);
+
+    cont.add([card, labelText, priceText]);
+    rows.push({ card, labelText, priceText, item });
+
+    card.on('pointerover', () => card.setStrokeStyle(3, 0xffffff, 1));
+    card.on('pointerout',  () => card.setStrokeStyle(2, 0xffe066, 0.9));
+    card.on('pointerdown', () => {
+      const cur = player.shopBought[item.id] || 0;
+      const cost = shopItemPrice(item, cur);
+      if (player.zeny < cost) {
+        ui.message(`Not enough zeny (need ${cost}, have ${player.zeny}).`);
+        sfxMiss();
+        return;
+      }
+      player.zeny -= cost;
+      item.apply(player);
+      player.shopBought[item.id] = cur + 1;
+      sfxLevelUp();
+      ui.message(`Bought ${item.label} for ${cost} zeny.`);
+      // Refresh prices + zeny on the open panel.
+      zenyTxt.setText(`Zeny: ${player.zeny}`);
+      const nb = player.shopBought[item.id];
+      const np = shopItemPrice(item, nb);
+      priceText.setText(`${np} zeny${item.flat ? '' : `   (bought ${nb})`}`);
+      saveGame();
+    });
+  });
+}
+
 function checkClassTierUpgrade(player) {
   if (!player.classId) return;
   const cdef = CLASS_DEFS[player.classId];
@@ -2387,6 +2496,20 @@ class UIManager {
       player._refreshNameTag();
       ui.message(`Level down. Now Lv.${player.level}.`);
       saveGame();
+    });
+
+    // Shop button — spend zeny on permanent upgrades + full-heal potion.
+    const shY = lvMY + btnH + 6;
+    this.shBg = scene.add.rectangle(btnX, shY, btnW, btnH, 0x553300, 0.9)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
+      .setStrokeStyle(2, 0xffe066, 1)
+      .setInteractive({ useHandCursor: true });
+    this.shText = scene.add.text(btnX + btnW / 2, shY + btnH / 2, '⚒ Shop', {
+      fontSize: '13px', color: '#ffe066', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    this.shBg.on('pointerdown', () => {
+      if (!player || player.dead) return;
+      showShop(scene);
     });
 
     // Boss HP bar (top of screen, hidden until a boss is engaged).
