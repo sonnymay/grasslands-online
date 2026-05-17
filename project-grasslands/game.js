@@ -36,6 +36,7 @@ const BLOBLING_COUNT = 30;
 const MOOHAM_COUNT = 20;
 const MOOWAAN_COUNT = 15;
 const DUNE_BLOB_COUNT = 12;
+const BIGFOOT_COUNT = 1;
 
 // Monster type catalog. Add new monsters here; spawn loop reads `count`.
 const MONSTER_TYPES = {
@@ -74,6 +75,15 @@ const MONSTER_TYPES = {
     maxHP: 240, atk: 16, expReward: 90, speed: 55,
     nameColor: '#ff9933', count: 1, scaleMult: 1.9,
     zones: ['desert'],
+  },
+  bigfoot: {
+    name: 'Bigfoot',
+    idleKey: 'bigfoot_idle', hitKey: 'bigfoot_hit', deadKey: 'bigfoot_dead',
+    aggroKey: 'bigfoot_aggro', chaseKey: 'bigfoot_chase', attackKey: 'bigfoot_attack',
+    maxHP: 900, atk: 220, expReward: 500, speed: 45,
+    nameColor: '#ff4444', count: BIGFOOT_COUNT, scaleMult: 2.2,
+    fixedLevel: 50, noLevelScaling: true, aggressive: true, aggroRange: 520, oneShotBelowLevel: 50,
+    zones: ['forest'],
   },
 };
 
@@ -205,6 +215,12 @@ function preload() {
   this.load.image('moowaan_idle', 'assets/sprites/moowaan_idle.png');
   this.load.image('moowaan_hit', 'assets/sprites/moowaan_hit.png');
   this.load.image('moowaan_dead', 'assets/sprites/moowaan_dead.png');
+  this.load.image('bigfoot_idle', 'assets/sprites/bigfoot_idle.png');
+  this.load.image('bigfoot_aggro', 'assets/sprites/bigfoot_aggro.png');
+  this.load.image('bigfoot_chase', 'assets/sprites/bigfoot_chase.png');
+  this.load.image('bigfoot_attack', 'assets/sprites/bigfoot_attack.png');
+  this.load.image('bigfoot_hit', 'assets/sprites/bigfoot_hit.png');
+  this.load.image('bigfoot_dead', 'assets/sprites/bigfoot_dead.png');
   // Decorations
   for (let i = 1; i <= 4; i++) this.load.image(`deco_flower_cluster_0${i}`, `assets/decorations/deco_flower_cluster_0${i}.png`);
   for (let i = 1; i <= 3; i++) this.load.image(`deco_rock_0${i}`, `assets/decorations/deco_rock_0${i}.png`);
@@ -265,6 +281,7 @@ function create() {
     'blobling_idle','blobling_hit','blobling_dead',
     'mooham_idle','mooham_hit','mooham_dead',
     'moowaan_idle','moowaan_hit','moowaan_dead',
+    'bigfoot_idle','bigfoot_aggro','bigfoot_chase','bigfoot_attack','bigfoot_hit','bigfoot_dead',
     'deco_flower_cluster_01','deco_flower_cluster_02','deco_flower_cluster_03','deco_flower_cluster_04',
     'deco_rock_01','deco_rock_02','deco_rock_03',
     'deco_tallgrass_01','deco_tallgrass_02','deco_tallgrass_03',
@@ -1246,19 +1263,19 @@ function applyRookieTexture(sprite, dir, frame) {
 }
 
 // ---------- MonsterController ----------
-// Passive AI: monsters only chase + attack the player after being hit
-// (provoked). Aggro lapses ~5s after the last damage tick.
+// Most monsters only chase after being hit. Aggressive monsters can open combat.
 class MonsterController {
   constructor(scene, x, y, typeId) {
     this.scene = scene;
     this.typeId = typeId;
     const cfg = MONSTER_TYPES[typeId];
     this.cfg = cfg;
-    // Random level 1-3, weighted toward 1.
+    // Random level 1-3, weighted toward 1 unless a monster defines a fixed level.
     const lr = Math.random();
-    this.level = lr < 0.65 ? 1 : (lr < 0.92 ? 2 : 3);
-    const hpMult = 1 + 0.5 * (this.level - 1);
-    const atkMult = 1 + 0.3 * (this.level - 1);
+    this.level = cfg.fixedLevel || (lr < 0.65 ? 1 : (lr < 0.92 ? 2 : 3));
+    const statLevel = cfg.noLevelScaling ? 1 : this.level;
+    const hpMult = 1 + 0.5 * (statLevel - 1);
+    const atkMult = 1 + 0.3 * (statLevel - 1);
     this.maxHP = Math.round(cfg.maxHP * hpMult);
     this.hp = this.maxHP;
     this.atk = Math.round(cfg.atk * atkMult);
@@ -1308,16 +1325,23 @@ class MonsterController {
     const dx = player.sprite.x - this.sprite.x;
     const dy = player.sprite.y - this.sprite.y;
     const dist = Math.hypot(dx, dy);
+    const playerAlive = !player.dead;
+
+    if (this.cfg.aggressive && playerAlive && dist <= (this.cfg.aggroRange || BLOBLING_AGGRO_RANGE)) {
+      this.provoked = true;
+      this.provokedUntil = time + 500;
+    }
 
     // Drop aggro after the cool-off window.
     if (this.provoked && time > this.provokedUntil) this.provoked = false;
 
-    const playerAlive = !player.dead;
     if (playerAlive && this.provoked) {
       if (dist > BLOBLING_ATTACK_RANGE) {
         this.sprite.setVelocity((dx / dist) * this.speed, (dy / dist) * this.speed);
+        if (this.cfg.chaseKey) this.sprite.setTexture(this.cfg.chaseKey);
       } else {
         this.sprite.setVelocity(0, 0);
+        if (this.cfg.aggroKey) this.sprite.setTexture(this.cfg.aggroKey);
         if (time - this.lastAttack > BLOBLING_ATTACK_COOLDOWN) {
           this.lastAttack = time;
           const hit = rollMonsterHit(this.atk);
@@ -1325,6 +1349,10 @@ class MonsterController {
             spawnFloatText(this.scene, player.sprite.x, player.sprite.y - 20, 'MISS', 0xcccccc);
             sfxMiss();
           } else {
+            if (this.cfg.attackKey) this.sprite.setTexture(this.cfg.attackKey);
+            if (this.cfg.oneShotBelowLevel && player.level < this.cfg.oneShotBelowLevel) {
+              hit.amount = player.hp + player.def;
+            }
             player.takeDamage(hit.amount);
             sfxPlayerHit();
           }
@@ -1343,6 +1371,7 @@ class MonsterController {
         }
       }
       this.sprite.setVelocity(this.wanderVx, this.wanderVy);
+      if (this.cfg.idleKey) this.sprite.setTexture(this.cfg.idleKey);
     }
 
     this._syncShadow();
@@ -1448,6 +1477,7 @@ class LootDrop {
 
 function spawnMonster(scene, typeId) {
   const cfg = MONSTER_TYPES[typeId];
+  if (cfg.count === 1 && bloblings.some(m => m.typeId === typeId && m.alive)) return;
   const allowedZones = cfg && cfg.zones;
   let x, y, tries = 0;
   let ok = false;
@@ -1649,12 +1679,18 @@ class UIManager {
       if (!m.alive) continue;
       let color = 0xff5555;
       let r = 2;
+      let outline = null;
       if (m.typeId === 'mooham') color = 0xffaa55;
       else if (m.typeId === 'moowaan') color = 0x55ff88;
       else if (m.typeId === 'dune_blob') color = 0xf5d98a;
       else if (m.typeId === 'boss_mooham') { color = 0xffff44; r = 4; }
+      else if (m.typeId === 'bigfoot') { color = 0xff2222; r = 5; outline = 0x000000; }
       g.fillStyle(color, 1);
       g.fillCircle(this.miniX + m.sprite.x * sx, this.miniY + m.sprite.y * sy, r);
+      if (outline !== null) {
+        g.lineStyle(2, outline, 1);
+        g.strokeCircle(this.miniX + m.sprite.x * sx, this.miniY + m.sprite.y * sy, r + 2);
+      }
     }
     // Loot.
     g.fillStyle(0xffd24a, 1);
