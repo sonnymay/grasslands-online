@@ -3,8 +3,8 @@
 
 const GAME_W = 1024;
 const GAME_H = 768;
-const WORLD_W = 3200;
-const WORLD_H = 3200;
+const WORLD_W = 6400;
+const WORLD_H = 6400;
 const TILE_SIZE = 128;
 const MAP_COLS = Math.ceil(WORLD_W / TILE_SIZE); // 25
 const MAP_ROWS = Math.ceil(WORLD_H / TILE_SIZE);
@@ -32,9 +32,10 @@ const LOOT_PICKUP_RADIUS = 28;
 const BLOBLING_ATTACK_COOLDOWN = 1500;
 const BLOBLING_AGGRO_RANGE = 200;
 const BLOBLING_ATTACK_RANGE = 80;
-const BLOBLING_COUNT = 15;
-const MOOHAM_COUNT = 10;
-const MOOWAAN_COUNT = 8;
+const BLOBLING_COUNT = 30;
+const MOOHAM_COUNT = 20;
+const MOOWAAN_COUNT = 15;
+const DUNE_BLOB_COUNT = 12;
 
 // Monster type catalog. Add new monsters here; spawn loop reads `count`.
 const MONSTER_TYPES = {
@@ -43,25 +44,48 @@ const MONSTER_TYPES = {
     idleKey: 'blobling_idle', hitKey: 'blobling_hit', deadKey: 'blobling_dead',
     maxHP: 50, atk: 5, expReward: 10, speed: 80,
     nameColor: '#ffcccc', count: BLOBLING_COUNT,
+    zones: ['grasslands'],
   },
   mooham: {
     name: 'MooHam',
     idleKey: 'mooham_idle', hitKey: 'mooham_hit', deadKey: 'mooham_dead',
     maxHP: 80, atk: 8, expReward: 18, speed: 70,
     nameColor: '#ffd9a8', count: MOOHAM_COUNT,
+    zones: ['grasslands', 'ruins'],
   },
   moowaan: {
     name: 'MooWaan',
     idleKey: 'moowaan_idle', hitKey: 'moowaan_hit', deadKey: 'moowaan_dead',
     maxHP: 60, atk: 6, expReward: 14, speed: 90,
     nameColor: '#d6ffd0', count: MOOWAAN_COUNT, scaleMult: 0.9,
+    zones: ['forest', 'riverside'],
+  },
+  dune_blob: {
+    name: 'Dune Blob',
+    idleKey: 'blobling_idle', hitKey: 'blobling_hit', deadKey: 'blobling_dead',
+    maxHP: 70, atk: 7, expReward: 16, speed: 85,
+    nameColor: '#f5d98a', count: DUNE_BLOB_COUNT, scaleMult: 1.0,
+    tint: 0xe8c878,
+    zones: ['desert'],
   },
   boss_mooham: {
     name: 'Boss MooHam',
     idleKey: 'mooham_idle', hitKey: 'mooham_hit', deadKey: 'mooham_dead',
     maxHP: 240, atk: 16, expReward: 90, speed: 55,
     nameColor: '#ff9933', count: 1, scaleMult: 1.9,
+    zones: ['desert'],
   },
+};
+
+// Zones partition the world into themed regions. Each zone gets its own tile
+// tint, decoration mix, and monster pool. Center stays grasslands so the spawn
+// area is unchanged for returning players.
+const ZONE_TINTS = {
+  grasslands: 0xffffff,
+  forest:     0x6b8a5a,
+  desert:     0xe8c878,
+  ruins:      0xb0a890,
+  riverside:  0xa8c8b0,
 };
 const ANIM_FRAME_MS = 180;
 const WALK_FRAME_MS = 120;
@@ -116,7 +140,7 @@ let dayNightOverlay = null;
 let targetRing = null;
 const DAY_NIGHT_CYCLE_MS = 120000; // 2-minute day/night loop
 let lastSaveAt = 0;
-const SAVE_KEY = 'grasslands_save_v1';
+const SAVE_KEY = 'grasslands_save_v2';
 const SAVE_INTERVAL_MS = 3000;
 let ui;
 let lastPlayerAttack = 0;
@@ -467,10 +491,28 @@ function getCellType(r, c) {
   return 'grass';
 }
 
+// Zone layout: keep a central grasslands square around spawn, partition the
+// outer ring into compass-aligned biomes. Tile coords (r, c) are 0..MAP_ROWS-1.
+function getZone(r, c) {
+  const midRow = Math.floor(MAP_ROWS / 2);
+  const midCol = Math.floor(MAP_COLS / 2);
+  const dr = r - midRow;
+  const dc = c - midCol;
+  const coreHalf = Math.floor(MAP_COLS * 0.18); // ~9 tiles either side of center
+  if (Math.abs(dr) <= coreHalf && Math.abs(dc) <= coreHalf) return 'grasslands';
+  // Outside the core: pick biome by dominant axis.
+  if (Math.abs(dr) >= Math.abs(dc)) {
+    return dr < 0 ? 'forest' : 'desert';
+  } else {
+    return dc < 0 ? 'ruins' : 'riverside';
+  }
+}
+
 function buildMap(scene) {
   for (let r = 0; r < MAP_ROWS; r++) {
     for (let c = 0; c < MAP_COLS; c++) {
       const type = getCellType(r, c);
+      const zone = getZone(r, c);
       let idx;
       if (type === 'path_cross') idx = TILE.DIRT_OPEN;
       else if (type === 'path_h') idx = TILE.DIRT_H;
@@ -491,6 +533,10 @@ function buildMap(scene) {
         if (Math.random() < 0.5) img.setFlipX(true);
         if (Math.random() < 0.5) img.setFlipY(true);
       }
+      // Zone tint: non-grasslands biomes recolor the shared tileset until real
+      // per-biome tilesets ship. Path tiles also tint so dirt blends with biome.
+      const tint = ZONE_TINTS[zone];
+      if (tint && tint !== 0xffffff) img.setTint(tint);
       img.setDepth(-1000);
     }
   }
@@ -521,10 +567,16 @@ function buildDecorations(scene) {
   // Generic scatter. By default decorations are flat overlays under entities.
   // `alignBottom` lets us anchor the base of a sprite (trees/bushes/pond) so the
   // depth-sort plays nicely with the player and the visual sits on the ground.
+  // `zoneFilter` restricts placement to one zone (string or array of zones).
   const place = (key, displayH, opts = {}) => {
     const tile_r = Phaser.Math.Between(0, MAP_ROWS - 1);
     const tile_c = Phaser.Math.Between(0, MAP_COLS - 1);
     if (getCellType(tile_r, tile_c) !== 'grass') return null;
+    if (opts.zoneFilter) {
+      const zone = getZone(tile_r, tile_c);
+      const allowed = Array.isArray(opts.zoneFilter) ? opts.zoneFilter : [opts.zoneFilter];
+      if (!allowed.includes(zone)) return null;
+    }
     const jitterX = Phaser.Math.Between(-TILE_SIZE / 2 + 12, TILE_SIZE / 2 - 12);
     const jitterY = Phaser.Math.Between(-TILE_SIZE / 2 + 12, TILE_SIZE / 2 - 12);
     const x = tile_c * TILE_SIZE + TILE_SIZE / 2 + jitterX;
@@ -550,18 +602,45 @@ function buildDecorations(scene) {
       img.setDepth(opts.depth ?? -500);
     }
     img.setAlpha(opts.alpha ?? 1);
+    if (opts.tint) img.setTint(opts.tint);
 
     if (opts.blockRadius) blockCells(x, y, opts.blockRadius);
     return img;
   };
 
-  // Density tuned for 25×25 map.
-  for (let i = 0; i < 220; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     52, { alpha: 0.95, maxAngle: 18 });
-  for (let i = 0; i < 110; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),    60, { maxAngle: 15 });
-  for (let i = 0; i <  90; i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  44, { maxAngle: 10 });
-  for (let i = 0; i <  70; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      72, { maxAngle:  8, alignBottom: true, blockRadius: 1 });
-  for (let i = 0; i <  35; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2 });
-  for (let i = 0; i <   3; i++) place('pond_01',                                  220, { maxAngle:  0, alignBottom: true, blockRadius: 3, allowFlip: false });
+  const rockKeys = ['deco_rock_01','deco_rock_02','deco_rock_03'];
+
+  // Grasslands (center) — original density, scaled up for the bigger core.
+  for (let i = 0; i < 350; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     52, { alpha: 0.95, maxAngle: 18, zoneFilter: 'grasslands' });
+  for (let i = 0; i < 180; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),    60, { maxAngle: 15, zoneFilter: 'grasslands' });
+  for (let i = 0; i < 140; i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  44, { maxAngle: 10, zoneFilter: 'grasslands' });
+  for (let i = 0; i < 110; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      72, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'grasslands' });
+  for (let i = 0; i <  60; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'grasslands' });
+  for (let i = 0; i <   4; i++) place('pond_01',                                  220, { maxAngle:  0, alignBottom: true, blockRadius: 3, allowFlip: false, zoneFilter: 'grasslands' });
+
+  // Forest (north) — heavy trees, dark bushes, mushrooms. Tinted darker green.
+  const forestTint = 0x9bbf86;
+  for (let i = 0; i < 320; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     200, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'forest', tint: forestTint });
+  for (let i = 0; i < 180; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      78, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'forest', tint: forestTint });
+  for (let i = 0; i < 220; i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  48, { maxAngle: 10, zoneFilter: 'forest' });
+  for (let i = 0; i < 200; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     54, { alpha: 0.9, maxAngle: 18, zoneFilter: 'forest', tint: forestTint });
+
+  // Desert (south) — sparse, lots of rocks, no flowers/trees/bushes.
+  const desertTint = 0xd9c08a;
+  for (let i = 0; i < 260; i++) place(Phaser.Utils.Array.GetRandom(rockKeys),      54, { maxAngle: 12, alignBottom: true, blockRadius: 1, zoneFilter: 'desert', tint: desertTint });
+  for (let i = 0; i <  90; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     40, { alpha: 0.6, maxAngle: 20, zoneFilter: 'desert', tint: 0xd6c178 });
+
+  // Ruins (west) — heavy rocks, occasional dead bush. Greyish.
+  const ruinTint = 0xc8c0b0;
+  for (let i = 0; i < 300; i++) place(Phaser.Utils.Array.GetRandom(rockKeys),      58, { maxAngle: 14, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: ruinTint });
+  for (let i = 0; i <  80; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      66, { maxAngle:  6, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: 0xa89878 });
+  for (let i = 0; i < 120; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     46, { alpha: 0.7, maxAngle: 18, zoneFilter: 'ruins', tint: ruinTint });
+
+  // Riverside (east) — ponds, tall grass, flowers, occasional tree.
+  for (let i = 0; i <  18; i++) place('pond_01',                                  240, { maxAngle:  0, alignBottom: true, blockRadius: 3, allowFlip: false, zoneFilter: 'riverside' });
+  for (let i = 0; i < 280; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     56, { alpha: 0.95, maxAngle: 18, zoneFilter: 'riverside' });
+  for (let i = 0; i < 200; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),    60, { maxAngle: 15, zoneFilter: 'riverside' });
+  for (let i = 0; i <  70; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'riverside' });
 
   // Always keep the player spawn cell + Healer cell walkable.
   const protect = (wx, wy) => {
@@ -923,7 +1002,7 @@ function findPath(sCol, sRow, gCol, gRow) {
   ];
 
   let iterations = 0;
-  const maxIterations = 8000;
+  const maxIterations = 32000;
   while (open.size > 0 && iterations++ < maxIterations) {
     // Pop the node with the lowest f.
     let bestKey = null, bestNode = null;
@@ -1196,6 +1275,7 @@ class MonsterController {
     this.sprite = scene.physics.add.sprite(x, y, cfg.idleKey);
     const bScale = (BLOBLING_DISPLAY_H / this.sprite.height) * (cfg.scaleMult || 1);
     this.sprite.setScale(bScale);
+    if (cfg.tint) this.sprite.setTint(cfg.tint);
     this.sprite.setCollideWorldBounds(true);
     this.shadow = scene.add.ellipse(
       x,
@@ -1367,16 +1447,21 @@ class LootDrop {
 }
 
 function spawnMonster(scene, typeId) {
+  const cfg = MONSTER_TYPES[typeId];
+  const allowedZones = cfg && cfg.zones;
   let x, y, tries = 0;
-  do {
+  let ok = false;
+  while (!ok && tries++ < 60) {
     x = 200 + Math.random() * (WORLD_W - 400);
     y = 200 + Math.random() * (WORLD_H - 400);
-    tries++;
-  } while (
-    player &&
-    Math.hypot(x - player.sprite.x, y - player.sprite.y) < 300 &&
-    tries < 20
-  );
+    if (player && Math.hypot(x - player.sprite.x, y - player.sprite.y) < 300) continue;
+    if (allowedZones) {
+      const tile_c = Math.floor(x / TILE_SIZE);
+      const tile_r = Math.floor(y / TILE_SIZE);
+      if (!allowedZones.includes(getZone(tile_r, tile_c))) continue;
+    }
+    ok = true;
+  }
   bloblings.push(new MonsterController(scene, x, y, typeId));
   spawnPuff(scene, x, y);
 }
@@ -1534,6 +1619,27 @@ class UIManager {
     g.clear();
     const sx = this.miniW / WORLD_W;
     const sy = this.miniH / WORLD_H;
+    // Zone backdrop — 5×5 sample grid blended with the dark bg so biomes read
+    // at a glance without dominating the map.
+    const samples = 16;
+    const cellW = this.miniW / samples;
+    const cellH = this.miniH / samples;
+    const zoneColor = {
+      grasslands: 0x6fa84a,
+      forest:     0x355028,
+      desert:     0xc8a85a,
+      ruins:      0x807868,
+      riverside:  0x4a8c9a,
+    };
+    for (let sr = 0; sr < samples; sr++) {
+      for (let sc = 0; sc < samples; sc++) {
+        const tile_r = Math.floor((sr + 0.5) / samples * MAP_ROWS);
+        const tile_c = Math.floor((sc + 0.5) / samples * MAP_COLS);
+        const z = getZone(tile_r, tile_c);
+        g.fillStyle(zoneColor[z] || 0x555555, 0.55);
+        g.fillRect(this.miniX + sc * cellW, this.miniY + sr * cellH, cellW + 1, cellH + 1);
+      }
+    }
     // Path cross (rough).
     g.fillStyle(0xb38a4a, 0.6);
     g.fillRect(this.miniX, this.miniY + this.miniH / 2 - 2, this.miniW, 4);
@@ -1545,6 +1651,7 @@ class UIManager {
       let r = 2;
       if (m.typeId === 'mooham') color = 0xffaa55;
       else if (m.typeId === 'moowaan') color = 0x55ff88;
+      else if (m.typeId === 'dune_blob') color = 0xf5d98a;
       else if (m.typeId === 'boss_mooham') { color = 0xffff44; r = 4; }
       g.fillStyle(color, 1);
       g.fillCircle(this.miniX + m.sprite.x * sx, this.miniY + m.sprite.y * sy, r);
