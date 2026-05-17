@@ -257,6 +257,7 @@ function create() {
   // audio context and starts the track. After that it just loops.
   if (scene.cache.audio.exists('bgm')) {
     const bgm = scene.sound.add('bgm', { loop: true, volume: 0.35 });
+    scene.bgm = bgm; // expose for the mute toggle in UIManager
     const start = () => {
       try {
         if (scene.sound.context && scene.sound.context.state === 'suspended') {
@@ -660,7 +661,7 @@ function buildDecorations(scene) {
   for (let i = 0; i < 140; i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  44, { maxAngle: 10, zoneFilter: 'grasslands' });
   for (let i = 0; i < 110; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      72, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'grasslands' });
   for (let i = 0; i <  60; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'grasslands' });
-  for (let i = 0; i <   4; i++) place('pond_01',                                  220, { maxAngle:  0, alignBottom: true, blockRadius: 3, allowFlip: false, zoneFilter: 'grasslands' });
+  for (let i = 0; i <   4; i++) place('pond_01',                                  220, { maxAngle:  0, alignBottom: true, blockRadius: 6, allowFlip: false, zoneFilter: 'grasslands' });
 
   // Forest (north) — heavy trees, dark bushes, mushrooms. Tinted darker green.
   const forestTint = 0x9bbf86;
@@ -683,7 +684,7 @@ function buildDecorations(scene) {
   for (let i = 0; i < 120; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     46, { alpha: 0.7, maxAngle: 18, zoneFilter: 'ruins', tint: ruinTint });
 
   // Riverside (east) — ponds, tall grass, flowers, occasional tree.
-  for (let i = 0; i <  18; i++) place('pond_01',                                  240, { maxAngle:  0, alignBottom: true, blockRadius: 3, allowFlip: false, zoneFilter: 'riverside' });
+  for (let i = 0; i <  18; i++) place('pond_01',                                  240, { maxAngle:  0, alignBottom: true, blockRadius: 7, allowFlip: false, zoneFilter: 'riverside' });
   for (let i = 0; i < 280; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     56, { alpha: 0.95, maxAngle: 18, zoneFilter: 'riverside' });
   for (let i = 0; i < 200; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),    60, { maxAngle: 15, zoneFilter: 'riverside' });
   for (let i = 0; i <  70; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'riverside' });
@@ -1448,7 +1449,14 @@ class MonsterController {
     this.nameTag.setVisible(false);
     player.gainExp(this.expReward);
     player.kills += 1;
-    ui.message(`Killed ${this.cfg.name} (+${this.expReward} EXP)`);
+    // Heal on kill: 8% of maxHP, scaled up for bosses (expReward >= 90).
+    const healPct = this.expReward >= 90 ? 0.30 : 0.08;
+    const healAmt = Math.max(1, Math.round(player.maxHP * healPct));
+    if (!player.dead && player.hp < player.maxHP) {
+      player.hp = Math.min(player.maxHP, player.hp + healAmt);
+      spawnFloatText(this.scene, player.sprite.x, player.sprite.y - 20, `+${healAmt}`, 0x66ff88);
+    }
+    ui.message(`Killed ${this.cfg.name} (+${this.expReward} EXP, +${healAmt} HP)`);
     spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 30, `+${this.expReward} EXP`, 0x66ff66, { fontSize: '14px' });
 
     // Drop a small zeny pile — scaled to monster reward.
@@ -1656,6 +1664,33 @@ class UIManager {
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10012)
       .setStrokeStyle(2, 0xffffff, 0.9).setFillStyle();
     this.miniGfx = scene.add.graphics().setScrollFactor(0).setDepth(10011);
+
+    // Music mute toggle — small button under the minimap.
+    const btnW = 90, btnH = 26;
+    const btnX = this.miniX + this.miniW - btnW;
+    const btnY = this.miniY + this.miniH + 6;
+    this.muteBg = scene.add.rectangle(btnX, btnY, btnW, btnH, 0x000000, 0.7)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
+      .setStrokeStyle(2, 0xffffff, 0.8)
+      .setInteractive({ useHandCursor: true });
+    this.muteText = scene.add.text(btnX + btnW / 2, btnY + btnH / 2, '♪ Music: ON', {
+      fontSize: '13px', color: '#ffffff', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    this.muteBg.on('pointerdown', () => {
+      const bgm = scene.bgm;
+      if (!bgm) return;
+      bgm.setMute(!bgm.mute);
+      // If unmuting and not yet started (autoplay block), kick it off here.
+      if (!bgm.mute && !bgm.isPlaying) {
+        try {
+          if (scene.sound.context && scene.sound.context.state === 'suspended') {
+            scene.sound.context.resume();
+          }
+          bgm.play();
+        } catch (e) { /* ignore */ }
+      }
+      this.muteText.setText(bgm.mute ? '♪ Music: OFF' : '♪ Music: ON');
+    });
 
     // Chat box
     this.chatBg = scene.add.rectangle(10, GAME_H - 220, 320, 150, 0x000000, 0.5)
