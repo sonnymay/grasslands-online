@@ -1,8 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 1:35pm CDT (post session 15,
-> map structure and exploration readability polish).
+> coding sessions. Last refresh: 2026-05-17 4:55pm CDT (post session 16,
+> reward/exploration/options polish + all-class directional art).
 
 ---
 
@@ -186,7 +186,185 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 15 (latest, in order)
+## 3. What we did in session 16 (latest, in order)
+
+Big QoL + content batch on top of Codex's session 15. Cache now at
+**`?v=88`**. All commit hashes are on `main` and pushed.
+
+**Auto-safety + exploration:**
+1. **Panic-heal** — when `player.hp / player.maxHP < 0.25`, the player
+   auto-spends `PANIC_COST` (50z) for a full heal, gated by a 6s
+   `PANIC_COOLDOWN_MS`. Green `💚 PANIC HEAL +N` float + heal chime +
+   chat line. Constants live near the top of `game.js`.
+2. **Landmark discovery rewards** — first time the player's cell
+   touches one of the 5 plaza tiles (`landmarkTiles()`), they earn
+   `DISCOVERY_ZENY` (250z) + `DISCOVERY_EXP` (75 EXP) with a
+   center-screen banner + chime. Tracked per-plaza in
+   `player.visitedLandmarks` (saved). Spawn plaza auto-unlocks when
+   the player first stands on it; the Travel overlay below also
+   auto-marks it visited so the warp panel is usable immediately.
+3. **Fast-travel system** — new 🧭 Travel button in the right UI
+   stack opens `showTravel(scene)`, listing all 5 landmark plazas
+   with friendly biome names (`landmarkLabel`). Unvisited rows show
+   `??? (undiscovered) — Locked`; visited rows are clickable and
+   warp the player instantly to that plaza's cell. Same modal
+   pattern as the shop / class chooser (explicit Phaser hit areas,
+   per-child `setScrollFactor(0)`, blocks world clicks via
+   `travelOpen` flag).
+
+**Ambient world feel:**
+4. **Road sparkles** — `tickRoadSparkles` drops a small 5–25z zeny
+   coin on a random road / path / landmark tile within 900 px of
+   the player every 8s, capped at 6 alive. Auto-magnet picks them
+   up. Birth flash tinted by zone (gold grasslands / green forest /
+   sandy desert / grey ruins / cyan riverside).
+5. **Biome ambience particles** — `tickAmbience` spawns small
+   per-zone particles tinted/styled by `AMBIENCE_STYLE` (forest =
+   falling leaves, riverside = blue motes, desert = heat specks,
+   ruins = dust, grasslands = warm fireflies). Spawn rates in
+   `AMBIENCE_RATE_PER_SEC`.
+6. **Day/night-aware ambience** — `worldDarkness` (0..1) is exposed
+   from the day/night cycle. Particle rate scales up to 2.5× at
+   midnight, plus warm fireflies drift on top of any biome once
+   darkness > 0.4. Chat once per cycle: `🌙 Night falls. Fireflies
+   stir.` at 0.65, `🌅 Dawn breaks.` at 0.15.
+
+**HUD + UI polish:**
+7. **Persistent boss ticker** — small top-left line under the gear
+   bar shows the current biome's boss state: `☠ Bigfoot: roaming`
+   or `☠ Bigfoot: returns in 1:23`, updated each tick from
+   `bossRespawns[]`. Hidden in zones without a boss.
+8. **Boss respawn toast** — `spawnMonster` broadcasts a top-screen
+   `☠ [Name] has returned to the [Biome]!` toast + chat line +
+   level-up chime when a non-rare boss respawns (initial spawn at
+   scene create is silent because `ui` isn't built yet).
+9. **Quest tracker color-coded** — Slay rows render green
+   (`#bce86a`), Clear (zone) rows blue (`#88c8ff`), Boss rows
+   red-orange (`#ff8866`). Each row prefixed with `SLAY/CLEAR/BOSS`
+   tag. Whole block colored by the highest-priority quest.
+10. **Hot-streak HUD chip** — `🔥 ×N   next +M   best ×B` under
+    the boss ticker, hidden when streak is 0. `player.bestStreak`
+    is now persisted in the save so the personal best survives
+    reloads.
+11. **Discovery badge** — `★ Biomes N/5` chip in the HUD stack
+    tracks `landmarkTiles().length` so it auto-adjusts if more
+    landmarks are added.
+12. **Gear bar inspector** — click the gear summary chip in the HUD
+    to print full equipment details in chat (weapon name + ATK
+    bonus, armor name + DEF bonus, per-boss trophy breakdown).
+    Border flips from blue to gold once both weapon + armor slots
+    are filled.
+
+**Options + cheats:**
+13. **Volume cycler** — the old binary mute button is now a 5-step
+    cycle `0 / 25 / 50 / 75 / 100 %` (multiplies the BGM base
+    volume 0.35). Index persisted to localStorage
+    `grasslands_volume_v2` (legacy `_v1` mute bool is ignored).
+14. **Hard Mode toggle** — new ⚔ Hard button between Travel and
+    Change Class. When ON: `rollMonsterHit` doubles outgoing damage
+    and `MonsterController.die()` doubles `earnedExp` + `zenyDrop`.
+    Rare-kill 5-level grants are NOT doubled. Persisted in
+    `grasslands_hardmode_v1`.
+15. **Shop auto-buy footer** — `⚡ Auto-buy cheapest` button inside
+    `showShop` picks the cheapest affordable non-potion upgrade and
+    purchases it, refreshing the row in place. Repeat-click chains.
+16. **Daily login bonus** — on `create()` after the save loads,
+    check `grasslands_last_login_v1` against today's ISO date. If
+    different (or first ever), grant +500 zeny + chat callout +
+    chime.
+
+**Player art (huge milestone):**
+17. **All three classes have full 5-direction art** —
+    `swordsman_/mage_/archer_{idle,walk}_{south,north,east,
+    southeast,northeast}.png` all loaded, in keyOutWhite, and
+    compressed via sips (~9–13 MB → ~2.5 MB per class). West / SW /
+    NW still mirror east / SE / NE via the existing `DIR_TEXTURE`
+    flip map. `pickPlayerTextureKey` auto-uses them; on a missing
+    direction it still falls back to the class south sprite (never
+    to rookie) per the strict class-only chain shipped earlier.
+
+**Cache + version bumps:** `?v=75` → `?v=88` over this session.
+
+**Commit trail (newest first):**
+- `057f646` Archer dirs + daily login
+- `0e7f4b5` Hard Mode toggle
+- `faf3eb5` Fast-travel
+- `567d136` Mage dirs + best-streak
+- `a5b8588` Boss respawn toast + gold gear border
+- `793668a` Discovery badge + auto-buy
+- `76ad1e1` Volume cycler + click gear inspect
+- `e883bab` Day/night ambience + dusk/dawn callouts + fireflies
+- `66f5bd1` Swordsman dirs + streak HUD + sparkle flash
+- `f5aebd8` Boss ticker + color-coded quests
+- `51887b7` Road sparkles + biome ambience
+- `b9bb4eb` Panic-heal + landmark discovery
+- `c5ee2de` Codex session 15 (roads/plazas/mini-map fidelity)
+
+## 4. Next steps for Codex (suggested)
+
+The user is paused while context recharges. Pick freely.
+
+**Quick polish (5–15 min):**
+1. **Trophy click-to-inspect overlay** — gear inspector already
+   prints to chat. Add a proper modal with per-boss icon + count +
+   the next-milestone target.
+2. **HUD compact-mode toggle** — small button that hides the
+   non-essential chips (streak, discovery, boss ticker) and shrinks
+   the chat box. Useful on small screens.
+3. **Mini-map zoom toggle** — cycle 1×/2×/3× zoom of the mini-map
+   for players who want more detail.
+4. **Pickup popups for ambience** — when a road sparkle gets
+   magneted, the `+Nz` float text we already show is fine, but the
+   sparkle birth flash should follow the coin briefly so it reads
+   as one event.
+5. **Auto-save indicator pulse** — tiny `💾` glyph in a HUD corner
+   that pulses each time `saveGame()` runs.
+
+**Gameplay (15–30 min):**
+6. **Per-zone weather events** — every ~90 s, kick off a 10 s
+   weather burst for the current zone: rain in riverside, sand
+   swirl in desert, mist patches in forest, dust devils in ruins,
+   petal storm in grasslands. Cheap particles, no rules.
+7. **Pet companion** — small sprite (reuse blobling tinted with
+   class color) that trails behind the player by 1 cell. No
+   combat, pure cosmetic. Toggle in shop or as a one-time 5000z
+   buy.
+8. **Cosmetic title above name** — picked from milestones (e.g.
+   "Plaza Wanderer" after all 5 landmarks, "Boss Hunter" after
+   5 trophies). Visible above the level/title nameTag.
+9. **Class switch cost** — first class pick is free; subsequent
+   switches via the chooser cost an increasing amount of zeny.
+   Currently free + risk-free.
+10. **Quest pity timer** — if the player hasn't completed the same
+    quest in N minutes, increase its reward each tick so unwanted
+    quest mobs eventually pay out.
+
+**Bigger features (1–2 hr):**
+11. **Trophy room** — a small instanced sub-zone (or a corner of
+    the spawn plaza) where defeated boss statues appear with their
+    kill counts.
+12. **NPC merchant sprite** at spawn — visual avatar that opens
+    `showShop` on click. User previously declined; check before
+    building.
+13. **Cosmetic equipment slot** — third equipment slot for
+    appearance-only drops (hat, cape) that don't affect stats.
+14. **Player vs player practice arena** — a small fenced area at
+    spawn with AI clones of each class to fight for practice.
+
+**Known small bugs / nits noticed in this session:**
+- The hot-streak `next +M` label uses modulo math; the very first
+  bonus tier (×5) shows `next +5` instead of `next +0`. Cosmetic.
+- `nearLandmark`/`landmarkTiles` use tile coords; the
+  panic-heal landmark check converts via
+  `TILE_SIZE / CELL_SIZE = 4`. If that ratio ever changes the
+  conversion breaks — the panic block uses
+  `Math.floor(TILE_SIZE / CELL_SIZE)` to stay safe.
+- Boss respawn toast suppresses on initial spawn only because
+  `ui` is undefined at that point. If `create()` order ever
+  changes to build `ui` first, the initial 5 boss spawns will
+  toast at once.
+
+## 5. (legacy) What we did in session 15 (in order)
 
 Goal: improve the map's look and satisfaction without adding controls or
 complexity. Cache now at **`?v=76`**.
@@ -217,23 +395,9 @@ complexity. Cache now at **`?v=76`**.
      still reports its local trust-path issue; served static verification was
      used instead.
 
-## 4. Suggestions / next best ROI
+(Session-15 suggestions are all shipped — see §3 above.)
 
-NPC merchant remains skipped per user request.
-
-Recommended next batch:
-
-1. **Auto-safety polish** — panic-heal at very low HP if affordable, with a
-   cooldown and clear float text.
-2. **Map rewards** — first time reaching each biome plaza grants a small zeny
-   / EXP discovery bonus.
-3. **Road sparkle pickups** — occasional low-value coin glints along roads to
-   gently pull players toward exploration.
-4. **Biome ambience particles** — falling leaves in forest, heat specks in
-   desert, blue motes near riverside. Pure feel, no rules.
-5. **Quest UI clarity pass** — color-code Slay / Clear / Boss objectives.
-
-## 5. (legacy) What we did in session 14 (in order)
+## 6. (legacy) What we did in session 14 (in order)
 
 Goal: make the game more satisfying, simpler to read, less annoying, and more
 automatic without adding NPCs or extra controls. Cache now at **`?v=75`**.
