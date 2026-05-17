@@ -1059,8 +1059,10 @@ class PlayerController {
 
     if (showingAttack) {
       applyRookieTexture(this.sprite, this.dir, 'attack');
-      // Attack pose has no per-direction frame, so re-apply the flip for west.
-      this.sprite.setFlipX(this.dir === 'west');
+      // For the (classless) rookie attack pose only, mirror for west — the
+      // single rookie_attack PNG faces east. When a class is chosen we trust
+      // applyRookieTexture's flip choice (south fallback faces forward).
+      if (!this.classId) this.sprite.setFlipX(this.dir === 'west');
     } else {
       applyRookieTexture(this.sprite, this.dir, this.frame);
     }
@@ -1465,12 +1467,11 @@ const DIR_TEXTURE = {
 };
 
 // Resolve any frame name ('idle' | 'walk' | 'walk2..4' | 'attack' | 'dead')
-// + direction to the best texture key. Prefers class-specific sprites and
-// falls back to rookie_* when the class hasn't shipped that frame yet.
+// + direction to the best texture key. Once a class is chosen we NEVER fall
+// back to rookie art — missing directions/frames use the class south idle
+// sprite so the player never visually reverts.
 function pickPlayerTextureKey(sprite, dir, frame) {
   const info = DIR_TEXTURE[dir] || DIR_TEXTURE.south;
-  // attack + dead are direction-less in the rookie set; everything else is
-  // per-direction.
   const directional = !(frame === 'attack' || frame === 'dead');
   const frameSeg =
       (frame === 'walk')  ? 'walk_'
@@ -1480,27 +1481,41 @@ function pickPlayerTextureKey(sprite, dir, frame) {
     : (frame === 'attack')? 'attack'
     : (frame === 'dead')  ? 'dead'
     : 'idle_';
-  const suffix = directional ? info.base : '';
+  const dirSuffix = directional ? info.base : '';
   const classDef = (player && player.classId) ? CLASS_DEFS[player.classId] : null;
-  let key = null;
-  let isClassKey = false;
+  const exists = (k) => sprite.scene.textures.exists(k);
+
   if (classDef) {
-    const candidate = classDef.spritePrefix + frameSeg + suffix;
-    if (sprite.scene.textures.exists(candidate)) {
-      key = candidate;
-      isClassKey = true;
+    // 1. Exact class + frame + direction.
+    const exact = classDef.spritePrefix + frameSeg + dirSuffix;
+    if (exists(exact)) return { key: exact, info, classDef, isClassKey: true, flip: info.flip };
+    // 2. Class same frame, south fallback (cancels flip).
+    const sameFrameSouth = classDef.spritePrefix + frameSeg + 'south';
+    if (exists(sameFrameSouth)) return { key: sameFrameSouth, info, classDef, isClassKey: true, flip: false };
+    // 3. For walk variants (walk2/3/4) fall to plain walk south.
+    if (frame !== 'idle' && frame !== 'attack' && frame !== 'dead') {
+      const walkSouth = classDef.spritePrefix + 'walk_south';
+      if (exists(walkSouth)) return { key: walkSouth, info, classDef, isClassKey: true, flip: false };
     }
+    // 4. Final: class idle south. Always exists for any class shipped per
+    // the spec (every class has at least idle_south + walk_south).
+    const idleSouth = classDef.spritePrefix + 'idle_south';
+    if (exists(idleSouth)) return { key: idleSouth, info, classDef, isClassKey: true, flip: false };
+    // If somehow even idle_south is missing, fall through to rookie below
+    // so the player isn't invisible.
   }
-  if (!key) key = 'rookie_' + frameSeg + suffix;
-  return { key, info, classDef, isClassKey };
+  // No class chosen → original rookie path.
+  const key = 'rookie_' + frameSeg + dirSuffix;
+  return { key, info, classDef, isClassKey: false, flip: info.flip };
 }
 
 function applyRookieTexture(sprite, dir, frame) {
-  const { key, info, classDef, isClassKey } = pickPlayerTextureKey(sprite, dir, frame);
+  const { key, info, classDef, isClassKey, flip } = pickPlayerTextureKey(sprite, dir, frame);
   sprite.setTexture(key);
-  sprite.setFlipX(info.flip);
-  // Clear tint when drawing real class art (palette already correct);
-  // keep the class tint on rookie fallbacks so they still read as the class.
+  sprite.setFlipX(flip);
+  // Real class art carries its own palette; clear tint so the sprite isn't
+  // double-colored. When a class is chosen but we fell back through the
+  // chain, the key is still a class key, so still clear tint.
   if (classDef) {
     if (isClassKey) sprite.clearTint();
     else sprite.setTint(classDef.tint);
