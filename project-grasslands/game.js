@@ -558,8 +558,12 @@ function preload() {
   this.load.image('archer_card',    'assets/sprites/archer_card.png');
   // Class tier-1 player sprites (south-only for now; other directions fall
   // back to rookie + class tint via applyRookieTexture).
-  this.load.image('swordsman_idle_south', 'assets/sprites/swordsman_idle_south.png');
-  this.load.image('swordsman_walk_south', 'assets/sprites/swordsman_walk_south.png');
+  // Swordsman: all 5 base directions (west / sw / nw mirror east / se / ne).
+  for (const d of ['south','north','east','southeast','northeast']) {
+    this.load.image(`swordsman_idle_${d}`, `assets/sprites/swordsman_idle_${d}.png`);
+    this.load.image(`swordsman_walk_${d}`, `assets/sprites/swordsman_walk_${d}.png`);
+  }
+  // Mage + Archer: south only for now; other dirs fall back to class south.
   this.load.image('mage_idle_south',      'assets/sprites/mage_idle_south.png');
   this.load.image('mage_walk_south',      'assets/sprites/mage_walk_south.png');
   this.load.image('archer_idle_south',    'assets/sprites/archer_idle_south.png');
@@ -636,6 +640,10 @@ function create() {
     'cactling_idle','cactling_hit','cactling_dead',
     'cactus_set','deco_sand_dune',
     'swordsman_idle_south','swordsman_walk_south',
+    'swordsman_idle_north','swordsman_walk_north',
+    'swordsman_idle_east','swordsman_walk_east',
+    'swordsman_idle_southeast','swordsman_walk_southeast',
+    'swordsman_idle_northeast','swordsman_walk_northeast',
     'mage_idle_south','mage_walk_south',
     'archer_idle_south','archer_walk_south',
     'deco_flower_cluster_01','deco_flower_cluster_02','deco_flower_cluster_03','deco_flower_cluster_04',
@@ -2284,6 +2292,18 @@ function tickRoadSparkles(scene, time) {
     const wy = tr * TILE_SIZE + TILE_SIZE / 2;
     if (Math.hypot(wx - player.sprite.x, wy - player.sprite.y) > SPARKLE_NEAR_PX) continue;
     loots.push(new LootDrop(scene, wx, wy, Phaser.Math.Between(5, 25), 'zeny'));
+    // Brief biome-tinted birth flash so the sparkle catches the eye.
+    const zone = getZone(tr, tc);
+    const tintByZone = {
+      grasslands: 0xfff0a8, forest: 0x88ee88, desert: 0xffd28a,
+      ruins: 0xcccccc, riverside: 0x99ddff,
+    };
+    const ring = scene.add.circle(wx, wy, 6, tintByZone[zone] || 0xffd24a, 0.85)
+      .setDepth(wy + 50);
+    scene.tweens.add({
+      targets: ring, scale: 4, alpha: 0,
+      duration: 700, onComplete: () => ring.destroy(),
+    });
     return;
   }
 }
@@ -3233,6 +3253,17 @@ class UIManager {
     this.bossTickerBg.setVisible(false);
     this.bossTickerText.setVisible(false);
 
+    // Hot-streak indicator — only visible when streak > 0.
+    this.streakBg = scene.add.rectangle(10, 142, 200, 24, 0x331100, 0.7)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
+      .setStrokeStyle(1, 0xffaa33, 0.8);
+    this.streakText = scene.add.text(20, 147, '', {
+      fontSize: '12px', fontStyle: 'bold', color: '#ffcc66',
+      stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
+    this.streakBg.setVisible(false);
+    this.streakText.setVisible(false);
+
     // Boss HP bar (top of screen, hidden until a boss is engaged).
     const bbW = 520, bbH = 22;
     const bbX = (GAME_W - bbW) / 2;
@@ -3340,6 +3371,19 @@ class UIManager {
     } else {
       this.bossTickerBg.setVisible(false);
       this.bossTickerText.setVisible(false);
+    }
+
+    // Hot-streak counter.
+    const streak = player.hotStreak || 0;
+    if (streak > 0) {
+      const next = 5 - (streak % 5);
+      const label = `🔥 Streak ×${streak}   (next bonus in ${next === 5 ? 5 : next})`;
+      if (this.streakText.text !== label) this.streakText.setText(label);
+      this.streakBg.setVisible(true);
+      this.streakText.setVisible(true);
+    } else {
+      this.streakBg.setVisible(false);
+      this.streakText.setVisible(false);
     }
 
     // Boss bar — show whenever any aggressive / boss-tier monster is alive
