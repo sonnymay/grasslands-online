@@ -122,6 +122,7 @@ const MONSTER_TYPES = {
 const CLASS_DEFS = {
   swordsman: {
     flavor: 'The blade never lies',
+    role: 'Melee tank — big slash, +HP',
     cardImage: 'swordsman_card',
     spritePrefix: 'swordsman_',
     tint: 0xff8866,
@@ -130,6 +131,7 @@ const CLASS_DEFS = {
   },
   mage: {
     flavor: 'The arcane calls you',
+    role: 'Caster — fireball + meteor special',
     cardImage: 'mage_card',
     spritePrefix: 'mage_',
     tint: 0x99aaff,
@@ -138,6 +140,7 @@ const CLASS_DEFS = {
   },
   archer: {
     flavor: 'Swift and true',
+    role: 'Ranged DPS — arrow + triple shot',
     cardImage: 'archer_card',
     spritePrefix: 'archer_',
     tint: 0x88ee88,
@@ -196,6 +199,10 @@ const config = {
   height: GAME_H,
   backgroundColor: '#3a6b35',
   pixelArt: false,
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+  },
   physics: {
     default: 'arcade',
     arcade: { gravity: { y: 0 }, debug: false },
@@ -487,7 +494,7 @@ function create() {
     let over = false;
     for (const b of bloblings) {
       if (!b.alive) continue;
-      if (Math.hypot(wx - b.sprite.x, wy - b.sprite.y) < 40) { over = true; break; }
+      if (Math.hypot(wx - b.sprite.x, wy - b.sprite.y) < 70) { over = true; break; }
     }
     scene.input.setDefaultCursor(over ? 'crosshair' : 'default');
   });
@@ -507,7 +514,7 @@ function create() {
     let clicked = null;
     for (const b of bloblings) {
       if (!b.alive) continue;
-      if (Math.hypot(wx - b.sprite.x, wy - b.sprite.y) < 50) { clicked = b; break; }
+      if (Math.hypot(wx - b.sprite.x, wy - b.sprite.y) < 80) { clicked = b; break; }
     }
 
     if (clicked) {
@@ -529,10 +536,11 @@ function create() {
   if (loaded) {
     ui.message(`Welcome back — Lv.${player.level}, ${player.zeny} zeny.`);
   } else {
+    // First-session tutorial only. Returning players don't need the hints.
     ui.message('Welcome to Grasslands Online!');
+    ui.message('Click monsters to attack. Click ground to walk.');
+    ui.message('Click monsters to auto-fight. Tab targets nearest. Shift+R resets save.');
   }
-  ui.message('Click monsters to attack. Click ground to walk.');
-  ui.message('Click monsters to auto-fight. Tab targets nearest. Shift+R resets save.');
 }
 
 // ---------- Update loop ----------
@@ -1576,10 +1584,21 @@ class MonsterController {
         scale: 1.4, alpha: 0.5,
         duration: 700, yoyo: true, repeat: -1,
       });
-      // Big chat callout the first time the player gets one in view.
       if (typeof ui !== 'undefined' && ui) {
         ui.message(`★ A ${cfg.name} appeared!`);
       }
+      // Screen flash + center banner so the rare isn't missed.
+      const flash = scene.add.rectangle(0, 0, GAME_W, GAME_H, cfg.tint || 0xffe066, 0.4)
+        .setOrigin(0, 0).setScrollFactor(0).setDepth(19000);
+      scene.tweens.add({ targets: flash, alpha: 0, duration: 600,
+        onComplete: () => flash.destroy() });
+      const banner = scene.add.text(GAME_W / 2, 220, `★ RARE ${cfg.name.toUpperCase()} ★`, {
+        fontSize: '36px', fontStyle: 'bold', color: '#ffffff',
+        stroke: '#000', strokeThickness: 6,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(19100).setAlpha(0);
+      scene.tweens.add({ targets: banner, alpha: 1, duration: 300, yoyo: true,
+        hold: 1500, onComplete: () => banner.destroy() });
+      sfxLevelUp();
     }
     this.sprite.setCollideWorldBounds(true);
     this.shadow = scene.add.ellipse(
@@ -1903,14 +1922,18 @@ function showClassSelect(scene) {
       fontSize: '24px', fontStyle: 'bold', color: '#ffffff',
       stroke: '#000', strokeThickness: 4,
     }).setOrigin(0.5);
-    const flavor = scene.add.text(cx + cardW / 2, cy + cardH - 28, `"${cdef.flavor}"`, {
+    const flavor = scene.add.text(cx + cardW / 2, cy + cardH - 36, `"${cdef.flavor}"`, {
       fontSize: '13px', color: '#f4f4f4', fontStyle: 'italic',
+      stroke: '#000', strokeThickness: 3, align: 'center', wordWrap: { width: cardW - 20 },
+    }).setOrigin(0.5);
+    const role = scene.add.text(cx + cardW / 2, cy + cardH - 16, cdef.role || '', {
+      fontSize: '11px', color: '#ffe066',
       stroke: '#000', strokeThickness: 3, align: 'center', wordWrap: { width: cardW - 20 },
     }).setOrigin(0.5);
 
     cont.add(card);
     if (img) cont.add(img);
-    cont.add([nameText, flavor]);
+    cont.add([nameText, flavor, role]);
 
     // Hover lift + glow.
     const lift = () => {
@@ -2261,6 +2284,7 @@ class UIManager {
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
     this.apBg.on('pointerdown', () => {
       autopilotOn = !autopilotOn;
+      autopilotLastScan = 0; // force immediate scan on next update tick
       this.apText.setText(autopilotOn ? '⚙ Auto: ON' : '⚙ Auto: OFF');
       this.apBg.setFillStyle(autopilotOn ? 0x1f6b3a : 0x000000, 0.75);
       try { localStorage.setItem(AP_KEY, autopilotOn ? '1' : '0'); } catch (e) { /* ignore */ }
