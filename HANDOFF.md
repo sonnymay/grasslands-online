@@ -1,8 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 1:31pm CDT (post session 14,
-> satisfaction/friction polish and automatic chase rewards).
+> coding sessions. Last refresh: 2026-05-17 1:35pm CDT (post session 15,
+> map structure and exploration readability polish).
 
 ---
 
@@ -186,7 +186,54 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 14 (latest, in order)
+## 3. What we did in session 15 (latest, in order)
+
+Goal: improve the map's look and satisfaction without adding controls or
+complexity. Cache now at **`?v=76`**.
+
+1. **Road network upgraded.** The map now has:
+   - the original center cross road,
+   - a loop road around the grasslands core,
+   - diagonal feeder paths into far biome corners,
+   - small open plazas/landmarks at spawn and in each major biome.
+2. **Biome edges improved.** Tiles near biome boundaries now use subtle flower
+   / dirt-patch variation so zone transitions feel less like flat tint cuts.
+3. **Landmark halos added.** Each plaza gets a soft pulsing ground halo tinted
+   to its biome. This gives players visible places to discover without adding
+   NPCs, menus, or extra rules.
+4. **Movement friction reduced.** After decoration scatter, all roads and
+   plazas are re-cleared in the walkable grid so trees/ponds/rocks don't make
+   the main routes feel snaggy.
+5. **Mini-map road fidelity improved.** Mini-map roads now draw from the same
+   tile classification as the world map, including the loop, diagonal paths,
+   and landmark rings.
+6. **Cache bust bumped** in `project-grasslands/index.html` from `?v=75`
+   to `?v=76`.
+7. **Verification**:
+   - `node -c project-grasslands/game.js` exited 0.
+   - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
+   - Served `index.html` references `game.js?v=76`.
+   - In-app Browser visual check attempted, but the current Browser plugin
+     still reports its local trust-path issue; served static verification was
+     used instead.
+
+## 4. Suggestions / next best ROI
+
+NPC merchant remains skipped per user request.
+
+Recommended next batch:
+
+1. **Auto-safety polish** — panic-heal at very low HP if affordable, with a
+   cooldown and clear float text.
+2. **Map rewards** — first time reaching each biome plaza grants a small zeny
+   / EXP discovery bonus.
+3. **Road sparkle pickups** — occasional low-value coin glints along roads to
+   gently pull players toward exploration.
+4. **Biome ambience particles** — falling leaves in forest, heat specks in
+   desert, blue motes near riverside. Pure feel, no rules.
+5. **Quest UI clarity pass** — color-code Slay / Clear / Boss objectives.
+
+## 5. (legacy) What we did in session 14 (in order)
 
 Goal: make the game more satisfying, simpler to read, less annoying, and more
 automatic without adding NPCs or extra controls. Cache now at **`?v=75`**.
@@ -222,7 +269,7 @@ automatic without adding NPCs or extra controls. Cache now at **`?v=75`**.
    - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
    - Served `index.html` references `game.js?v=75`.
 
-## 4. Suggestions / next best ROI
+## 6. Previous suggestions
 
 NPC merchant remains skipped per user request.
 
@@ -240,7 +287,7 @@ Recommended next batch:
 5. **Biome identity polish** — more unique boss stinger colors and minimap
    boss markers per zone.
 
-## 5. (legacy) What we did in session 13 (in order)
+## 7. (legacy) What we did in session 13 (in order)
 
 Goal: make players feel visible progress and have one-more-run goals without
 adding NPCs or broad new systems. Cache now at **`?v=74`**.
@@ -266,7 +313,7 @@ adding NPCs or broad new systems. Cache now at **`?v=74`**.
    - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
    - Served `index.html` references `game.js?v=74`.
 
-## 6. Previous suggestions
+## 8. Previous suggestions
 
 NPC merchant remains skipped per user request.
 
@@ -283,7 +330,7 @@ Recommended next batch:
 5. **Long-term collection goals** — trophy milestones at 3/10/25 boss kills
    grant titles or small stat bonuses.
 
-## 7. (legacy) What we did in session 12 (in order)
+## 9. (legacy) What we did in session 12 (in order)
 
 User said to do all non-NPC suggestions. Cache now at **`?v=73`**.
 
@@ -323,7 +370,7 @@ User said to do all non-NPC suggestions. Cache now at **`?v=73`**.
    - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
    - Served `index.html` references `game.js?v=73`.
 
-## 8. Previous suggestions
+## 10. Previous suggestions
 
 NPC merchant is intentionally skipped per user request.
 
@@ -340,7 +387,7 @@ Recommended next batch:
 5. **Boss respawn longer cadence** — if 5 seconds feels too arcade, move
    bosses to 60-180 seconds and keep normal mobs at 5 seconds.
 
-## 9. (legacy) What we did in session 11 (in order)
+## 11. (legacy) What we did in session 11 (in order)
 
 Followed the suggested next ROI order. Cache now at **`?v=72`**.
 
@@ -361,7 +408,7 @@ Followed the suggested next ROI order. Cache now at **`?v=72`**.
    - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
    - Served `index.html` references `game.js?v=72`.
 
-## 10. Previous suggestions
+## 12. Previous suggestions
 
 Recommended next batch:
 
@@ -377,7 +424,7 @@ Recommended next batch:
 5. **Mini-boss per biome** — strong content expansion, but needs either
    new art or careful recolor/reuse choices to avoid feeling cheap.
 
-## 11. (legacy) What we did in session 10 (in order)
+## 13. (legacy) What we did in session 10 (in order)
 
 Follow-up from the user's ranked ROI list. Cache now at **`?v=71`**.
 
@@ -403,7 +450,7 @@ Follow-up from the user's ranked ROI list. Cache now at **`?v=71`**.
    - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
    - Served `index.html` references `game.js?v=71`.
 
-## 12. Previous suggestions
+## 14. Previous suggestions
 
 Recommended next batch:
 

@@ -914,24 +914,51 @@ function keyOutWhite(scene, key) {
 }
 
 // ---------- Map ----------
-// Center cross path. Everything else is plain grass; decorations scatter on top.
-function getCellType(r, c) {
+function mapCenter() {
   const midRow = Math.floor(MAP_ROWS / 2);
   const midCol = Math.floor(MAP_COLS / 2);
+  return { midRow, midCol, coreHalf: Math.floor(MAP_COLS * 0.18) };
+}
+
+function landmarkTiles() {
+  const { midRow, midCol, coreHalf } = mapCenter();
+  return [
+    { r: midRow, c: midCol, radius: 1 },
+    { r: midRow - coreHalf - 8, c: midCol, radius: 1 },
+    { r: midRow + coreHalf + 8, c: midCol, radius: 1 },
+    { r: midRow, c: midCol - coreHalf - 8, radius: 1 },
+    { r: midRow, c: midCol + coreHalf + 8, radius: 1 },
+  ];
+}
+
+function nearLandmark(r, c) {
+  return landmarkTiles().some(p => Math.abs(r - p.r) <= p.radius && Math.abs(c - p.c) <= p.radius);
+}
+
+// Roads make the world legible: a spawn cross, a loop around grasslands,
+// diagonal feeders into far biomes, and small landmark plazas.
+function getCellType(r, c) {
+  const { midRow, midCol, coreHalf } = mapCenter();
+  const dr = r - midRow;
+  const dc = c - midCol;
+  const ring = coreHalf + 1;
+  if (nearLandmark(r, c)) return 'path_open';
   if (r === midRow && c === midCol) return 'path_cross';
   if (r === midRow) return 'path_h';
   if (c === midCol) return 'path_v';
+  if ((Math.abs(dr) === ring && Math.abs(dc) <= ring) ||
+      (Math.abs(dc) === ring && Math.abs(dr) <= ring)) return 'path_loop';
+  if (Math.abs(Math.abs(dr) - Math.abs(dc)) <= 1 &&
+      Math.abs(dr) > ring && Math.abs(dc) > ring) return 'path_diag';
   return 'grass';
 }
 
 // Zone layout: keep a central grasslands square around spawn, partition the
 // outer ring into compass-aligned biomes. Tile coords (r, c) are 0..MAP_ROWS-1.
 function getZone(r, c) {
-  const midRow = Math.floor(MAP_ROWS / 2);
-  const midCol = Math.floor(MAP_COLS / 2);
+  const { midRow, midCol, coreHalf } = mapCenter();
   const dr = r - midRow;
   const dc = c - midCol;
-  const coreHalf = Math.floor(MAP_COLS * 0.18); // ~9 tiles either side of center
   if (Math.abs(dr) <= coreHalf && Math.abs(dc) <= coreHalf) return 'grasslands';
   // Outside the core: pick biome by dominant axis.
   if (Math.abs(dr) >= Math.abs(dc)) {
@@ -941,18 +968,33 @@ function getZone(r, c) {
   }
 }
 
+function nearZoneBoundary(r, c) {
+  const z = getZone(r, c);
+  return [[1,0],[-1,0],[0,1],[0,-1]].some(([dr, dc]) => {
+    const nr = Phaser.Math.Clamp(r + dr, 0, MAP_ROWS - 1);
+    const nc = Phaser.Math.Clamp(c + dc, 0, MAP_COLS - 1);
+    return getZone(nr, nc) !== z;
+  });
+}
+
 function buildMap(scene) {
   for (let r = 0; r < MAP_ROWS; r++) {
     for (let c = 0; c < MAP_COLS; c++) {
       const type = getCellType(r, c);
       const zone = getZone(r, c);
       let idx;
-      if (type === 'path_cross') idx = TILE.DIRT_OPEN;
+      if (type === 'path_cross' || type === 'path_open') idx = TILE.DIRT_OPEN;
       else if (type === 'path_h') idx = TILE.DIRT_H;
       else if (type === 'path_v') idx = TILE.DIRT_V;
+      else if (type === 'path_loop') idx = Math.random() < 0.5 ? TILE.DIRT_WIDE : TILE.DIRT_PATCH;
+      else if (type === 'path_diag') idx = Math.random() < 0.5 ? TILE.DIRT_CORNER : TILE.DIRT_HEAVY;
       else {
-        // Plain grass base. Only two variants for low contrast.
-        idx = (Math.random() < 0.5) ? TILE.GRASS : TILE.THICK_GRASS;
+        // Plain grass base, with subtle edge detail where biomes meet.
+        if (nearZoneBoundary(r, c) && Math.random() < 0.38) {
+          idx = Math.random() < 0.55 ? TILE.FLOWER : TILE.DIRT_PATCH;
+        } else {
+          idx = (Math.random() < 0.55) ? TILE.GRASS : TILE.THICK_GRASS;
+        }
       }
 
       // Pick tileset key by zone. Desert uses real sand tiles; other biomes
@@ -1049,6 +1091,33 @@ function buildDecorations(scene) {
   };
 
   const rockKeys = ['deco_rock_01','deco_rock_02','deco_rock_03'];
+  const addLandmarkHalo = (tile_r, tile_c, color) => {
+    const x = tile_c * TILE_SIZE + TILE_SIZE / 2;
+    const y = tile_r * TILE_SIZE + TILE_SIZE / 2;
+    const halo = scene.add.ellipse(x, y + 6, 190, 86, color, 0.16)
+      .setStrokeStyle(3, color, 0.35)
+      .setDepth(-620);
+    scene.tweens.add({
+      targets: halo,
+      alpha: 0.23,
+      scaleX: 1.05,
+      scaleY: 1.08,
+      duration: 1600,
+      yoyo: true,
+      repeat: -1,
+    });
+  };
+  for (const p of landmarkTiles()) {
+    const z = getZone(p.r, p.c);
+    const color = {
+      grasslands: 0xffe066,
+      forest: 0x77bb66,
+      desert: 0xd8aa52,
+      ruins: 0xb8b0a0,
+      riverside: 0x77ccff,
+    }[z] || 0xffffff;
+    addLandmarkHalo(p.r, p.c, color);
+  }
 
   // Grasslands (center) — original density, scaled up for the bigger core.
   for (let i = 0; i < 350; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     52, { alpha: 0.95, maxAngle: 18, zoneFilter: 'grasslands' });
@@ -1084,15 +1153,21 @@ function buildDecorations(scene) {
   for (let i = 0; i < 200; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),    60, { maxAngle: 15, zoneFilter: 'riverside' });
   for (let i = 0; i <  70; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'riverside' });
 
-  // Always keep the player spawn cell + Healer cell walkable.
+  // Always keep spawn, plazas, and roads walkable after blocking decorations.
   const protect = (wx, wy) => {
     const cx = Math.floor(wx / CELL_SIZE), cy = Math.floor(wy / CELL_SIZE);
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
       const r = cy + dy, c = cx + dx;
       if (r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS) walkable[r][c] = true;
     }
   };
   protect(WORLD_W / 2, WORLD_H / 2);                  // spawn
+  for (let r = 0; r < MAP_ROWS; r++) {
+    for (let c = 0; c < MAP_COLS; c++) {
+      if (getCellType(r, c) === 'grass') continue;
+      protect(c * TILE_SIZE + TILE_SIZE / 2, r * TILE_SIZE + TILE_SIZE / 2);
+    }
+  }
 }
 
 // ---------- PlayerController ----------
@@ -3149,10 +3224,26 @@ class UIManager {
         g.fillRect(this.miniX + sc * cellW, this.miniY + sr * cellH, cellW + 1, cellH + 1);
       }
     }
-    // Path cross (rough).
-    g.fillStyle(0xb38a4a, 0.6);
-    g.fillRect(this.miniX, this.miniY + this.miniH / 2 - 2, this.miniW, 4);
-    g.fillRect(this.miniX + this.miniW / 2 - 2, this.miniY, 4, this.miniH);
+    // Road network: center cross, grasslands loop, diagonal biome feeders,
+    // and plazas. Draw from map tiles so minimap matches the actual world.
+    g.fillStyle(0xd0a35a, 0.72);
+    for (let r = 0; r < MAP_ROWS; r++) {
+      for (let c = 0; c < MAP_COLS; c++) {
+        const t = getCellType(r, c);
+        if (t === 'grass') continue;
+        const x = this.miniX + (c / MAP_COLS) * this.miniW;
+        const y = this.miniY + (r / MAP_ROWS) * this.miniH;
+        const w = Math.max(2, this.miniW / MAP_COLS);
+        const h = Math.max(2, this.miniH / MAP_ROWS);
+        g.fillRect(x, y, w + 0.5, h + 0.5);
+      }
+    }
+    g.lineStyle(1, 0xffe0a0, 0.75);
+    for (const p of landmarkTiles()) {
+      const x = this.miniX + ((p.c + 0.5) / MAP_COLS) * this.miniW;
+      const y = this.miniY + ((p.r + 0.5) / MAP_ROWS) * this.miniH;
+      g.strokeCircle(x, y, 4);
+    }
     // Monsters.
     for (const m of bloblings) {
       if (!m.alive) continue;
