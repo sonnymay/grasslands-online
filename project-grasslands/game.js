@@ -34,6 +34,7 @@ const BLOBLING_AGGRO_RANGE = 200;
 const BLOBLING_ATTACK_RANGE = 80;
 const BLOBLING_COUNT = 15;
 const MOOHAM_COUNT = 10;
+const MOOWAAN_COUNT = 8;
 
 // Monster type catalog. Add new monsters here; spawn loop reads `count`.
 const MONSTER_TYPES = {
@@ -48,6 +49,12 @@ const MONSTER_TYPES = {
     idleKey: 'mooham_idle', hitKey: 'mooham_hit', deadKey: 'mooham_dead',
     maxHP: 80, atk: 8, expReward: 18, speed: 70,
     nameColor: '#ffd9a8', count: MOOHAM_COUNT,
+  },
+  moowaan: {
+    name: 'MooWaan',
+    idleKey: 'moowaan_idle', hitKey: 'moowaan_hit', deadKey: 'moowaan_dead',
+    maxHP: 60, atk: 6, expReward: 14, speed: 90,
+    nameColor: '#d6ffd0', count: MOOWAAN_COUNT, scaleMult: 0.9,
   },
   boss_mooham: {
     name: 'Boss MooHam',
@@ -154,6 +161,9 @@ function preload() {
   this.load.image('mooham_idle', 'assets/sprites/mooham_idle.png');
   this.load.image('mooham_hit', 'assets/sprites/mooham_hit.png');
   this.load.image('mooham_dead', 'assets/sprites/mooham_dead.png');
+  this.load.image('moowaan_idle', 'assets/sprites/moowaan_idle.png');
+  this.load.image('moowaan_hit', 'assets/sprites/moowaan_hit.png');
+  this.load.image('moowaan_dead', 'assets/sprites/moowaan_dead.png');
   // Decorations
   for (let i = 1; i <= 4; i++) this.load.image(`deco_flower_cluster_0${i}`, `assets/decorations/deco_flower_cluster_0${i}.png`);
   for (let i = 1; i <= 3; i++) this.load.image(`deco_rock_0${i}`, `assets/decorations/deco_rock_0${i}.png`);
@@ -189,6 +199,7 @@ function create() {
     'rookie_attack','rookie_dead',
     'blobling_idle','blobling_hit','blobling_dead',
     'mooham_idle','mooham_hit','mooham_dead',
+    'moowaan_idle','moowaan_hit','moowaan_dead',
     'deco_flower_cluster_01','deco_flower_cluster_02','deco_flower_cluster_03','deco_flower_cluster_04',
     'deco_rock_01','deco_rock_02','deco_rock_03',
     'deco_tallgrass_01','deco_tallgrass_02','deco_tallgrass_03',
@@ -1453,6 +1464,7 @@ class UIManager {
       let color = 0xff5555;
       let r = 2;
       if (m.typeId === 'mooham') color = 0xffaa55;
+      else if (m.typeId === 'moowaan') color = 0x55ff88;
       else if (m.typeId === 'boss_mooham') { color = 0xffff44; r = 4; }
       g.fillStyle(color, 1);
       g.fillCircle(this.miniX + m.sprite.x * sx, this.miniY + m.sprite.y * sy, r);

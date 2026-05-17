@@ -4,7 +4,7 @@
 > just opened a fresh Claude Code session, read top-to-bottom and follow §9
 > ("How to continue") at the bottom.
 >
-> Last updated: 2026-05-16 (session 6)
+> Last updated: 2026-05-16 (session 7)
 
 ---
 
@@ -70,7 +70,7 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 - Death: lose 5% of current EXP requirement, respawn at world centre after 3 s.
 
 ### Monsters
-- 25 total — 15 Blobling + 10 MooHam — configured in `MONSTER_TYPES`.
+- 34 total — 15 Blobling + 10 MooHam + 8 MooWaan + 1 Boss MooHam — configured in `MONSTER_TYPES`.
 - **Passive AI:** monsters only chase + attack the player after being hit (`provoked` flag, 5 s aggro lapse).
 - Random level 1–3 per monster (weighted toward 1). `hp ×1+0.5(L-1)`, `atk ×1+0.3(L-1)`, `exp × L`.
 - Name tag shows `Blobling Lv.2` etc.
@@ -101,6 +101,23 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 ---
 
 ## 3. What we just did this session (latest first)
+
+### Session 7 — MooWaan baby monkey monster
+1. **User generated three MooWaan sprites** and placed them in `project-grasslands/assets/sprites/`.
+2. **Normalized one filename**: `moowaan_hit.png.png` was renamed to `moowaan_hit.png` so asset naming matches the existing monster convention.
+3. **Verified asset files exist**:
+   - `assets/sprites/moowaan_idle.png`
+   - `assets/sprites/moowaan_hit.png`
+   - `assets/sprites/moowaan_dead.png`
+4. **Observed asset format**: all three MooWaan PNGs are `1254 x 1254`, RGB, non-interlaced. They do not have true alpha yet, so the existing runtime `keyOutWhite()` fallback handles near-white/checker backgrounds.
+5. **Added `MOOWAAN_COUNT = 8`** near the other monster-count constants.
+6. **Added `moowaan` to `MONSTER_TYPES`** with display name `MooWaan`, HP 60, ATK 6, EXP 14, speed 90, light-green name color, and `scaleMult: 0.9`.
+7. **Preloaded MooWaan sprites** in `preload()`.
+8. **Added MooWaan to `keyOutWhite()` sprite list** so it follows the same transparency fallback as Blobling/MooHam.
+9. **Added green mini-map marker color** for `typeId === 'moowaan'`.
+10. **Updated cache bust**: `index.html` changed from `game.js?v=38` → `game.js?v=39`.
+11. **Verified** with `node -c project-grasslands/game.js`, `git diff --check`, and in-app browser reload. Browser loaded `http://localhost:8000/game.js?v=39` with no game console warnings/errors.
+12. **Note**: random spawn may place MooWaan offscreen on first load, but it is now in the spawn loop through `MONSTER_TYPES`.
 
 ### Session 6 — RO-reference walk timing pass
 1. **Looked up Ragnarok Online animation behavior** because the user explicitly asked to Google if needed. Ragnarok Research Lab documents RO sprite animations as timer/state-machine based rather than tied to movement distance, with ACT frame timing based around short fixed intervals.
@@ -214,7 +231,7 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 - A* runs every repath; fine at 100×100 grid. Becomes expensive if grid grows. (max 8 000 iterations cap inside `findPath`).
 - Mini-map redraws every frame — cheap but allocates one graphics command list each tick.
 - Phaser banner spams the console on every reload. Cosmetic.
-- `?v=N` cache-bust in `index.html` — bump on every `game.js` change. Current: `?v=38`.
+- `?v=N` cache-bust in `index.html` — bump on every `game.js` change. Current: `?v=39`.
 
 ---
 
@@ -267,6 +284,7 @@ Grasslands Online/                    ← git repo root
 | rookie_dead.png | Death pose |
 | blobling_idle/hit/dead.png | Blobling monster |
 | mooham_idle/hit/dead.png | MooHam (pig) monster |
+| moowaan_idle/hit/dead.png | MooWaan baby monkey monster |
 
 ### Decorations — `assets/decorations/`
 | File | Role |
@@ -303,7 +321,7 @@ Stored in §9 of the older `~/Downloads/HANDOFF.md` and repeated for diagonals i
 5. Pick a task from §4 (or whatever the user asks for).
 6. **Every meaningful change:**
    - Edit code.
-   - Bump `?v=N` in `index.html` (next: `?v=39`).
+   - Bump `?v=N` in `index.html` (next: `?v=40`).
    - Reload preview, verify visually.
    - `git add` exact files, conventional-prefix commit, push.
 7. **End of session:**
