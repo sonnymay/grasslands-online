@@ -262,6 +262,7 @@ let autopilotLastScan = 0;
 let classSelectOpen = false;
 let shopOpen = false;
 let travelOpen = false;
+let hardMode = false; // doubles monster damage, EXP, and zeny drops
 let activeQuests = []; // [{ monsterTypeId, monsterName, target, count, reward }]
 let questChain = 0;
 let bossRespawns = {};
@@ -2201,7 +2202,8 @@ class MonsterController {
     this.nameTag.setVisible(false);
     spawnDeathBurst(this.scene, this.sprite.x, this.sprite.y + 8, colorValue(this.cfg.tint || this.cfg.nameColor, 0xffffff));
     // Rare variant: grant N levels worth of EXP in one shot + huge fanfare.
-    const earnedExp = this.cfg.levelsAward ? this.expReward : scaledMonsterExp(this);
+    let earnedExp = this.cfg.levelsAward ? this.expReward : scaledMonsterExp(this);
+    if (hardMode && !this.cfg.levelsAward) earnedExp = Math.round(earnedExp * 2);
     if (this.cfg.levelsAward) {
       const want = this.cfg.levelsAward;
       let total = 0;
@@ -2248,8 +2250,9 @@ class MonsterController {
     ui.message(`Killed ${this.cfg.name} (+${earnedExp} EXP, +${healAmt} HP)`);
     spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 30, `+${fmt(earnedExp)} EXP`, 0x66ff66, { fontSize: '14px' });
 
-    // Drop a small zeny pile — scaled to monster reward.
-    const zenyDrop = Math.max(1, Math.round(this.expReward * Phaser.Math.FloatBetween(0.6, 1.6)));
+    // Drop a small zeny pile — scaled to monster reward. Hard mode doubles.
+    let zenyDrop = Math.max(1, Math.round(this.expReward * Phaser.Math.FloatBetween(0.6, 1.6)));
+    if (hardMode) zenyDrop = Math.round(zenyDrop * 2);
     loots.push(new LootDrop(this.scene, this.sprite.x, this.sprite.y + 10, zenyDrop, 'zeny'));
     // 15% chance of a green healing herb on top of zeny.
     if (Math.random() < 0.15) {
@@ -3136,7 +3139,9 @@ function spawnClassAttackFx(scene, pl, target, special = false) {
 function rollMonsterHit(monsterAtk) {
   if (Math.random() < MONSTER_MISS_CHANCE) return { miss: true, amount: 0 };
   const variance = 1 + (Math.random() * 2 - 1) * DAMAGE_VARIANCE;
-  return { miss: false, amount: Math.max(1, Math.round(monsterAtk * variance)) };
+  let amount = Math.max(1, Math.round(monsterAtk * variance));
+  if (hardMode) amount = Math.max(1, Math.round(amount * 2));
+  return { miss: false, amount };
 }
 
 // Generic floating text. Accepts a number or string. Crit bumps size + adds "!".
@@ -3355,10 +3360,35 @@ class UIManager {
     });
     addTip(this.tvBg, 'Fast travel to discovered plazas', btnX, tvY + btnH / 2);
 
+    // Hard Mode toggle — doubles monster damage, EXP, and zeny.
+    const HARD_KEY = 'grasslands_hardmode_v1';
+    try { hardMode = localStorage.getItem(HARD_KEY) === '1'; } catch (e) { hardMode = false; }
+    const hmY = tvY + btnH + 6;
+    this.hmBg = scene.add.rectangle(btnX, hmY, btnW, btnH, hardMode ? 0x882222 : 0x222222, 0.9)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
+      .setStrokeStyle(2, hardMode ? 0xff5566 : 0x888888, 0.95)
+      .setInteractive({ useHandCursor: true });
+    this.hmText = scene.add.text(btnX + btnW / 2, hmY + btnH / 2,
+      hardMode ? '⚔ Hard: ON' : '⚔ Hard: OFF', {
+      fontSize: '13px', color: hardMode ? '#ffcccc' : '#cccccc',
+      stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    this.hmBg.on('pointerdown', () => {
+      hardMode = !hardMode;
+      this.hmText.setText(hardMode ? '⚔ Hard: ON' : '⚔ Hard: OFF');
+      this.hmText.setColor(hardMode ? '#ffcccc' : '#cccccc');
+      this.hmBg.setFillStyle(hardMode ? 0x882222 : 0x222222, 0.9);
+      this.hmBg.setStrokeStyle(2, hardMode ? 0xff5566 : 0x888888, 0.95);
+      try { localStorage.setItem(HARD_KEY, hardMode ? '1' : '0'); } catch (e) { /* ignore */ }
+      ui.message(hardMode ? '⚔ Hard mode ON — ×2 damage, ×2 EXP, ×2 zeny.' : '⚔ Hard mode OFF.');
+      sfxMiss();
+    });
+    addTip(this.hmBg, 'Hard mode: ×2 damage / EXP / zeny', btnX, hmY + btnH / 2);
+
     // Change Class button — always visible. Below Lv 10 it just tells the
     // player to keep leveling. At Lv 10+ it opens the class chooser
-    // (re-pickable at any time). Shifted down to make room for Travel.
-    const clY = tvY + btnH + 6;
+    // (re-pickable at any time). Sits below Hard Mode toggle.
+    const clY = hmY + btnH + 6;
     this.clBg = scene.add.rectangle(btnX, clY, btnW, btnH, 0x664422, 0.9)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
       .setStrokeStyle(2, 0xffe066, 1)
