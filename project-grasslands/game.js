@@ -2272,6 +2272,21 @@ class UIManager {
       showClassSelect(scene);
     });
 
+    // Cheat button — manually bump level by 1. Triggers normal levelUp() so
+    // tier upgrades + class select prompt fire as if earned organically.
+    const lvY = clY + btnH + 6;
+    this.lvBg = scene.add.rectangle(btnX, lvY, btnW, btnH, 0x444444, 0.85)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
+      .setStrokeStyle(2, 0xffffff, 0.7)
+      .setInteractive({ useHandCursor: true });
+    this.lvText = scene.add.text(btnX + btnW / 2, lvY + btnH / 2, '⇧ +1 Level', {
+      fontSize: '13px', color: '#ffffff', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    this.lvBg.on('pointerdown', () => {
+      if (!player || player.dead) return;
+      player.levelUp();
+    });
+
     // Boss HP bar (top of screen, hidden until a boss is engaged).
     const bbW = 520, bbH = 22;
     const bbX = (GAME_W - bbW) / 2;
