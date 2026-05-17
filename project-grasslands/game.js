@@ -3222,6 +3222,17 @@ class UIManager {
       lineSpacing: 2,
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
 
+    // Boss ticker — small persistent line under the gear bar showing the
+    // current biome's boss state (roaming / respawning in MM:SS).
+    this.bossTickerBg = scene.add.rectangle(10, 112, 330, 24, 0x000000, 0.55)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
+      .setStrokeStyle(1, 0xff8866, 0.7);
+    this.bossTickerText = scene.add.text(20, 117, '', {
+      fontSize: '12px', color: '#ffcc99', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
+    this.bossTickerBg.setVisible(false);
+    this.bossTickerText.setVisible(false);
+
     // Boss HP bar (top of screen, hidden until a boss is engaged).
     const bbW = 520, bbH = 22;
     const bbX = (GAME_W - bbW) / 2;
@@ -3275,14 +3286,22 @@ class UIManager {
     const wantedLbl = player.classId ? '✦ Change Class' : '✦ Choose Class';
     if (this.clText.text !== wantedLbl) this.clText.setText(wantedLbl);
 
-    // Quest tracker badge.
+    // Quest tracker badge — color-coded per kind via tint hint in label.
     if (activeQuests.length) {
-      const txt = activeQuests.map((q, i) => {
-        const label = q.kind === 'boss' ? 'Boss' : `Quest ${i + 1}`;
+      const colorFor = (k) => k === 'boss' ? '#ff8866' : k === 'zone' ? '#88c8ff' : '#bce86a';
+      const tagFor   = (k) => k === 'boss' ? 'BOSS' : k === 'zone' ? 'CLEAR' : 'SLAY';
+      // Phaser Text doesn't render per-line color out of the box; emulate by
+      // showing a small colored chip glyph at the start of each line.
+      const txt = activeQuests.map((q) => {
         const target = q.kind === 'zone' ? q.zoneName : q.monsterName;
-        return `${label}: ${q.count}/${q.target} ${target}`;
+        return `■ ${tagFor(q.kind)}  ${q.count}/${q.target}  ${target}`;
       }).join('\n');
       if (this.questText.text !== txt) this.questText.setText(txt);
+      // Color the whole block by the highest-priority quest (boss > zone > slay).
+      const top = activeQuests.find(q => q.kind === 'boss')
+              || activeQuests.find(q => q.kind === 'zone')
+              || activeQuests[0];
+      this.questText.setColor(colorFor(top.kind));
       this.questBg.setVisible(true);
       this.questText.setVisible(true);
     } else {
@@ -3291,6 +3310,37 @@ class UIManager {
     }
     const gearTxt = gearSummary();
     if (this.gearText.text !== gearTxt) this.gearText.setText(gearTxt);
+
+    // Persistent boss ticker for the current zone's resident boss.
+    let tickerLine = '';
+    const zoneKey = currentZone;
+    if (zoneKey) {
+      const bossTypeId = Object.keys(MONSTER_TYPES).find(id => {
+        const c = MONSTER_TYPES[id];
+        return isBossCfg(c) && c.zones && c.zones.includes(zoneKey);
+      });
+      if (bossTypeId) {
+        const cfg = MONSTER_TYPES[bossTypeId];
+        const alive = bloblings.some(m => m.alive && m.typeId === bossTypeId);
+        if (alive) {
+          tickerLine = `☠ ${cfg.name}: roaming`;
+        } else {
+          const rt = bossRespawns[bossTypeId];
+          if (rt) {
+            const secs = Math.max(0, Math.ceil((rt - player.scene.time.now) / 1000));
+            tickerLine = `☠ ${cfg.name}: returns in ${Math.floor(secs/60)}:${String(secs%60).padStart(2,'0')}`;
+          }
+        }
+      }
+    }
+    if (tickerLine) {
+      if (this.bossTickerText.text !== tickerLine) this.bossTickerText.setText(tickerLine);
+      this.bossTickerBg.setVisible(true);
+      this.bossTickerText.setVisible(true);
+    } else {
+      this.bossTickerBg.setVisible(false);
+      this.bossTickerText.setVisible(false);
+    }
 
     // Boss bar — show whenever any aggressive / boss-tier monster is alive
     // anywhere in the world. Picks the closest one when several are around.
