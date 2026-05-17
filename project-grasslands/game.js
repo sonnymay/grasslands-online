@@ -2841,6 +2841,18 @@ function spawnMonster(scene, typeId) {
   bloblings.push(new MonsterController(scene, x, y, typeId));
   delete bossRespawns[typeId];
   spawnPuff(scene, x, y);
+  // Boss respawn callout: when a boss-tier monster appears, broadcast a
+  // top-screen toast + chime so the player knows the world just refilled.
+  if (isBossCfg(cfg) && !cfg.rare && typeof ui !== 'undefined' && ui) {
+    ui.message(`☠ ${cfg.name} has returned to the ${cfg.zones ? (ZONE_LABELS[cfg.zones[0]] || cfg.zones[0]) : 'wilds'}!`);
+    const toast = scene.add.text(GAME_W / 2, 240, `☠ ${cfg.name} has returned`, {
+      fontSize: '24px', fontStyle: 'bold', color: '#ffcc99',
+      stroke: '#3a0000', strokeThickness: 5,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(15000).setAlpha(0);
+    scene.tweens.add({ targets: toast, alpha: 1, duration: 250, yoyo: true,
+      hold: 1300, onComplete: () => toast.destroy() });
+    if (typeof sfxLevelUp === 'function') sfxLevelUp();
+  }
 }
 
 // Brief expanding white ring — used on monster respawn.
@@ -3446,6 +3458,14 @@ class UIManager {
     }
     const gearTxt = gearSummary();
     if (this.gearText.text !== gearTxt) this.gearText.setText(gearTxt);
+    // Promote gear bar border to gold once both slots are filled — visible
+    // sign of full kit without opening the inspector.
+    const fullyGeared = player.equipment.weapon && player.equipment.armor;
+    const wantBorder = fullyGeared ? 0xffe066 : 0x88ddff;
+    if (this.gearBg._lastBorder !== wantBorder) {
+      this.gearBg.setStrokeStyle(fullyGeared ? 2 : 1, wantBorder, 0.85);
+      this.gearBg._lastBorder = wantBorder;
+    }
 
     // Persistent boss ticker for the current zone's resident boss.
     let tickerLine = '';
