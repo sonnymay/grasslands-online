@@ -1319,8 +1319,20 @@ class MonsterController {
     this.wanderVy = 0;
 
     this.sprite = scene.physics.add.sprite(x, y, cfg.idleKey);
-    const bScale = (BLOBLING_DISPLAY_H / this.sprite.height) * (cfg.scaleMult || 1);
+    // Target on-screen height; setTexture across differently-sized source
+    // PNGs (e.g. Bigfoot idle 1254px vs chase 512px) must recompute scale
+    // from this, otherwise the sprite shrinks/grows when textures swap.
+    this.targetDisplayH = BLOBLING_DISPLAY_H * (cfg.scaleMult || 1);
+    const bScale = this.targetDisplayH / this.sprite.height;
     this.sprite.setScale(bScale);
+
+    // Texture swap helper: keeps on-screen size constant when source PNGs
+    // have different pixel heights (e.g. Bigfoot idle 1254 vs chase 512).
+    this._setTex = (key) => {
+      this.sprite.setTexture(key);
+      const h = this.sprite.height || 1;
+      this.sprite.setScale(this.targetDisplayH / h);
+    };
     if (cfg.tint) this.sprite.setTint(cfg.tint);
     this.sprite.setCollideWorldBounds(true);
     this.shadow = scene.add.ellipse(
@@ -1367,10 +1379,10 @@ class MonsterController {
     if (playerAlive && this.provoked) {
       if (dist > BLOBLING_ATTACK_RANGE) {
         this.sprite.setVelocity((dx / dist) * this.speed, (dy / dist) * this.speed);
-        if (this.cfg.chaseKey) this.sprite.setTexture(this.cfg.chaseKey);
+        if (this.cfg.chaseKey) this._setTex(this.cfg.chaseKey);
       } else {
         this.sprite.setVelocity(0, 0);
-        if (this.cfg.aggroKey) this.sprite.setTexture(this.cfg.aggroKey);
+        if (this.cfg.aggroKey) this._setTex(this.cfg.aggroKey);
         if (time - this.lastAttack > BLOBLING_ATTACK_COOLDOWN) {
           this.lastAttack = time;
           const hit = rollMonsterHit(this.atk);
@@ -1378,7 +1390,7 @@ class MonsterController {
             spawnFloatText(this.scene, player.sprite.x, player.sprite.y - 20, 'MISS', 0xcccccc);
             sfxMiss();
           } else {
-            if (this.cfg.attackKey) this.sprite.setTexture(this.cfg.attackKey);
+            if (this.cfg.attackKey) this._setTex(this.cfg.attackKey);
             if (this.cfg.oneShotBelowLevel && player.level < this.cfg.oneShotBelowLevel) {
               hit.amount = player.hp + player.def;
             }
@@ -1400,7 +1412,7 @@ class MonsterController {
         }
       }
       this.sprite.setVelocity(this.wanderVx, this.wanderVy);
-      if (this.cfg.idleKey) this.sprite.setTexture(this.cfg.idleKey);
+      if (this.cfg.idleKey) this._setTex(this.cfg.idleKey);
     }
 
     this._syncShadow();
@@ -1419,9 +1431,9 @@ class MonsterController {
     this.provokedUntil = this.scene.time.now + 5000;
     const color = opts.crit ? 0xffe14a : 0xff5555;
     spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 20, amount, color, { crit: !!opts.crit });
-    this.sprite.setTexture(this.cfg.hitKey);
+    this._setTex(this.cfg.hitKey);
     this.scene.time.delayedCall(120, () => {
-      if (this.alive) this.sprite.setTexture(this.cfg.idleKey);
+      if (this.alive) this._setTex(this.cfg.idleKey);
     });
     if (this.hp <= 0) this.die();
   }
@@ -1429,7 +1441,7 @@ class MonsterController {
   die() {
     this.alive = false;
     this.sprite.setVelocity(0, 0);
-    this.sprite.setTexture(this.cfg.deadKey);
+    this._setTex(this.cfg.deadKey);
     this._syncShadow();
     this.hpBar.setVisible(false);
     this.hpBarBg.setVisible(false);
