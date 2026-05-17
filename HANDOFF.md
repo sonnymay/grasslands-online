@@ -1,7 +1,7 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-16 11:55pm CDT (post session 5).
+> coding sessions. Last refresh: 2026-05-17 1:05am CDT (post session 6).
 
 ---
 
@@ -103,9 +103,9 @@ spawns outside the listed zones.
 | `blobling` | 50 | 5 | 10 | 80 | 30 | grasslands | Pink slime |
 | `mooham` | 80 | 8 | 18 | 70 | 20 | grasslands, ruins | Pig |
 | `moowaan` | 60 | 6 | 14 | 90 | 15 | forest, riverside | scaleMult 0.9 |
-| `dune_blob` | 70 | 7 | 16 | 85 | 12 | desert | Tinted blobling (0xe8c878) until real cactling art is wired |
+| `cactling` | 70 | 7 | 16 | 85 | 12 | desert | Real green cactus sprite (replaced tinted Dune Blob in session 6) |
 | `boss_mooham` | 240 | 16 | 90 | 55 | 1 | desert | Far-zone challenge, scaleMult 1.9 |
-| `bigfoot` | 900 | 220 | 500 | 45 | 1 | forest | **Forest boss**, fixed level 50, no scaling, aggressive (520 px aggro), one-shots players below lv 50. Uses `aggroKey/chaseKey/attackKey/idleKey` extra textures. |
+| `bigfoot` | 900 | 220 | 500 | 45 | 1 | forest | **Forest boss**, fixed level 50, no scaling, aggressive (520 px aggro), one-shots players below lv 50. Uses `aggroKey/chaseKey/attackKey/idleKey` extra textures. `minSpawnDistance: 2400` keeps him on the far edge so new players don't walk into a one-shot. |
 
 All monsters are **passive**. They only chase + attack the player after
 being hit (`provoked` flag, drops after 5 s of no damage). Monster level
@@ -162,9 +162,10 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
   - **desert** (S) — sparse rocks, yellow tint `0xe8c878`
   - **ruins** (W) — heavy rocks + dead bushes, grey tint `0xb0a890`
   - **riverside** (E) — ponds + flowers + trees, blue-green tint `0xa8c8b0`
-- Tile + decoration tints applied via `setTint` on the existing
-  `grass_tileset` until real per-biome tilesets ship. **Sand tileset PNG
-  already exists** (`assets/tiles/sand_tileset.png`) but is not yet wired.
+- **Desert is the first real per-biome tileset:** `sand_tileset.png` is
+  wired in `buildMap` as of session 6 — desert cells draw sand tiles
+  with no tint. Forest / ruins / riverside still recolor `grass_tileset`
+  via `setTint` until their own tilesets land.
 - Mini-map gets a sampled zone backdrop so all 5 biomes read at a glance.
 - Centre cross dirt path (horizontal + vertical mid-row / mid-col).
   Path tiles also tint to blend with biome. Plain grass tiles use
@@ -184,7 +185,44 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 5 (latest, in order)
+## 3. What we did in session 6 (latest, in order)
+
+1. **Wired real desert art** — `sand_tileset.png` loaded + sliced
+   identically to grass tileset; `buildMap` picks `sand_tileset` for
+   desert zone and skips the tint pass for it.
+2. **Cactling replaces tinted Dune Blob.** New `cactling` entry in
+   `MONSTER_TYPES` with dedicated `cactling_idle/hit/dead` textures,
+   no runtime tint. Mini-map marker recoloured.
+3. **Desert decoration overhaul** — added cactus + sand-dune scatter
+   passes, kept rocks (lighter density), `cactus_set.png` and
+   `deco_sand_dune.png` placed via the existing `place()` helper.
+4. **Per-tileset inset map** (`TILESET_INSET_PCT`) — grass keeps the
+   4 % crop for its baked white separator; sand uses 0 % since its
+   edges are flush, killing the faint grid seams the inset exposed.
+5. **Bigfoot relocated to far forest edge.** New `cfg.minSpawnDistance`
+   knob (defaults to 300, Bigfoot uses 2400) so new players don't get
+   one-shot when they first cross north into the trees.
+6. **Cache bumped to `?v=45`.**
+7. `desert_props.png` (skull/bones/skeleton/rocks/signpost on a single
+   512×512 sheet) is **still untracked-wired** — layout is irregular,
+   needs hand-tuned per-prop frame coords. Noted in §4.
+
+## 4. Next steps (pick any)
+
+1. **Slice `desert_props.png` by hand.** The sheet has 7 props in a
+   non-uniform layout. Open it in Preview, read pixel coords for each
+   prop, then add named frames in `preload()` similar to the tileset
+   slicer but with manual `{x, y, w, h}` per frame. Place them in the
+   desert scatter pass.
+2. **Forest tileset.** Same workflow as desert: generate a 4×4 forest
+   tileset (dark grass + moss + dirt path variants), load it, branch
+   `buildMap` for `zone === 'forest'` to draw from it, drop the
+   forest tint. Ruins and riverside next.
+3. **Boss feedback when Bigfoot aggros.** Currently he just walks at
+   you — add a chat message ("A Bigfoot has noticed you!") + screen
+   pulse + bass hit so low-level players have a chance to retreat.
+
+## 5. What we did in session 5 (in order)
 
 1. **World doubled** to 6400×6400 (200×200 cells, 50×50 tiles). A* iter
    cap 8 000 → 32 000.
@@ -224,51 +262,7 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 4. Next steps (pick any)
-
-1. **Wire the new desert art (biggest visual win — assets already in
-   repo, just untracked).**
-   - `cactling_{idle,hit,dead}.png` → swap the `dune_blob` entry in
-     `MONSTER_TYPES` to use these keys, remove the `tint:` line, rename
-     to `cactling`. Preload + keyOutWhite + minimap entry.
-   - `sand_tileset.png` → load as a second tileset key, branch in
-     `buildMap` so desert tiles draw from `sand_tileset` instead of a
-     tinted `grass_tileset`. Cactus + dune deco get their own placement
-     pass in `buildDecorations` desert section, removing the
-     `rockKeys`/`grass_tileset` desert tint.
-   - `desert_props.png` is a multi-prop sheet — needs slicing in
-     `preload()` similar to how `grass_tileset` is sliced into 16 keys.
-   - `git add` the new files when wiring.
-2. **More compression headroom.** sips downscale brought us 96 → 34 MB.
-   `pngquant --quality=70-85` on top would lossy-cut another 40–60 %
-   without visible damage. Requires `brew install pngquant` (was blocked
-   in session 5; run manually next time).
-3. **Walk polish (still open).** Verify in browser that the 4-frame cycle
-   `['walk','walk2','walk3','walk4']` reads as L → pass → R → pass in
-   **every** direction. Codex's `dafed39` added direction-specific frame
-   ordering. If a direction still slides, reorder per-direction inside
-   `_pickWalkFrame()` or reject bad frames with a per-frame Y offset.
-4. **Verify BGM in production** — refresh the Vercel URL, click once,
-   confirm music loops cleanly. If autoplay never starts, surface a
-   one-time "Click to start music" button.
-5. **Zone transitions / portals** — current paths cross the whole map
-   naturally, but adding visible biome boundary markers (stone arches,
-   wooden signs, palette gradient tiles at zone edges) would sell the
-   "you entered the desert" feeling without scene changes.
-6. **More monsters per zone** — pattern is well-trodden. Add to
-   `MONSTER_TYPES` with a `zones: [...]` field, drop sprites at
-   `assets/sprites/<name>_idle/hit/dead.png`, mini-map colour in
-   `drawMinimap()`.
-7. **Walk audio per surface** (grass vs dirt vs sand vs stone) — use
-   `getZone()` at the player's cell to pick the footstep tone.
-8. **Two-stage preload** — essentials (player + tileset + first monster)
-   start the scene immediately, decorations load after
-   `scene.scene.start()` and pop in when ready. Largest engineering
-   change but kills the green-screen wait entirely.
-
----
-
-## 5. Known issues / quirks
+## 6. Known issues / quirks
 
 - **Asset weight** — now **~34 MB** of PNGs (down from 96 MB after
   sips downscale in session 5). Acceptable on broadband; mobile / slow
@@ -301,7 +295,7 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 6. File structure
+## 7. File structure
 
 ```
 Grasslands Online/                                  ← git repo root
@@ -360,7 +354,7 @@ Grasslands Online/                                  ← git repo root
 
 ---
 
-## 7. Assets
+## 8. Assets
 
 ### Sprites — `project-grasslands/assets/sprites/`
 
@@ -412,7 +406,7 @@ Always include `transparent background PNG with alpha channel`. The
 
 ---
 
-## 8. GitHub + Vercel workflow (enforced)
+## 9. GitHub + Vercel workflow (enforced)
 
 - Commit **after every meaningful change**.
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
@@ -426,7 +420,7 @@ Always include `transparent background PNG with alpha channel`. The
 
 ---
 
-## 9. How to continue (do this first in a new session)
+## 10. How to continue (do this first in a new session)
 
 1. **Read this file in full.** No skimming.
 2. From repo root run `git status` and `git log --oneline -10` to confirm
@@ -446,7 +440,7 @@ Always include `transparent background PNG with alpha channel`. The
 
 ---
 
-## 10. Constraints (do NOT re-add)
+## 11. Constraints (do NOT re-add)
 
 The user has explicitly cut these features. Re-adding them is regressive:
 
