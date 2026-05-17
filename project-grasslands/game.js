@@ -462,6 +462,13 @@ function create() {
 
   // Pointer: click a Blobling to fight it; click ground to walk there.
   scene.input.on('pointerdown', (pointer) => {
+    // Block world clicks while the class overlay is up.
+    if (classSelectOpen) return;
+    // Ignore clicks that landed on a UI button (mute / autopilot / return /
+    // class cards). Phaser's scene-level pointerdown fires regardless of
+    // which interactive object was hit, so we check the hit list ourselves.
+    const hits = scene.input.hitTestPointer(pointer);
+    if (hits && hits.length > 0) return;
     const wx = pointer.worldX;
     const wy = pointer.worldY;
 
