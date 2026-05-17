@@ -156,6 +156,7 @@ const CLASS_DEFS = {
     role: 'Melee tank — big slash, +HP',
     cardImage: 'swordsman_card',
     spritePrefix: 'swordsman_',
+    tierSpritePrefixes: { 2: 'knight_' },
     tint: 0xff8866,
     nameColor: '#ff9966',
     tierNames: ['Swordsman', 'Knight', 'Lord Knight', 'Dragon Sovereign'],
@@ -537,9 +538,9 @@ function preload() {
   this.load.image('rookie_walk2_south', 'assets/sprites/rookie_walk2_south.png');
   this.load.image('rookie_walk2_north', 'assets/sprites/rookie_walk2_north.png');
   this.load.image('rookie_walk2_east', 'assets/sprites/rookie_walk2_east.png');
-  // Optional 4-frame stride — silently skipped if files don't exist.
+  // Optional sprite sets — silently skipped if files don't exist.
   this.load.on('loaderror', (file) => {
-    if (file && file.key && /^rookie_(walk3|walk4)_/.test(file.key)) {
+    if (file && file.key && (/^rookie_(walk3|walk4)_/.test(file.key) || /^knight_/.test(file.key))) {
       // expected when art hasn't been generated yet — no-op
     }
   });
@@ -577,10 +578,13 @@ function preload() {
   this.load.image('archer_card',    'assets/sprites/archer_card.png');
   // Class tier-1 player sprites (south-only for now; other directions fall
   // back to rookie + class tint via applyRookieTexture).
-  // Swordsman: all 5 base directions (west / sw / nw mirror east / se / ne).
-  for (const d of ['south','north','east','southeast','northeast']) {
-    this.load.image(`swordsman_idle_${d}`, `assets/sprites/swordsman_idle_${d}.png`);
-    this.load.image(`swordsman_walk_${d}`, `assets/sprites/swordsman_walk_${d}.png`);
+  // Swordsman + Tier-2 Knight: all 5 base directions (west / sw / nw mirror
+  // east / se / ne).
+  for (const prefix of ['swordsman', 'knight']) {
+    for (const d of ['south','north','east','southeast','northeast']) {
+      this.load.image(`${prefix}_idle_${d}`, `assets/sprites/${prefix}_idle_${d}.png`);
+      this.load.image(`${prefix}_walk_${d}`, `assets/sprites/${prefix}_walk_${d}.png`);
+    }
   }
   // Mage: all 5 base directions.
   for (const d of ['south','north','east','southeast','northeast']) {
@@ -668,6 +672,11 @@ function create() {
     'swordsman_idle_east','swordsman_walk_east',
     'swordsman_idle_southeast','swordsman_walk_southeast',
     'swordsman_idle_northeast','swordsman_walk_northeast',
+    'knight_idle_south','knight_walk_south',
+    'knight_idle_north','knight_walk_north',
+    'knight_idle_east','knight_walk_east',
+    'knight_idle_southeast','knight_walk_southeast',
+    'knight_idle_northeast','knight_walk_northeast',
     'mage_idle_north','mage_walk_north',
     'mage_idle_east','mage_walk_east',
     'mage_idle_southeast','mage_walk_southeast',
@@ -2011,23 +2020,28 @@ function pickPlayerTextureKey(sprite, dir, frame) {
   const exists = (k) => sprite.scene.textures.exists(k);
 
   if (classDef) {
-    // 1. Exact class + frame + direction.
-    const exact = classDef.spritePrefix + frameSeg + dirSuffix;
-    if (exists(exact)) return { key: exact, info, classDef, isClassKey: true, flip: info.flip };
-    // 2. Class same frame, south fallback (cancels flip).
-    const sameFrameSouth = classDef.spritePrefix + frameSeg + 'south';
-    if (exists(sameFrameSouth)) return { key: sameFrameSouth, info, classDef, isClassKey: true, flip: false };
-    // 3. For walk variants (walk2/3/4) fall to plain walk south.
-    if (frame !== 'idle' && frame !== 'attack' && frame !== 'dead') {
-      const walkSouth = classDef.spritePrefix + 'walk_south';
-      if (exists(walkSouth)) return { key: walkSouth, info, classDef, isClassKey: true, flip: false };
+    const tierPrefix = classDef.tierSpritePrefixes && player
+      ? classDef.tierSpritePrefixes[player.classTier]
+      : null;
+    const prefixes = tierPrefix ? [tierPrefix, classDef.spritePrefix] : [classDef.spritePrefix];
+    for (const prefix of prefixes) {
+      // 1. Exact class/tier + frame + direction.
+      const exact = prefix + frameSeg + dirSuffix;
+      if (exists(exact)) return { key: exact, info, classDef, isClassKey: true, flip: info.flip };
+      // 2. Same frame, south fallback (cancels flip).
+      const sameFrameSouth = prefix + frameSeg + 'south';
+      if (exists(sameFrameSouth)) return { key: sameFrameSouth, info, classDef, isClassKey: true, flip: false };
+      // 3. For walk variants (walk2/3/4) fall to plain walk south.
+      if (frame !== 'idle' && frame !== 'attack' && frame !== 'dead') {
+        const walkSouth = prefix + 'walk_south';
+        if (exists(walkSouth)) return { key: walkSouth, info, classDef, isClassKey: true, flip: false };
+      }
+      // 4. Final for this prefix: idle south.
+      const idleSouth = prefix + 'idle_south';
+      if (exists(idleSouth)) return { key: idleSouth, info, classDef, isClassKey: true, flip: false };
     }
-    // 4. Final: class idle south. Always exists for any class shipped per
-    // the spec (every class has at least idle_south + walk_south).
-    const idleSouth = classDef.spritePrefix + 'idle_south';
-    if (exists(idleSouth)) return { key: idleSouth, info, classDef, isClassKey: true, flip: false };
-    // If somehow even idle_south is missing, fall through to rookie below
-    // so the player isn't invisible.
+    // If somehow even the base class idle_south is missing, fall through to
+    // rookie below so the player isn't invisible.
   }
   // No class chosen → original rookie path.
   const key = 'rookie_' + frameSeg + dirSuffix;

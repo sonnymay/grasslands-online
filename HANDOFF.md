@@ -1,8 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 6:25pm CDT (post session 22,
-> road sparkle pickup polish).
+> coding sessions. Last refresh: 2026-05-17 6:40pm CDT (post session 23,
+> Tier-2 Knight sprite wiring).
 
 ---
 
@@ -186,7 +186,36 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 22 (latest, in order)
+## 3. What we did in session 23 (latest, in order)
+
+User asked to wire Knight sprites for Swordsman Tier 2. Cache now at
+**`?v=95`**.
+
+1. **Tier-specific player sprite prefixes** — `CLASS_DEFS.swordsman` now
+   supports `tierSpritePrefixes: { 2: 'knight_' }`.
+2. **Knight preload + alpha-key hooks** — `preload()` now requests
+   `knight_{idle,walk}_{south,north,east,southeast,northeast}.png`, and
+   `keyOutWhite()` includes those keys.
+3. **Tier-aware texture picker** — `pickPlayerTextureKey()` now tries the
+   current tier prefix first, then falls back to the base class prefix. For
+   Swordsman Tier 2, Knight art is preferred; if a Knight frame is missing,
+   Swordsman art remains the fallback so the player never reverts to rookie
+   art or goes invisible.
+4. **Local asset caveat** — current local checkout still has no
+   `knight_*` files under `project-grasslands/assets/sprites/`
+   (`find ... -iname '*knight*'` returned nothing). Code is wired for the
+   expected filenames, but visual Knight art requires those PNGs to be added
+   and committed.
+5. **Cache bump** — `project-grasslands/index.html` now loads
+   `game.js?v=95`.
+6. **Verification**:
+   - `node -c project-grasslands/game.js` exited 0.
+   - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
+   - Served `index.html` references `game.js?v=95`.
+   - `assets/sprites/knight_idle_south.png` returned `HTTP/1.0 404 File not found`
+     in this checkout, confirming the local asset caveat above.
+
+### (legacy) session 22
 
 Continued from §4 quick polish. Cache now at **`?v=94`**.
 
@@ -1034,7 +1063,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=94`**. Next change should use `?v=95`.
+  change. Current: **`?v=95`**. Next change should use `?v=96`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1157,7 +1186,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=94`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=95`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.
