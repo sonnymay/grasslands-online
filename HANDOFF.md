@@ -1,7 +1,7 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-16 9:20pm CDT (post session 4).
+> coding sessions. Last refresh: 2026-05-16 11:55pm CDT (post session 5).
 
 ---
 
@@ -95,12 +95,17 @@ Claude Code preview server: `mcp__Claude_Preview__preview_start` name
   full HP.
 
 ### Monsters (`MONSTER_TYPES` table)
-| Type | HP | ATK | EXP | Speed | Count | Notes |
-|---|---|---|---|---|---|---|
-| `blobling` | 50 | 5 | 10 | 80 | 15 | Pink slime |
-| `mooham` | 80 | 8 | 18 | 70 | 10 | Pig |
-| `moowaan` | 60 | 6 | 14 | 90 | 8 | Green-ish, scaleMult 0.9 |
-| `boss_mooham` | 240 | 16 | 90 | 55 | 1 | scaleMult 1.9 |
+Each entry now has a `zones: [...]` whitelist; `spawnMonster()` rejects
+spawns outside the listed zones.
+
+| Type | HP | ATK | EXP | Speed | Count | Zone(s) | Notes |
+|---|---|---|---|---|---|---|---|
+| `blobling` | 50 | 5 | 10 | 80 | 30 | grasslands | Pink slime |
+| `mooham` | 80 | 8 | 18 | 70 | 20 | grasslands, ruins | Pig |
+| `moowaan` | 60 | 6 | 14 | 90 | 15 | forest, riverside | scaleMult 0.9 |
+| `dune_blob` | 70 | 7 | 16 | 85 | 12 | desert | Tinted blobling (0xe8c878) until real cactling art is wired |
+| `boss_mooham` | 240 | 16 | 90 | 55 | 1 | desert | Far-zone challenge, scaleMult 1.9 |
+| `bigfoot` | 900 | 220 | 500 | 45 | 1 | forest | **Forest boss**, fixed level 50, no scaling, aggressive (520 px aggro), one-shots players below lv 50. Uses `aggroKey/chaseKey/attackKey/idleKey` extra textures. |
 
 All monsters are **passive**. They only chase + attack the player after
 being hit (`provoked` flag, drops after 5 s of no damage). Monster level
@@ -130,7 +135,9 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 - Implemented as a `scrollFactor 0` fullscreen rect at depth 9000.
 
 ### Persistence
-- `localStorage[grasslands_save_v1]` auto-saves every 3 s and on level-up.
+- `localStorage[grasslands_save_v2]` auto-saves every 3 s and on level-up.
+  Bumped from `v1` when the world doubled — old saves had cells in a
+  100×100 grid and would land in the wrong zone in the 200×200 world.
 - Saves: `level, exp, hp, maxHP, atk, def, zeny, kills, cellCol, cellRow`.
 - On load: position falls back to spawn if the saved cell is now blocked
   by decorations.
@@ -146,9 +153,22 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
   browser blocks autoplay.
 
 ### Map
-- 25×25 tile grid. Centre cross dirt path (horizontal + vertical mid-row /
-  mid-col). Everything else: plain grass alternating GRASS / THICK_GRASS,
-  random flipX/flipY to break the 128 px grid.
+- **6400×6400 world, 50×50 tile grid, 200×200 cell grid.** 4× the original
+  Phase-1 footprint. A* iteration cap raised to 32 000.
+- **5 themed zones** (`getZone(r, c)`) carved around a central grasslands
+  core (~9 tiles either side of map center):
+  - **grasslands** (center) — original mix, no tint, all standard deco
+  - **forest** (N) — heavy trees, dark bushes, green tint `0x6b8a5a`
+  - **desert** (S) — sparse rocks, yellow tint `0xe8c878`
+  - **ruins** (W) — heavy rocks + dead bushes, grey tint `0xb0a890`
+  - **riverside** (E) — ponds + flowers + trees, blue-green tint `0xa8c8b0`
+- Tile + decoration tints applied via `setTint` on the existing
+  `grass_tileset` until real per-biome tilesets ship. **Sand tileset PNG
+  already exists** (`assets/tiles/sand_tileset.png`) but is not yet wired.
+- Mini-map gets a sampled zone backdrop so all 5 biomes read at a glance.
+- Centre cross dirt path (horizontal + vertical mid-row / mid-col).
+  Path tiles also tint to blend with biome. Plain grass tiles use
+  GRASS / THICK_GRASS, random flipX/flipY to break the 128 px grid.
 - Decoration scatter overlay (`buildDecorations`):
   - 220 tall-grass clumps
   - 110 flower clusters
@@ -164,64 +184,106 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 4 (latest, in order)
+## 3. What we did in session 5 (latest, in order)
 
-1. Bumped `MS_PER_CELL` from 130 → 170 so footfalls read instead of slide.
-2. Reduced `BOB_AMPLITUDE` 6 → 3, added `WALK_FRAME_MS = 120` constant.
-3. Codex shipped `MooWaan` monster + `dafed39` walk-frame-by-direction fix.
-4. Soft ground shadows under monsters + loot drops.
-5. Vercel deploy wired: `vercel.json` (outputDirectory + cache headers),
-   `DEPLOY.md`, two GitHub workflows.
-6. **Loading overlay** added in `index.html` — green-themed card with
-   progress bar + percentage. `preload()` listens to `progress` and
-   `complete` events and hides/removes the overlay when assets finish.
-7. **BGM wired**: `this.load.audio('bgm', ['…/bgm.mp3', '…/bgm.ogg'])`
-   in preload. In `create()` add a looped sound at volume 0.35, try
-   immediate play, then `scene.input.once('pointerdown'/'keydown', start)`
-   as autoplay-fallback. `assets/audio/bgm.mp3` (4 MB) now committed.
-8. Cache buster bumped to **`?v=41`**.
+1. **World doubled** to 6400×6400 (200×200 cells, 50×50 tiles). A* iter
+   cap 8 000 → 32 000.
+2. **5-zone biome system** added via `getZone(r, c)` — central grasslands
+   core, outer ring partitioned by compass direction into forest (N),
+   desert (S), ruins (W), riverside (E).
+3. **Per-zone tile tinting**: `ZONE_TINTS` map applied via `setTint` in
+   `buildMap` so existing grass tileset visually differentiates biomes.
+4. **Per-zone decoration scatter**: `buildDecorations` accepts a
+   `zoneFilter` opts param and runs separate placement passes per biome
+   (trees-heavy forest, rocky desert + ruins, ponds + flowers riverside).
+   The `deco_rock_01..03` PNGs now actually get placed.
+5. **Dune Blob monster** added — recoloured Blobling sprite via
+   `tint: 0xe8c878` on the MonsterController, desert-only.
+6. **Bigfoot forest boss** added (Codex change, committed in same wave):
+   fixed lv 50, 900 HP, 220 ATK, aggressive aggro, one-shots players
+   below lv 50, uses extra textures (`aggro/chase/attack`).
+7. **Mini-map zone backdrop** — 16×16 sample grid colours every cell by
+   `getZone()`, plus Bigfoot gets a black-outlined red marker so the
+   boss is visible from anywhere on the map.
+8. **Save key bumped to v2** so 100×100-coord saves don't land players in
+   the wrong zone in the 200×200 world.
+9. **Asset compression via `sips --resampleHeightWidthMax`** — every PNG
+   downscaled (tilesets cap 768, sprites + decorations cap 512). Total
+   assets dropped from **~96 MB → ~34 MB** (≈65 % cut). Lossless visual
+   quality at current display sizes (96–240 px). pngquant not used —
+   `brew install` blocked, sips was sufficient.
+10. **New desert art generated but not yet wired:** `sand_tileset.png`,
+    `desert_props.png`, `cactus_set.png`, `deco_sand_dune.png`,
+    `cactling_idle.png`/`hit`/`dead`. Compressed but still untracked.
+    See §4 #1.
+11. Cache buster bumped to **`?v=43`** (`v=42` shipped the zone system,
+    `v=43` ships the compressed assets).
+12. **`.claude/launch.json` switched** to `/opt/homebrew/bin/python3.13`
+    because the bundled Python 3.9 hits `PermissionError: getcwd()` in
+    the sandbox. Absolute path to project dir baked into args.
 
 ---
 
 ## 4. Next steps (pick any)
 
-1. **Shrink assets — biggest open win.** First-load is ~71 MB of PNGs and
-   the slow-link delay is what triggered the loading bar work. Manual
-   compression:
-   ```bash
-   brew install pngquant
-   cd "/Users/santipapmay/Documents/Grasslands Online/project-grasslands/assets"
-   find . -name "*.png" -exec pngquant --force --skip-if-larger --quality=70-85 --ext .png {} \;
-   git add . && git commit -m "asset: compress PNGs via pngquant" && git push
-   ```
-   Expect a 60–80 % size drop. Walks well with the existing immutable
-   asset cache.
-2. **Walk polish (still requested).** Verify in browser that the 4-frame
-   cycle ['walk','walk2','walk3','walk4'] reads as L → pass → R → pass
-   in **every** direction. Codex already added direction-specific frame
-   ordering (`dafed39`). If a particular direction still slides, the cycle
-   may need per-direction reordering inside `_pickWalkFrame()`. Inspect
-   art for mismatched feet baselines and consider rejecting bad frames
-   with a per-frame Y offset.
-3. **Verify BGM in production** — refresh the Vercel URL, click once,
+1. **Wire the new desert art (biggest visual win — assets already in
+   repo, just untracked).**
+   - `cactling_{idle,hit,dead}.png` → swap the `dune_blob` entry in
+     `MONSTER_TYPES` to use these keys, remove the `tint:` line, rename
+     to `cactling`. Preload + keyOutWhite + minimap entry.
+   - `sand_tileset.png` → load as a second tileset key, branch in
+     `buildMap` so desert tiles draw from `sand_tileset` instead of a
+     tinted `grass_tileset`. Cactus + dune deco get their own placement
+     pass in `buildDecorations` desert section, removing the
+     `rockKeys`/`grass_tileset` desert tint.
+   - `desert_props.png` is a multi-prop sheet — needs slicing in
+     `preload()` similar to how `grass_tileset` is sliced into 16 keys.
+   - `git add` the new files when wiring.
+2. **More compression headroom.** sips downscale brought us 96 → 34 MB.
+   `pngquant --quality=70-85` on top would lossy-cut another 40–60 %
+   without visible damage. Requires `brew install pngquant` (was blocked
+   in session 5; run manually next time).
+3. **Walk polish (still open).** Verify in browser that the 4-frame cycle
+   `['walk','walk2','walk3','walk4']` reads as L → pass → R → pass in
+   **every** direction. Codex's `dafed39` added direction-specific frame
+   ordering. If a direction still slides, reorder per-direction inside
+   `_pickWalkFrame()` or reject bad frames with a per-frame Y offset.
+4. **Verify BGM in production** — refresh the Vercel URL, click once,
    confirm music loops cleanly. If autoplay never starts, surface a
    one-time "Click to start music" button.
-4. **More monsters.** Pattern is well-trodden — add to `MONSTER_TYPES`,
-   drop sprites at `assets/sprites/<name>_idle/hit/dead.png`, mini-map
-   colour in `drawMinimap()`.
-5. **Walk audio per surface** (grass vs dirt) — tile-aware footstep tones.
-6. **Tame the green-screen further.** Consider a two-stage preload:
-   essentials (player + tileset + first monster) start the scene
-   immediately, decorations load after `scene.scene.start()` and pop in
-   when ready. Largest engineering change.
+5. **Zone transitions / portals** — current paths cross the whole map
+   naturally, but adding visible biome boundary markers (stone arches,
+   wooden signs, palette gradient tiles at zone edges) would sell the
+   "you entered the desert" feeling without scene changes.
+6. **More monsters per zone** — pattern is well-trodden. Add to
+   `MONSTER_TYPES` with a `zones: [...]` field, drop sprites at
+   `assets/sprites/<name>_idle/hit/dead.png`, mini-map colour in
+   `drawMinimap()`.
+7. **Walk audio per surface** (grass vs dirt vs sand vs stone) — use
+   `getZone()` at the player's cell to pick the footstep tone.
+8. **Two-stage preload** — essentials (player + tileset + first monster)
+   start the scene immediately, decorations load after
+   `scene.scene.start()` and pop in when ready. Largest engineering
+   change but kills the green-screen wait entirely.
 
 ---
 
 ## 5. Known issues / quirks
 
-- **Asset bloat** — ~71 MB of PNGs. First-time visitors see ~30–60 s
-  load. Vercel caches assets `immutable` so repeat visitors are instant.
-  Loading bar now shows progress; real fix is pngquant.
+- **Asset weight** — now **~34 MB** of PNGs (down from 96 MB after
+  sips downscale in session 5). Acceptable on broadband; mobile / slow
+  links still see a multi-second load. Vercel caches assets `immutable`
+  so repeat visitors are instant. Loading bar shows progress.
+  `pngquant` would cut another 40–60 % when the user installs it.
+- **Tinted-tile biomes look muddy.** Multiplying `0xe8c878` over the
+  saturated green tileset gives olive, not sand. The right fix is real
+  per-biome tilesets — `sand_tileset.png` is already on disk waiting to
+  be wired (§4 #1).
+- **Bigfoot one-shots low-level players.** Forest is the closest biome
+  to spawn (player walks N from grasslands core). Until levelling
+  catches players up to 50, the forest is effectively a death zone.
+  Consider either (a) gating Bigfoot spawn behind a kill-count flag, or
+  (b) moving Bigfoot to the far edge of the forest.
 - `keyOutWhite()` strips any near-white pixel — will damage future art
   with intentional whites. Prefer art with real alpha and remove the hack
   one day.
@@ -232,8 +294,8 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 - A* recomputes every repath; fine at 100×100 with the iteration cap.
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
-- `?v=N` cache-bust lives in `index.html`. Bump on every `game.js` change.
-  Current: **`?v=41`**. Next change should use `?v=42`.
+- `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
+  change. Current: **`?v=43`**. Next change should use `?v=44`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -308,9 +370,11 @@ Grasslands Online/                                  ← git repo root
 | `rookie_walk{,2,3,4}_<dir>.png` | 5 × 4 = 20 | 4-frame walk cycle, 8-dir via flip |
 | `rookie_attack.png` | 1 | 250 ms swing flash |
 | `rookie_dead.png` | 1 | Death pose |
-| `blobling_{idle,hit,dead}.png` | 3 | Pink slime |
-| `mooham_{idle,hit,dead}.png` | 3 | Pig |
-| `moowaan_{idle,hit,dead}.png` | 3 | New green-ish monster |
+| `blobling_{idle,hit,dead}.png` | 3 | Pink slime, also retinted for Dune Blob |
+| `mooham_{idle,hit,dead}.png` | 3 | Pig, also reused for Boss MooHam |
+| `moowaan_{idle,hit,dead}.png` | 3 | Green-ish, forest/riverside |
+| `bigfoot_{idle,aggro,chase,attack,hit,dead}.png` | 6 | Forest boss, lv 50 |
+| `cactling_{idle,hit,dead}.png` | 3 | **Untracked, not yet wired.** Replacement for tinted Dune Blob in desert. |
 
 ### Decorations — `project-grasslands/assets/decorations/`
 
@@ -318,7 +382,10 @@ Grasslands Online/                                  ← git repo root
 |---|---|---|
 | `deco_flower_cluster_01..04.png` | 4 | Random scatter on grass |
 | `deco_tallgrass_01..03.png` | 3 | Random scatter on grass |
-| `deco_rock_01..03.png` | 3 | **Loaded, not placed** |
+| `deco_rock_01..03.png` | 3 | Now placed in desert + ruins zones |
+| `cactus_set.png` | 1 | **Untracked, not yet wired.** Multi-cactus PNG for desert. |
+| `deco_sand_dune.png` | 1 | **Untracked, not yet wired.** Sandy mound deco. |
+| `desert_props.png` | 1 | **Untracked, not yet wired.** Multi-prop sheet (rocks/bones/signpost) — needs slicing like the tileset. |
 | `mushroom_red_01.png`, `mushroom_brown_02.png` | 2 | Decoration only |
 | `bush_01.png`, `bush_02.png` | 2 | Block radius 1 |
 | `tree_oak_01.png`, `tree_pine_02.png`, `tree_round_03.png` | 3 | Block radius 2 |
@@ -326,8 +393,12 @@ Grasslands Online/                                  ← git repo root
 
 ### Tiles — `project-grasslands/assets/tiles/`
 
-- `grass_tileset.png` 1254×1254, 4×4 grid (16 tiles), sliced with a 4 %
-  inset crop, drawn `TILE_SIZE + 2` to hide subpixel seams.
+- `grass_tileset.png` — 4×4 grid (16 tiles), sliced with a 4 % inset
+  crop, drawn `TILE_SIZE + 2` to hide subpixel seams. Downscaled to
+  768 px longest side in session 5.
+- `sand_tileset.png` — **Untracked, not yet wired.** Companion to
+  `grass_tileset.png`; same 4×4 layout but desert palette. Wire as a
+  second key in `preload()` and branch in `buildMap()` per zone.
 
 ### Audio — `project-grasslands/assets/audio/`
 
@@ -347,7 +418,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=41`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=43`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.
