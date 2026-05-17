@@ -2378,9 +2378,84 @@ const AMBIENCE_STYLE = {
   ruins:      { color: 0xcccccc, drift: { x: 0, y: -8 },  shape: 'dot', size: 2 },
   riverside:  { color: 0x99ddff, drift: { x: 8, y: -14 }, shape: 'dot', size: 3 },
 };
+const WEATHER_INTERVAL_MS = 90000;
+const WEATHER_JITTER_MS = 18000;
+const WEATHER_DURATION_MS = 10000;
+const WEATHER_STYLE = {
+  grasslands: { name: 'petal storm', color: 0xffb7d5, rate: 10 },
+  forest:     { name: 'low mist', color: 0xbde8d1, rate: 7 },
+  desert:     { name: 'sand swirl', color: 0xffd28a, rate: 12 },
+  ruins:      { name: 'dust devils', color: 0xd7c8aa, rate: 8 },
+  riverside:  { name: 'rain burst', color: 0x88ccff, rate: 16 },
+};
+let _nextWeatherAt = 0;
+let _weatherEvent = null;
+
+function scheduleNextWeather(time) {
+  _nextWeatherAt = time + WEATHER_INTERVAL_MS + Phaser.Math.Between(-WEATHER_JITTER_MS, WEATHER_JITTER_MS);
+}
+
+function startWeatherBurst(scene, time, zone) {
+  const style = WEATHER_STYLE[zone];
+  if (!style) {
+    scheduleNextWeather(time);
+    return;
+  }
+  _weatherEvent = { zone, style, endsAt: time + WEATHER_DURATION_MS };
+  scheduleNextWeather(time);
+  if (ui) ui.message(`Weather: ${style.name} moves through ${ZONE_LABELS[zone] || zone}.`);
+}
+
+function tickWeatherBurst(scene, time, delta) {
+  if (!_weatherEvent) {
+    if (!_nextWeatherAt) scheduleNextWeather(time);
+    if (time >= _nextWeatherAt && currentZone) startWeatherBurst(scene, time, currentZone);
+    return;
+  }
+  if (time >= _weatherEvent.endsAt || _weatherEvent.zone !== currentZone) {
+    _weatherEvent = null;
+    return;
+  }
+
+  const { zone, style } = _weatherEvent;
+  const cam = scene.cameras.main;
+  const nightBoost = zone === 'forest' ? (1 + worldDarkness * 1.2) : 1;
+  const burstRate = style.rate * nightBoost;
+  const expected = burstRate * delta / 1000;
+  let count = Math.floor(expected);
+  if (Math.random() < expected - count) count += 1;
+  for (let i = 0; i < count; i++) {
+    const x = cam.scrollX + Math.random() * cam.width;
+    const y = cam.scrollY + Math.random() * cam.height;
+    let obj;
+    if (zone === 'riverside') {
+      obj = scene.add.rectangle(x, y, 2, 18, style.color, 0.7).setAngle(12);
+      scene.tweens.add({ targets: obj, x: x + 28, y: y + 150, alpha: 0, duration: 520, onComplete: () => obj.destroy() });
+    } else if (zone === 'desert') {
+      obj = scene.add.circle(x, y, Phaser.Math.Between(2, 4), style.color, 0.55);
+      scene.tweens.add({ targets: obj, x: x + Phaser.Math.Between(-80, 90), y: y + Phaser.Math.Between(-35, 30),
+        alpha: 0, scale: 2.2, duration: 900, onComplete: () => obj.destroy() });
+    } else if (zone === 'forest') {
+      obj = scene.add.ellipse(x, y, Phaser.Math.Between(28, 60), Phaser.Math.Between(8, 18), style.color, 0.12 + worldDarkness * 0.16);
+      scene.tweens.add({ targets: obj, x: x + Phaser.Math.Between(-18, 18), alpha: 0, scaleX: 1.8,
+        duration: 1700, onComplete: () => obj.destroy() });
+    } else if (zone === 'ruins') {
+      obj = scene.add.rectangle(x, y, 4, 4, style.color, 0.45).setAngle(Math.random() * 360);
+      scene.tweens.add({ targets: obj, x: x + Phaser.Math.Between(-45, 45), y: y - Phaser.Math.Between(40, 95),
+        angle: obj.angle + 540, alpha: 0, duration: 1200, onComplete: () => obj.destroy() });
+    } else {
+      obj = scene.add.ellipse(x, y, 8, 4, style.color, 0.72).setAngle(Math.random() * 360);
+      scene.tweens.add({ targets: obj, x: x + Phaser.Math.Between(-30, 30), y: y + Phaser.Math.Between(55, 110),
+        angle: obj.angle + Phaser.Math.Between(120, 300), alpha: 0, duration: 1500, onComplete: () => obj.destroy() });
+    }
+    obj.setDepth(15450);
+  }
+}
+
 function tickAmbience(scene, time, delta) {
   const zone = currentZone;
   if (!zone) return;
+  tickWeatherBurst(scene, time, delta);
   // Base zone particle.
   const rate = AMBIENCE_RATE_PER_SEC[zone] || 0.5;
   // Night doubles the spawn rate + halves alpha for "darker air" feel.

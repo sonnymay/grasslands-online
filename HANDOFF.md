@@ -1,8 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 5:15pm CDT (post session 17,
-> trophy inspector overlay).
+> coding sessions. Last refresh: 2026-05-17 5:25pm CDT (post session 18,
+> per-zone weather bursts).
 
 ---
 
@@ -186,7 +186,29 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 17 (latest, in order)
+## 3. What we did in session 18 (latest, in order)
+
+Continued from the recommended §4 order. Cache now at **`?v=90`**.
+
+1. **Per-zone weather bursts** — `tickAmbience` now drives a lightweight
+   weather scheduler: about every 90s (with jitter), the current zone gets
+   a 10s no-rules particle burst.
+2. **Zone-specific weather identity**:
+   - Grasslands: pink petal storm.
+   - Forest: low mist patches.
+   - Desert: sand swirl.
+   - Ruins: dust devils.
+   - Riverside: short rain streaks.
+3. **Night-aware weather** — forest mist reuses `worldDarkness` for denser,
+   more visible night fog while keeping the effect cheap.
+4. **Cache bump** — `project-grasslands/index.html` now loads
+   `game.js?v=90`.
+5. **Verification**:
+   - `node -c project-grasslands/game.js` exited 0.
+   - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
+   - Served `index.html` references `game.js?v=90`.
+
+### (legacy) session 17
 
 Focused Codex pickup from §4. Cache now at **`?v=89`**.
 
@@ -337,21 +359,17 @@ The user is paused while context recharges. Pick freely.
    that pulses each time `saveGame()` runs.
 
 **Gameplay (15–30 min):**
-6. **Per-zone weather events** — every ~90 s, kick off a 10 s
-   weather burst for the current zone: rain in riverside, sand
-   swirl in desert, mist patches in forest, dust devils in ruins,
-   petal storm in grasslands. Cheap particles, no rules.
-7. **Pet companion** — small sprite (reuse blobling tinted with
+1. **Pet companion** — small sprite (reuse blobling tinted with
    class color) that trails behind the player by 1 cell. No
    combat, pure cosmetic. Toggle in shop or as a one-time 5000z
    buy.
-8. **Cosmetic title above name** — picked from milestones (e.g.
+2. **Cosmetic title above name** — picked from milestones (e.g.
    "Plaza Wanderer" after all 5 landmarks, "Boss Hunter" after
    5 trophies). Visible above the level/title nameTag.
-9. **Class switch cost** — first class pick is free; subsequent
+3. **Class switch cost** — first class pick is free; subsequent
    switches via the chooser cost an increasing amount of zeny.
    Currently free + risk-free.
-10. **Quest pity timer** — if the player hasn't completed the same
+4. **Quest pity timer** — if the player hasn't completed the same
     quest in N minutes, increase its reward each tick so unwanted
     quest mobs eventually pay out.
 
@@ -955,7 +973,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=89`**. Next change should use `?v=90`.
+  change. Current: **`?v=90`**. Next change should use `?v=91`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1078,7 +1096,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=89`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=90`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.
