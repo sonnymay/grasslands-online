@@ -1766,11 +1766,26 @@ function showClassSelect(scene) {
   if (classSelectOpen) return;
   classSelectOpen = true;
   const cont = scene.add.container(0, 0).setScrollFactor(0).setDepth(20000);
+  const closeOverlay = () => {
+    if (!classSelectOpen) return;
+    cont.destroy();
+    classSelectOpen = false;
+  };
   // Dark overlay catches input below the cards so the world freezes.
   const bg = scene.add.rectangle(0, 0, GAME_W, GAME_H, 0x000000, 0.78)
     .setOrigin(0, 0).setScrollFactor(0).setInteractive();
   bg.on('pointerdown', (p, lx, ly, ev) => { ev && ev.stopPropagation && ev.stopPropagation(); });
   cont.add(bg);
+
+  // Close (X) button top-right of the overlay — stay novice / change mind later.
+  const closeBtn = scene.add.text(GAME_W - 40, 30, '✕', {
+    fontSize: '32px', fontStyle: 'bold', color: '#ffffff',
+    stroke: '#000', strokeThickness: 4,
+  }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+  closeBtn.on('pointerover', () => closeBtn.setColor('#ffe066'));
+  closeBtn.on('pointerout',  () => closeBtn.setColor('#ffffff'));
+  closeBtn.on('pointerdown', () => { closeOverlay(); ui.message('Stayed as a Rookie. Open the Class button anytime.'); });
+  cont.add(closeBtn);
 
   // Title — gold with a soft glow via stacked text strokes.
   const titleShadow = scene.add.text(GAME_W / 2, 80, 'CHOOSE YOUR PATH', {
@@ -2186,6 +2201,26 @@ class UIManager {
       player.stepFromY = player.stepToY = wy;
       ui.message('Warped home.');
       sfxPickup();
+    });
+
+    // Class button — open the class chooser anytime (or report current class).
+    const clY = rsY + btnH + 6;
+    this.clBg = scene.add.rectangle(btnX, clY, btnW, btnH, 0x664422, 0.85)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
+      .setStrokeStyle(2, 0xffe066, 0.9)
+      .setInteractive({ useHandCursor: true });
+    this.clText = scene.add.text(btnX + btnW / 2, clY + btnH / 2, '✦ Class', {
+      fontSize: '13px', color: '#ffe066', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    this.clBg.on('pointerdown', () => {
+      if (!player) return;
+      if (player.classId) {
+        const cdef = CLASS_DEFS[player.classId];
+        const tierIdx = Math.max(0, Math.min(cdef.tierNames.length - 1, player.classTier - 1));
+        ui.message(`You are a ${cdef.tierNames[tierIdx]} (Tier ${player.classTier}). Class locked once chosen.`);
+      } else {
+        showClassSelect(scene);
+      }
     });
 
     // Boss HP bar (top of screen, hidden until a boss is engaged).
