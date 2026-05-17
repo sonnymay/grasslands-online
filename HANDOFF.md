@@ -1,28 +1,25 @@
 # HANDOFF.md — Grasslands Online
 
-> **READ THIS FIRST.** Single source of truth between coding sessions. If you
-> just opened a fresh Claude Code session, read top-to-bottom and follow §9
-> ("How to continue") at the bottom.
->
-> Last updated: 2026-05-16 (session 9)
+> **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
+> coding sessions. Last refresh: 2026-05-16 9:20pm CDT (post session 4).
 
 ---
 
 ## 1. Project overview
 
 **Grasslands Online** — browser-based 2D MMORPG inspired by Ragnarok Online.
-Everything is original (name, art, code), copyright-safe by design.
+Original name, original art, original code, copyright-safe.
 
 - **Owner:** Sonny (GitHub: `sonnymay`)
 - **Repo:** https://github.com/sonnymay/grasslands-online (public)
-- **Local root:** `/Users/santipapmay/Documents/Grasslands Online`
-- **Playable subfolder:** `project-grasslands/`
-- **Production URL:** https://grasslands-online.vercel.app
-- **Engine:** Phaser 3.70 (loaded from CDN, no build tools)
-- **Language:** plain JavaScript + HTML
+- **Live prod:** https://grasslands-online.vercel.app
+- **Local repo root:** `/Users/santipapmay/Documents/Grasslands Online`
+- **Playable subfolder (Vercel `outputDirectory`):** `project-grasslands/`
+- **Engine:** Phaser 3.70 from CDN
+- **Language:** plain JavaScript + HTML, **no build step, no npm packages**
 - **Art:** ChatGPT image-gen, anime 2D, no pixel art
 
-### Run
+### Run locally
 
 ```bash
 cd "/Users/santipapmay/Documents/Grasslands Online/project-grasslands"
@@ -30,355 +27,364 @@ python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
-Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grasslands` (port 8001, configured in `/Users/santipapmay/Documents/Grasslands Online/.claude/launch.json` with `--directory project-grasslands`).
+Claude Code preview server: `mcp__Claude_Preview__preview_start` name
+`grasslands` (port 8001; configured in
+`/Users/santipapmay/Documents/Grasslands Online/.claude/launch.json` with
+`--directory project-grasslands`).
+
+### Deployment
+
+- Vercel auto-deploys on every push to `main` via the GitHub integration.
+- `vercel.json` at repo root sets `outputDirectory: project-grasslands`,
+  no build/install command, and these cache headers:
+  - `index.html` + `game.js` → `max-age=0, must-revalidate`
+  - `assets/(.*)` → `max-age=31536000, immutable`
+- `.github/workflows/ci.yml` runs `node -c` on `game.js` and a smoke fetch
+  on each push.
+- `.github/workflows/vercel-deploy.yml` is a **manual** fallback workflow.
+- `DEPLOY.md` at repo root has the production URL, project IDs, and
+  step-by-step Vercel setup notes.
 
 ### Controls
 
-- Click ground → A* path → walk
-- Click monster → walk into range + auto-attack until dead
-- `Tab` → target nearest live monster
-- `Shift+R` → wipe save and reload
-- No WASD/arrows. RO is mouse-only.
-- No manual skill hotkeys right now. Combat is automatic after clicking a monster.
+- Click ground → A* path → walk.
+- Click a monster → walk into range + auto-attack until target dies. No
+  re-clicks needed.
+- `Tab` → target nearest live monster.
+- `Shift+R` → wipe localStorage save and reload.
+- **No WASD, no arrow keys, no skill hotkeys, no camera shake.** All
+  intentionally removed at user request.
 
 ---
 
 ## 2. Current state — what works right now
 
 ### Movement
-- 32 px cell grid (100×100) over the 3200×3200 world.
-- 8-direction A* pathfinding (`findPath`) with octile heuristic + diagonal squeeze guard.
-- Player position lerps cell-to-cell at `MS_PER_CELL = 170` ms. The slower cadence makes each footfall readable instead of sliding.
-- Walk animation uses direction-specific timer-driven cycles. South/north avoid the wrong-facing `walk` frames and use `walk2 → idle → walk3 → idle`; east/west/diagonals use `walk → idle → walk2 → idle`. `walk4` assets remain loaded but unused because some have dark/spotlight backgrounds.
-- Step-phase bob is subtle (3 px) with tiny squash (4%) so the character stays grounded.
-- Rookie and monsters have soft ground shadows that stay pinned to the feet/body base, making movement read less floaty.
-- 8-direction sprite art (`north/south/east/southeast/northeast`, plus mirrored `west/southwest/northwest`). No more head-spin on diagonals.
-- Hit stun (200 ms freeze) when damaged.
-- Camera follows with smoothing; `setZoom(0.85)` for wider RO-like FOV.
+- 32 px logical cell grid (`CELL_SIZE = 32`, `GRID_COLS/ROWS = 100`) over the
+  3200×3200 world. 128 px display tiles draw on top via `buildMap`.
+- 8-direction A* (`findPath`, octile heuristic, diagonal-squeeze guard) with
+  `MAX_PATH_LEN = 256` and an 8 000-iteration cap.
+- Player position lerps cell-to-cell at `MS_PER_CELL = 170`. Sprite Y is
+  offset by a full-sine bob (`BOB_AMPLITUDE = 3`) plus a 10% vertical squash
+  for foot-fall feel.
+- Animation cycles **4 walk frames per direction** when all walk3/walk4
+  textures load. `_pickWalkFrame()` auto-detects, falls back to 2-frame.
+  Frame cadence ≈ `WALK_FRAME_MS = 120` per frame.
+- 8-direction sprite art for N/S/E/SE/NE. SW/NW/W = horizontally-flipped
+  versions of E/SE/NE via `DIR_TEXTURE` map.
+- Click marker (fading green ring) shows the target spot on every move.
+- Hit stun: 200 ms of frozen movement after being damaged.
 
-### Combat
-- Click monster → walks adjacent → auto-attacks every 1 s until dead.
-- ±20% damage variance every hit.
-- 3% crit (2× dmg, yellow bigger floating text with `!`).
-- 5% player miss / 10% monster miss → `MISS` floats up.
-- Player ATK starts at 10. No manual skill keys right now.
-- No camera shake on hit (removed because user disliked it).
-- Hover cursor changes to `crosshair` over monsters.
+### Combat (fully auto)
+- Click monster → A* to a cell adjacent to it, attack on cooldown until dead.
+- Player ATK 10 (+ level scaling). ±20 % damage variance per swing.
+- 3 % critical hit (×2, yellow `-N!`, big text, rich SFX).
+- 5 % player whiff, 10 % monster whiff → `MISS` floats.
+- DEF reduces incoming dmg, min 1.
+- Tab cycles target. Persistent red ellipse ring sits under the current
+  target.
+- Auto-attack is range-aware: when target steps out of range player repaths
+  to an adjacent cell; when in range the path is cleared so the player
+  plants and swings.
 
-### Player stats + progression
-- HP regen: 2% maxHP every 3 s (paused for 200 ms after a hit via `stunUntil`).
-- EXP scales `level × 100`. Level-up: +20 HP / +3 ATK / +1 DEF, full HP, plays jingle.
-- DEF subtracts from incoming damage (min 1).
-- Death: lose 5% of current EXP requirement, respawn at world centre after 3 s.
+### Player progression
+- HP regen: 2 % maxHP every 3 s, paused while stunned.
+- EXP threshold = `level × 100`. On level-up: +20 maxHP, +3 ATK, +1 DEF,
+  full heal, jingle, `LEVEL UP!` text.
+- Death: lose 5 % of `expNeeded()`, respawn at spawn cell after 3 s with
+  full HP.
 
-### Monsters
-- 34 total — 15 Blobling + 10 MooHam + 8 MooWaan + 1 Boss MooHam — configured in `MONSTER_TYPES`.
-- **Passive AI:** monsters only chase + attack the player after being hit (`provoked` flag, 5 s aggro lapse).
-- Random level 1–3 per monster (weighted toward 1). `hp ×1+0.5(L-1)`, `atk ×1+0.3(L-1)`, `exp × L`.
-- Name tag shows `Blobling Lv.2` etc.
-- Death → 1.5 s dead pose → despawn → respawn 5 s later via `spawnMonster` (with white puff effect).
-- Drop a yellow zeny coin (60–160 % of EXP reward). 15 % bonus chance of a green healing herb (+20–35 HP). Walk over to pick up.
+### Monsters (`MONSTER_TYPES` table)
+| Type | HP | ATK | EXP | Speed | Count | Notes |
+|---|---|---|---|---|---|---|
+| `blobling` | 50 | 5 | 10 | 80 | 15 | Pink slime |
+| `mooham` | 80 | 8 | 18 | 70 | 10 | Pig |
+| `moowaan` | 60 | 6 | 14 | 90 | 8 | Green-ish, scaleMult 0.9 |
+| `boss_mooham` | 240 | 16 | 90 | 55 | 1 | scaleMult 1.9 |
+
+All monsters are **passive**. They only chase + attack the player after
+being hit (`provoked` flag, drops after 5 s of no damage). Monster level
+1–3 rolled per spawn (weighted 65/27/8); HP / ATK / EXP scale with level.
+On death: 1.5 s dead pose → despawn → respawn 5 s later via
+`spawnMonster(typeId)`, with a white "puff" ring effect.
+
+### Loot
+- Every monster drop: zeny coin (60–160 % of EXP reward), bounces in,
+  pulses to be visible.
+- 15 % chance: extra green healing herb (+20–35 HP).
+- Pickup radius 28 px; auto-collected when walking over.
+- Soft ground shadow under every monster / loot for grounding.
 
 ### UI
-- Bottom bar: HP bar (red) on left; EXP bar (purple) centre; Lv + Zeny stacked right.
-- Chat box bottom-left (10 latest messages).
-- Mini-map top-right (160×160, semi-transparent, shows player white, monsters red/orange dots, loot yellow dots, faint path cross).
-- Player HP bar above head when wounded.
-- Floating damage numbers (white player / red enemy / yellow crit / grey MISS).
-- Green click-ring marker at every walk-target.
+- Bottom bar: red HP bar (left), purple EXP bar (centre), Lv + Zeny (right).
+- Chat box, bottom-left, last 10 messages.
+- Mini-map, top-right, 160×160 px: white = player, red = Blobling,
+  orange = MooHam, green = MooWaan, large yellow = Boss MooHam,
+  small yellow = loot. Faint dirt path drawn under markers.
+- Floating damage numbers: white (to player), red (to enemy), yellow
+  bigger+`!` (crit), grey (`MISS`).
+- Player HP bar above sprite, hidden at full HP.
+
+### Day/night
+- Cosine-driven darkness overlay, 2-minute loop, max alpha 0.45.
+- Implemented as a `scrollFactor 0` fullscreen rect at depth 9000.
 
 ### Persistence
-- Auto-saves to `localStorage[grasslands_save_v1]` every 3 s and on level-up.
-- Restored on page load (level / exp / HP / maxHP / ATK / DEF / zeny / kills / cell position).
-- `Shift+R` wipes save and reloads for a fresh run.
+- `localStorage[grasslands_save_v1]` auto-saves every 3 s and on level-up.
+- Saves: `level, exp, hp, maxHP, atk, def, zeny, kills, cellCol, cellRow`.
+- On load: position falls back to spawn if the saved cell is now blocked
+  by decorations.
+- `Shift+R` wipes the save and reloads.
 
 ### Audio
-- Synthesised WebAudio SFX — no asset files. Tones for hit / crit / miss / player-hit / level-up / pickup / death.
+- **WebAudio synthesised SFX**, no asset files: footstep scuff, melee hit
+  (noise + descending square thud), critical (noise sweep + bell stack +
+  bass), miss, player-hit, level-up jingle, pickup, death.
+- **Background music**: `assets/audio/bgm.mp3` (4 MB). Preloaded by Phaser,
+  built with `sound.add('bgm', { loop: true, volume: 0.35 })`. Tries to
+  play on scene create; falls back to first pointerdown / keydown if the
+  browser blocks autoplay.
 
 ### Map
-- 25×25 procedural tilemap. Center cross dirt path (horizontal + vertical) for readability. Everything else = plain grass with random flipX/flipY to break the grid.
-- Scatter-decoration layer (`buildDecorations`) sprinkles tall-grass clumps (220) and flower clusters (110) at random sub-cell offsets with random rotation/scale/flip. Rocks are commented out (looked off).
-- Source PNGs have no alpha → runtime `keyOutWhite()` keys near-white pixels to transparent. Applied to every character + decoration on preload.
+- 25×25 tile grid. Centre cross dirt path (horizontal + vertical mid-row /
+  mid-col). Everything else: plain grass alternating GRASS / THICK_GRASS,
+  random flipX/flipY to break the 128 px grid.
+- Decoration scatter overlay (`buildDecorations`):
+  - 220 tall-grass clumps
+  - 110 flower clusters
+  - 90 mushrooms
+  - 70 bushes (cell-blocking radius 1)
+  - 35 trees (cell-blocking radius 2)
+  - 3 ponds (cell-blocking radius 3)
+  - Rock PNGs are loaded but **commented out** of placement.
+- Spawn cell + a 3×3 area around it always forced walkable post-scatter so
+  the player never starts inside a tree.
+- Source PNGs lack alpha → `keyOutWhite()` strips near-white pixels at
+  runtime via canvas. Skipped silently if a texture is missing.
 
 ---
 
-## 3. What we just did this session (latest first)
+## 3. What we did in session 4 (latest, in order)
 
-### Session 9 — Vercel deployment + GitHub Actions setup
-1. **Added `vercel.json` at repo root** for static deployment:
-   - `framework: null`
-   - no build command
-   - no install command
-   - `outputDirectory: project-grasslands`
-2. **Added Vercel cache headers**:
-   - `index.html` and `game.js` use `max-age=0, must-revalidate`.
-   - `/assets/*` uses long immutable caching because asset filenames are stable and game code cache-busts with `?v=N`.
-3. **Added `.vercel/` to `.gitignore`** so local Vercel project-link metadata stays off GitHub.
-4. **Added `.github/workflows/ci.yml`**:
-   - runs on push, pull request, and manual dispatch;
-   - parses `project-grasslands/game.js` with `node -c`;
-   - verifies required HTML/JS/tile/sprite files exist;
-   - starts a local Python static server and fetches key files with `curl`.
-5. **Added `.github/workflows/vercel-deploy.yml`** as an optional manual deploy workflow. It requires GitHub repo secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`. Recommended default remains Vercel Git integration.
-6. **Added `DEPLOY.md`** with production URL, recommended Vercel Git setup, GitHub Actions notes, and local deploy commands.
-7. **Verified local config**:
-   - `node -c project-grasslands/game.js`
-   - `python3 -m json.tool vercel.json`
-   - Ruby YAML parse for both workflow files
-   - `git diff --check`
-8. **Authenticated Vercel CLI as `sonnymay`** with `vercel whoami`.
-9. **Linked local repo to Vercel project `grasslands-online`**, connecting GitHub repo `sonnymay/grasslands-online`.
-10. **Deployed production to Vercel**. First normal upload hit a network `EPIPE`; retry with `vercel deploy --prod --yes --archive=tgz` succeeded.
-11. **Production deployment is live**:
-   - Canonical alias: https://grasslands-online.vercel.app
-   - Deployment URL: https://grasslands-online-flf8e4ogu-sonnys-projects-f5a1e40b.vercel.app
-   - Inspector: https://vercel.com/sonnys-projects-f5a1e40b/grasslands-online/Cxed7H7X5QyPnDSosjXNNwxqN9g9
-12. **Verified deployed production**:
-   - `curl -I https://grasslands-online.vercel.app` returned `HTTP/2 200`.
-   - `curl -I 'https://grasslands-online.vercel.app/game.js?v=40'` returned `HTTP/2 200`.
-
-### Session 8 — Ground shadow visual grounding pass
-1. **Added a soft ellipse shadow under Rookie** using Phaser graphics primitives, not a new image asset.
-2. **Tracked `player.groundY` separately from `sprite.y`** so the shadow stays on the grass while the body uses subtle bob/squash during walking.
-3. **Synced the Rookie shadow during all important player states**:
-   - normal idle/walk update,
-   - walk step interpolation,
-   - snap-to-target when entering attack range,
-   - death pose,
-   - respawn,
-   - saved-position restore from `localStorage`.
-4. **Added soft ellipse shadows under every monster** through `MonsterController`, including Blobling, MooHam, MooWaan, and Boss MooHam.
-5. **Scaled monster shadows from each sprite's display size**, so Boss MooHam gets a naturally larger footprint and MooWaan stays lighter/smaller.
-6. **Kept dead monster shadows visible during the 1.5 s dead-pose window**, then destroyed the shadow together with the sprite/name/HP bar cleanup.
-7. **Updated Y-sort depth** so shadows render just behind their owning sprite based on ground/body Y.
-8. **Updated cache bust**: `index.html` changed from `game.js?v=39` → `game.js?v=40`.
-9. **Implementation note**: shadows are deliberately subtle (`alpha` about 0.22–0.24) to improve RO-like grounding without making characters look pasted onto dark blobs.
-
-### Session 7 — MooWaan baby monkey monster
-1. **User generated three MooWaan sprites** and placed them in `project-grasslands/assets/sprites/`.
-2. **Normalized one filename**: `moowaan_hit.png.png` was renamed to `moowaan_hit.png` so asset naming matches the existing monster convention.
-3. **Verified asset files exist**:
-   - `assets/sprites/moowaan_idle.png`
-   - `assets/sprites/moowaan_hit.png`
-   - `assets/sprites/moowaan_dead.png`
-4. **Observed asset format**: all three MooWaan PNGs are `1254 x 1254`, RGB, non-interlaced. They do not have true alpha yet, so the existing runtime `keyOutWhite()` fallback handles near-white/checker backgrounds.
-5. **Added `MOOWAAN_COUNT = 8`** near the other monster-count constants.
-6. **Added `moowaan` to `MONSTER_TYPES`** with display name `MooWaan`, HP 60, ATK 6, EXP 14, speed 90, light-green name color, and `scaleMult: 0.9`.
-7. **Preloaded MooWaan sprites** in `preload()`.
-8. **Added MooWaan to `keyOutWhite()` sprite list** so it follows the same transparency fallback as Blobling/MooHam.
-9. **Added green mini-map marker color** for `typeId === 'moowaan'`.
-10. **Updated cache bust**: `index.html` changed from `game.js?v=38` → `game.js?v=39`.
-11. **Verified** with `node -c project-grasslands/game.js`, `git diff --check`, and in-app browser reload. Browser loaded `http://localhost:8000/game.js?v=39` with no game console warnings/errors.
-12. **Note**: random spawn may place MooWaan offscreen on first load, but it is now in the spawn loop through `MONSTER_TYPES`.
-
-### Session 6 — RO-reference walk timing pass
-1. **Looked up Ragnarok Online animation behavior** because the user explicitly asked to Google if needed. Ragnarok Research Lab documents RO sprite animations as timer/state-machine based rather than tied to movement distance, with ACT frame timing based around short fixed intervals.
-2. **Changed Rookie walk from cell-progress driven to time-driven.** `_pickWalkFrame()` now uses `Math.floor(time / WALK_FRAME_MS)` instead of switching based on `stepT` inside each 32 px path cell.
-3. **Added `WALK_FRAME_MS = 120`** so walking poses change at a readable animation cadence independent of `MS_PER_CELL=170`.
-4. **Inserted idle/pass frames between foot poses** to avoid the puppet-like snapping from alternating only extreme foot frames:
-   - `south/north`: `walk2`, `idle`, `walk3`, `idle`
-   - `east/west/diagonals`: `walk`, `idle`, `walk2`, `idle`
-5. **Kept direction-specific filtering** from Session 5 so bad/wrong-facing frames still stay out of the active walk cycle.
-6. **Updated cache bust**: `index.html` changed from `game.js?v=37` → `game.js?v=38`.
-7. **Verified in the in-app browser** after reload with horizontal and diagonal/northward walk samples. The first screenshot after reload can briefly show a green loading background while assets stream, then the game renders normally.
-8. **Verified no game console errors** in the in-app browser. `node -c project-grasslands/game.js` and `git diff --check` passed.
-9. **Remaining visual limitation**: this is now more RO-like in timing, but still only as good as generated art. True polish needs a single consistent sprite sheet where every frame shares feet baseline, scale, lighting, direction, and transparent alpha.
-
-### Session 5 — Direction-specific walk frame fix
-1. **Tested in the in-app browser** at `http://localhost:8000/?verify=walk36` after the user said the walk still looked strange.
-2. **Observed the actual visual bug**: the player was not just sliding; it was snapping between wrong-facing body poses while moving. South/north movement could briefly show side/opposite-facing art, making the character look like it was twisting.
-3. **Root cause**: the previous global 2-frame cycle still used `walk`/`walk2` for every direction. In the generated art set, `rookie_walk_south.png` and `rookie_walk_north.png` are not visually compatible with the correct forward/back walk cycle.
-4. **Changed `_pickWalkFrame(t, dir)`** to choose frame pairs by direction:
-   - `south`: `walk2`, `walk3`
-   - `north`: `walk2`, `walk3`
-   - `east/west`: `walk`, `walk2`
-   - diagonals: `walk`, `walk2`
-5. **Kept `MS_PER_CELL=170`, subtle 3 px bob, and 4% squash** from Session 4.
-6. **Updated cache bust**: `index.html` changed from `game.js?v=36` → `game.js?v=37`.
-7. **Verified** with `node -c project-grasslands/game.js`, `git diff --check`, and live in-app browser walk tests for horizontal, north, and south movement.
-8. **Remaining visual limitation**: walk is less strange now, but true RO-quality walking still needs regenerated, consistent 4-frame walk art with matched feet baseline, scale, direction, and real alpha.
-
-### Session 4 — Walk feel fix after Claude Code limit
-1. **Reviewed live walk motion in Chrome** at `http://localhost:8000` after starting `python3 -m http.server 8000` from `project-grasslands/`.
-2. **Confirmed current cache-bust state**: `index.html` was already at `game.js?v=35` before edits, despite older handoff text saying `?v=28`.
-3. **Identified the sliding cause**: movement itself worked, but `MS_PER_CELL=130` plus `_pickWalkFrame()` cycling `['walk','walk2','walk3','walk4']` inside one short 32 px cell made the legs flicker too fast to read.
-4. **Audited walk art contact sheet** and found `walk3`/`walk4` are not production-ready: several frames have mismatched facing/pose/lighting, and some have dark background/spotlight artifacts. Using them made the player look less grounded.
-5. **Changed movement cadence**: `MS_PER_CELL` from `130` → `170` so grid steps feel closer to old MMO footfall timing.
-6. **Reduced body tweening**: `BOB_AMPLITUDE` from `6` → `3`, `STEP_SQUASH` from `0.10` → `0.04`, keeping the walk grounded instead of bouncy.
-7. **Disabled the bad 4-frame stride in code**: `_pickWalkFrame()` now intentionally uses only `['walk','walk2']` and holds each pose for roughly half a cell. `walk3`/`walk4` remain loaded assets but are not used until regenerated cleanly.
-8. **Updated cache bust**: `index.html` changed from `game.js?v=35` → `game.js?v=36`.
-9. **Removed stale code comment** that still mentioned Power Strike hotkeys even though combat is auto-click only.
-10. **Verified** with `node -c project-grasslands/game.js` and live browser click-to-walk on `http://localhost:8000/?verify=walk36`.
-11. **Observed verification caveat**: Chrome console showed MetaMask extension warnings/errors, not game errors. Game loaded and walk worked.
-
-### Session 3 — RO feel pass
-> Historical note: several session 3 experiments were later removed after user feedback (manual skill hotkeys, SP UI, healer/stat panel, camera shake). §2 above is current truth.
-
-1. **Tile-grid + A* pathfinding** replacing free velocity (`MS_PER_CELL=160`, cell-to-cell lerp, walk/walk2 alternation per cell, RO-style cadence).
-2. **8-direction sprites** wired (NE/SE generated; SW/NW are mirrored). `pickDirection` returns 8 sectors.
-3. **Click marker** (green fading ring) on every move click.
-4. **Hit stun + HP regen + SP regen**.
-5. **Passive monster AI** — provoked only after being hit.
-6. **MooHam monster type** introduced via `MONSTER_TYPES` config; spawn loop reads `count` per type.
-7. **Monster levels 1–3** with stat scaling, name tag shows `Lv.X`.
-8. **Damage variance + crit (8%) + miss (5%/10%)** with distinct floating-text styling.
-9. **Loot system**: zeny coin drops + 15 % chance of healing herb. Walk-over pickup, bouncy spawn + pulse tween.
-10. **Mini-map** in top-right corner, ~30 lines of `Graphics`.
-11. **Player HP bar** above sprite (only when wounded).
-12. **Spawn puff** ring when a monster respawns.
-13. **Hover cursor** crosshair over monsters.
-14. **Camera zoom 0.85** for wider RO-like FOV.
-15. **Camera shake** on every player hit (90 ms, 0.004).
-16. **localStorage save/load** every 3 s and on level-up; `Shift+R` wipes save.
-17. **WebAudio synthesised SFX** (hit, crit, miss, player-hit, level-up, pickup, death). No asset files.
-18. **SP stat + Power Strike skill** (`Q` or `1`, 10 SP, 1.7× damage, blue flash, "Power Strike!" float).
-19. **Death EXP penalty** (5 % of `expNeeded()` on death).
-20. **Organic map**: plain-grass base + random tile flips + decoration overlay layer.
-21. **Self-Heal skill** (`2`/`W`, 15 SP, +30 HP base scaling +5/level, 3 s cooldown, green flash).
-22. **Tab targeting** + persistent red ring around current attack target.
-23. **HealerNPC** near spawn — blue circle with `+`, full HP/SP restore on contact (5 s cooldown).
-24. **Day/night cycle** — cosine-driven darkness overlay, 2-minute loop, max alpha 0.45.
-25. **Boss MooHam** — rare 1-of variant (240 HP, 16 ATK, 90 EXP, 1.9× scale).
-26. **EXP gain float text** + respawn restores SP.
-27. **Skill cooldown HUD** above EXP bar showing `[Q] Power Strike` / `[W] Self-Heal` and remaining seconds.
-28. **Character stat panel** (`C`) — overlay with Lv / EXP / HP / SP / ATK / DEF / Zeny / Kills.
-29. **Persistent kill counter** saved to localStorage.
-30. **Mini-map markers** — healer cyan dot, boss MooHam large yellow dot.
-
-### Session 2 — RO movement foundation
-- Researched RO movement; added tile grid + A* + click-only + diagonal sprites pipeline.
-
-### Session 1 — Phase 1 MVP
-- Built `index.html` + `game.js` from scratch (Phaser 3).
-- Fixed silent hang from missing arcade physics config.
-- `keyOutWhite()` runtime alpha keying for source PNGs.
-- Tile inset crop + overdraw to hide tileset seams.
-- 2-frame walk cycle (`walk` + `walk2`).
-- `rookie_attack.png` + `rookie_dead.png` poses wired.
-- GitHub repo initialized, made public.
+1. Bumped `MS_PER_CELL` from 130 → 170 so footfalls read instead of slide.
+2. Reduced `BOB_AMPLITUDE` 6 → 3, added `WALK_FRAME_MS = 120` constant.
+3. Codex shipped `MooWaan` monster + `dafed39` walk-frame-by-direction fix.
+4. Soft ground shadows under monsters + loot drops.
+5. Vercel deploy wired: `vercel.json` (outputDirectory + cache headers),
+   `DEPLOY.md`, two GitHub workflows.
+6. **Loading overlay** added in `index.html` — green-themed card with
+   progress bar + percentage. `preload()` listens to `progress` and
+   `complete` events and hides/removes the overlay when assets finish.
+7. **BGM wired**: `this.load.audio('bgm', ['…/bgm.mp3', '…/bgm.ogg'])`
+   in preload. In `create()` add a looped sound at volume 0.35, try
+   immediate play, then `scene.input.once('pointerdown'/'keydown', start)`
+   as autoplay-fallback. `assets/audio/bgm.mp3` (4 MB) now committed.
+8. Cache buster bumped to **`?v=41`**.
 
 ---
 
-## 4. Next steps — pick any
+## 4. Next steps (pick any)
 
-1. **Regenerate clean 4-frame Rookie walk art** if user wants smoother RO-like walking. Prompt must require: same character, same direction, same scale, same feet baseline, transparent background PNG with alpha channel, no lighting/background changes. Replace `walk3`/`walk4`, then re-enable a 4-frame loop only after browser verification.
-2. **Map variety pass.** Add biome patches/forest clusters using current tiles + decorations. Keep spawn/walkable protection intact.
-3. **Fantasy UI skin pass.** Replace debug black rectangles with warm brown/gold framed RO-inspired panels.
-4. **More monsters.** Add another original monster via `MONSTER_TYPES`. Requires 3 new sprites.
-5. **Quest stub** — kill 5 Bloblings, get reward zeny. Tracker in chat box.
-6. **Inventory/equipment UI** only after user approves scope; keep game simple for now.
-7. **Multiplayer (Phase 2)** — big jump: FastAPI WebSocket server + Vercel/Railway. Confirm scope first.
-
-**Recommendation:** #1 only if new art is generated. Otherwise do #2 map variety + #3 UI skin next because look matters most.
+1. **Shrink assets — biggest open win.** First-load is ~71 MB of PNGs and
+   the slow-link delay is what triggered the loading bar work. Manual
+   compression:
+   ```bash
+   brew install pngquant
+   cd "/Users/santipapmay/Documents/Grasslands Online/project-grasslands/assets"
+   find . -name "*.png" -exec pngquant --force --skip-if-larger --quality=70-85 --ext .png {} \;
+   git add . && git commit -m "asset: compress PNGs via pngquant" && git push
+   ```
+   Expect a 60–80 % size drop. Walks well with the existing immutable
+   asset cache.
+2. **Walk polish (still requested).** Verify in browser that the 4-frame
+   cycle ['walk','walk2','walk3','walk4'] reads as L → pass → R → pass
+   in **every** direction. Codex already added direction-specific frame
+   ordering (`dafed39`). If a particular direction still slides, the cycle
+   may need per-direction reordering inside `_pickWalkFrame()`. Inspect
+   art for mismatched feet baselines and consider rejecting bad frames
+   with a per-frame Y offset.
+3. **Verify BGM in production** — refresh the Vercel URL, click once,
+   confirm music loops cleanly. If autoplay never starts, surface a
+   one-time "Click to start music" button.
+4. **More monsters.** Pattern is well-trodden — add to `MONSTER_TYPES`,
+   drop sprites at `assets/sprites/<name>_idle/hit/dead.png`, mini-map
+   colour in `drawMinimap()`.
+5. **Walk audio per surface** (grass vs dirt) — tile-aware footstep tones.
+6. **Tame the green-screen further.** Consider a two-stage preload:
+   essentials (player + tileset + first monster) start the scene
+   immediately, decorations load after `scene.scene.start()` and pop in
+   when ready. Largest engineering change.
 
 ---
 
-## 5. Known issues
+## 5. Known issues / quirks
 
-- `keyOutWhite()` strips any pure-white pixel — will damage future art with intentional whites. Regenerate with real alpha then remove this hack.
-- Rookie walk frames are inconsistent across directions. Code now works around this with direction-specific timer-driven cycles and idle/pass frames, but true RO-quality walking needs regenerated 4-frame art with consistent direction, scale, feet baseline, lighting, and transparent PNG alpha. `walk4` remains unused.
-- Tile seams: mitigated by 4 % inset crop + 2 px overdraw. Acceptable but visible at certain camera positions.
-- No world collisions beyond `setCollideWorldBounds`. Player walks through bloblings/moohams.
-- A* runs every repath; fine at 100×100 grid. Becomes expensive if grid grows. (max 8 000 iterations cap inside `findPath`).
-- Mini-map redraws every frame — cheap but allocates one graphics command list each tick.
+- **Asset bloat** — ~71 MB of PNGs. First-time visitors see ~30–60 s
+  load. Vercel caches assets `immutable` so repeat visitors are instant.
+  Loading bar now shows progress; real fix is pngquant.
+- `keyOutWhite()` strips any near-white pixel — will damage future art
+  with intentional whites. Prefer art with real alpha and remove the hack
+  one day.
+- Tile seams: mitigated by 4 % inset crop + 2 px overdraw. Still faintly
+  visible at some camera positions.
+- No world collisions beyond `setCollideWorldBounds` for monsters. Player
+  uses cell-based A* and respects the `walkable` grid.
+- A* recomputes every repath; fine at 100×100 with the iteration cap.
+- Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
-- `?v=N` cache-bust in `index.html` — bump on every `game.js` change. Current: `?v=40`.
+- `?v=N` cache-bust lives in `index.html`. Bump on every `game.js` change.
+  Current: **`?v=41`**. Next change should use `?v=42`.
+- `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
+  `.DS_Store` are also ignored.
 
 ---
 
 ## 6. File structure
 
 ```
-Grasslands Online/                    ← git repo root
-├── .gitignore                        ← ignores .DS_Store, .claude/, node_modules, *.log
-├── .github/workflows/                ← CI + optional manual Vercel deploy
-├── DEPLOY.md                         ← Vercel/GitHub deployment notes
-├── HANDOFF.md                        ← this file
-├── vercel.json                       ← static Vercel config
-└── project-grasslands/               ← the playable web app
-    ├── CLAUDE.md                     ← per-project coding rules
-    ├── index.html                    ← Phaser CDN + game.js?v=N
-    ├── game.js                       ← entire game
+Grasslands Online/                                  ← git repo root
+├── .github/workflows/
+│   ├── ci.yml                  ← node -c + smoke fetch on push
+│   └── vercel-deploy.yml       ← manual deploy fallback (needs secrets)
+├── .gitignore                  ← .DS_Store, .claude/, .vercel/, node_modules, *.log
+├── DEPLOY.md                   ← prod URL + Vercel setup
+├── HANDOFF.md                  ← this file
+├── vercel.json                 ← outputDirectory + cache headers
+└── project-grasslands/         ← the static web app (Vercel root)
+    ├── CLAUDE.md               ← per-project coding rules
+    ├── index.html              ← Phaser CDN + game.js?v=N + loader overlay
+    ├── game.js                 ← entire game (~1700 lines)
     └── assets/
-        ├── sprites/                  ← character + monster PNGs
-        ├── decorations/              ← scatter overlay PNGs
+        ├── audio/
+        │   └── bgm.mp3         ← background music (4 MB, loops)
+        ├── decorations/        ← scatter PNGs (flowers, grass, mushrooms,
+        │                          bushes, trees, pond; rocks loaded but
+        │                          not placed)
+        ├── sprites/            ← Rookie (8-dir + idle/walk/walk2/walk3/
+        │                          walk4 + attack + dead) + monsters
+        │                          (blobling/mooham/moowaan idle/hit/dead)
         └── tiles/grass_tileset.png
 ```
 
-### `game.js` map (~1 100 lines)
+### `game.js` map (~1 700 lines)
 
-- Constants → world / cell / combat / regen / save / loot.
-- `MONSTER_TYPES` table.
-- Globals → `player`, `bloblings`, `loots`, `walkable`, `clickMarker`, etc.
-- `config + new Phaser.Game(config)` (arcade physics on).
-- `preload()` — every PNG.
-- `create()` — alpha-key, tileset slicing, map + decorations, player, monsters, input wiring, UI, save load.
-- `update()` — player + monster ticks, loot pickup, auto-save, y-sort.
-- Persistence: `saveGame / loadGameSave / applySave`.
-- WebAudio: `_tone` + `sfx*` helpers.
+- Constants block (world, cell, movement, regen, combat, save).
+- `MONSTER_TYPES` config table.
+- Globals: `player`, `bloblings` (all monsters), `loots`, `walkable`,
+  `clickMarker`, `targetRing`, `dayNightOverlay`, `lastSaveAt`.
+- `config + new Phaser.Game(config)` — arcade physics on.
+- `preload()` — every PNG, BGM audio, loader-overlay progress hooks.
+- `create()` — alpha-key, tileset slicing, map + walkable + decorations,
+  target ring, monster spawn loop, click marker, day/night overlay,
+  pointer + Tab + Shift+R input, UI, save apply, BGM start.
+- `update(time, delta)` — player tick, monster ticks, loot pickup,
+  target ring draw, day/night alpha update, auto-save, y-sort.
+- `applyRookieTexture(sprite, dir, frame)` + `DIR_TEXTURE` map for the
+  8-direction × {idle, walk, walk2, walk3, walk4} sprite picker.
 - A*: `findPath / heuristic / findAdjacentReachableCell`.
-- `pickDirection` (8 sectors) + `DIR_TEXTURE` map + `applyRookieTexture`.
-- `PlayerController`: tile-grid walking, attack target pursuit, `powerStrike`, level-up, death.
-- `MonsterController`: passive AI, level scaling, takeDamage, die with loot drop, respawn.
+- `PlayerController`: tile-grid walking, attack target pursuit, level-up,
+  death. Hosts `_pickWalkFrame(t)` with the 2/4-frame auto-detect.
+- `MonsterController`: passive AI (only chase when provoked), random
+  level, takeDamage, die with loot drop, scheduled respawn.
 - `LootDrop` (zeny or heal kind).
-- `attemptPlayerAttack / rollMonsterHit` combat math.
-- `spawnFloatText / spawnDamageNumber` floating text.
-- `buildMap / buildDecorations / getCellType` map gen.
-- `UIManager`: bars, chat, mini-map.
+- `attemptPlayerAttack / rollMonsterHit` damage math.
+- `spawnFloatText / spawnDamageNumber` floating combat text.
+- `buildMap / buildDecorations / getCellType` map gen + scatter +
+  cell blocking.
+- WebAudio: `_tone / _noise + sfxHit / sfxCrit / sfxMiss / sfxLevelUp /
+  sfxPickup / sfxPlayerHit / sfxDeath / sfxFootstep`.
+- Persistence: `saveGame / loadGameSave / applySave`.
+- `UIManager`: HP / EXP / Lv / Zeny + chat box + mini-map.
 
 ---
 
 ## 7. Assets
 
-### Sprites — `assets/sprites/`
-| File | Role |
-|---|---|
-| rookie_idle/walk/walk2_{south,north,east,southeast,northeast}.png | 8-dir player art (15 files) |
-| rookie_attack.png | 250 ms swing pose |
-| rookie_dead.png | Death pose |
-| blobling_idle/hit/dead.png | Blobling monster |
-| mooham_idle/hit/dead.png | MooHam (pig) monster |
-| moowaan_idle/hit/dead.png | MooWaan baby monkey monster |
+### Sprites — `project-grasslands/assets/sprites/`
 
-### Decorations — `assets/decorations/`
-| File | Role |
-|---|---|
-| deco_flower_cluster_01..04.png | Random scatter on grass |
-| deco_tallgrass_01..03.png | Random scatter on grass |
-| deco_rock_01..03.png | Loaded but **commented out** in `buildDecorations` |
+| File pattern | Files | Role |
+|---|---|---|
+| `rookie_idle_{south,north,east,southeast,northeast}.png` | 5 | Player idle, 8-dir base |
+| `rookie_walk{,2,3,4}_<dir>.png` | 5 × 4 = 20 | 4-frame walk cycle, 8-dir via flip |
+| `rookie_attack.png` | 1 | 250 ms swing flash |
+| `rookie_dead.png` | 1 | Death pose |
+| `blobling_{idle,hit,dead}.png` | 3 | Pink slime |
+| `mooham_{idle,hit,dead}.png` | 3 | Pig |
+| `moowaan_{idle,hit,dead}.png` | 3 | New green-ish monster |
 
-### Tiles
-- `grass_tileset.png` — 1254×1254, 4×4 grid (16 tiles), sliced with 4 % inset crop, drawn `TILE_SIZE+2` to hide seams.
+### Decorations — `project-grasslands/assets/decorations/`
+
+| File pattern | Files | Role |
+|---|---|---|
+| `deco_flower_cluster_01..04.png` | 4 | Random scatter on grass |
+| `deco_tallgrass_01..03.png` | 3 | Random scatter on grass |
+| `deco_rock_01..03.png` | 3 | **Loaded, not placed** |
+| `mushroom_red_01.png`, `mushroom_brown_02.png` | 2 | Decoration only |
+| `bush_01.png`, `bush_02.png` | 2 | Block radius 1 |
+| `tree_oak_01.png`, `tree_pine_02.png`, `tree_round_03.png` | 3 | Block radius 2 |
+| `pond_01.png` | 1 | Block radius 3 |
+
+### Tiles — `project-grasslands/assets/tiles/`
+
+- `grass_tileset.png` 1254×1254, 4×4 grid (16 tiles), sliced with a 4 %
+  inset crop, drawn `TILE_SIZE + 2` to hide subpixel seams.
+
+### Audio — `project-grasslands/assets/audio/`
+
+- `bgm.mp3` 4 MB — loop background music (volume 0.35).
+- Folder also contains `.gitkeep` for cases where the mp3 is removed.
 
 ### ChatGPT prompts
-Stored in §9 of the older `~/Downloads/HANDOFF.md` and repeated for diagonals in chat. Always request "transparent background PNG with alpha channel".
+
+Always include `transparent background PNG with alpha channel`. The
+`keyOutWhite()` runtime hack is a fallback for art without real alpha.
 
 ---
 
-## 8. GitHub workflow (enforced)
+## 8. GitHub + Vercel workflow (enforced)
 
 - Commit **after every meaningful change**.
-- Conventional prefixes only: `feat:`, `fix:`, `asset:`, `refactor:`, `docs:`, `chore:`, `tweak:`.
+- Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
+  `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Never end a session with uncommitted changes. Final action: `git status` clean, HANDOFF.md updated, both pushed.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=41`.
+- Run `node -c project-grasslands/game.js` before pushing.
+- Never end a session with uncommitted changes. Final action: clean
+  `git status`, HANDOFF.md refreshed, both pushed.
+- Vercel re-deploys automatically on `main`.
 
 ---
 
-## 9. How to continue (run this first in a new session)
+## 9. How to continue (do this first in a new session)
 
 1. **Read this file in full.** No skimming.
-2. `git status` and `git log --oneline -10` from repo root.
-3. Start preview server:
-   - `cd project-grasslands && python3 -m http.server 8000`, or
+2. From repo root run `git status` and `git log --oneline -10` to confirm
+   tree clean and see recent work.
+3. Boot preview:
+   - `cd project-grasslands && python3 -m http.server 8000`, **or**
    - `mcp__Claude_Preview__preview_start` name `grasslands` (port 8001).
-4. Open in browser, walk around, click a monster to auto-fight, pick up loot/herb, and confirm HP regen plus §2 still holds.
-5. Pick a task from §4 (or whatever the user asks for).
-6. **Every meaningful change:**
-   - Edit code.
-   - Bump `?v=N` in `index.html` (next: `?v=41`).
-   - Reload preview, verify visually.
-   - `git add` exact files, conventional-prefix commit, push.
-7. **End of session:**
-   - Update §3 ("What we just did"), §4 ("Next steps"), §5 ("Known issues"), §7 ("Assets") here.
-   - Bump §2 if behaviour changed.
-   - Commit HANDOFF.md, push. **Then** stop.
+4. Visit the preview, walk around, kill a Blobling, check HP regen,
+   confirm the loader overlay appears + hides cleanly. Confirm music
+   plays after the first click. Test by visiting prod
+   https://grasslands-online.vercel.app.
+5. Pick a task from §4 or whatever the user asks.
+6. **Per change:** edit → bump `?v=N` → `node -c` parse → reload →
+   conventional commit → push. Vercel re-deploys automatically.
+7. **End of session:** update §3, §4, §5, §7 in this file. Commit
+   `HANDOFF.md`, push. Then stop.
+
+---
+
+## 10. Constraints (do NOT re-add)
+
+The user has explicitly cut these features. Re-adding them is regressive:
+
+- WASD / arrow-key movement.
+- Skill hotkeys (Power Strike, Self-Heal).
+- SP stat + SP bar.
+- HealerNPC (the blue `+` circle near spawn).
+- Camera shake on hit.
+- Toggleable stat panel overlay (`C` key).
+
+Combat is intentionally **fully automatic** after a single click on a
+monster.
