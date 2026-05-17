@@ -812,6 +812,12 @@ function update(time, delta) {
     }
   }
 
+  // Road sparkles + biome ambience particles. Pure feel, no rules.
+  if (player && !player.dead) {
+    tickRoadSparkles(player.scene, time);
+    tickAmbience(player.scene, time, delta);
+  }
+
   // Autopilot: when on, pick the nearest safe live monster as attack target.
   // "Safe" = not aggressive, not boss-tier reward, maxHP not >1.5x player.
   if (autopilotOn && !player.dead &&
@@ -2254,6 +2260,76 @@ class MonsterController {
 }
 
 // ---------- LootDrop ----------
+// ---------- Road sparkles ----------
+// Periodically drops a tiny zeny glint on a road tile near the player so
+// following the roads feels rewarding. Capped so it never floods the map.
+let _lastSparkleAt = 0;
+const SPARKLE_INTERVAL_MS = 8000;
+const SPARKLE_MAX_ALIVE   = 6;
+const SPARKLE_NEAR_PX     = 900;
+
+function tickRoadSparkles(scene, time) {
+  if (time - _lastSparkleAt < SPARKLE_INTERVAL_MS) return;
+  _lastSparkleAt = time;
+  // Count current sparkles (zeny loots <= 30 are treated as sparkles).
+  const aliveSparkles = loots.filter(l => l.alive && l.kind === 'zeny' && l.amount <= 30).length;
+  if (aliveSparkles >= SPARKLE_MAX_ALIVE) return;
+  // Sample 30 random tiles, pick the first walkable road tile near player.
+  for (let tries = 0; tries < 30; tries++) {
+    const tc = Math.floor(Math.random() * MAP_COLS);
+    const tr = Math.floor(Math.random() * MAP_ROWS);
+    const type = getCellType(tr, tc);
+    if (!type || type === 'grass') continue;
+    const wx = tc * TILE_SIZE + TILE_SIZE / 2;
+    const wy = tr * TILE_SIZE + TILE_SIZE / 2;
+    if (Math.hypot(wx - player.sprite.x, wy - player.sprite.y) > SPARKLE_NEAR_PX) continue;
+    loots.push(new LootDrop(scene, wx, wy, Phaser.Math.Between(5, 25), 'zeny'));
+    return;
+  }
+}
+
+// ---------- Biome ambience particles ----------
+// Cheap, infrequent particles tinted per biome. No physics, just fade tweens.
+const AMBIENCE_RATE_PER_SEC = {
+  grasslands: 0.6,
+  forest:     2.0,
+  desert:     1.2,
+  ruins:      0.8,
+  riverside:  1.4,
+};
+const AMBIENCE_STYLE = {
+  grasslands: { color: 0xfff0a8, drift: { x: 0, y: -10 }, shape: 'dot',  size: 3 },
+  forest:     { color: 0x88cc66, drift: { x: 12, y: 30 }, shape: 'leaf', size: 4 },
+  desert:     { color: 0xffd28a, drift: { x: -6, y: -20 }, shape: 'dot', size: 2 },
+  ruins:      { color: 0xcccccc, drift: { x: 0, y: -8 },  shape: 'dot', size: 2 },
+  riverside:  { color: 0x99ddff, drift: { x: 8, y: -14 }, shape: 'dot', size: 3 },
+};
+function tickAmbience(scene, time, delta) {
+  const zone = currentZone;
+  if (!zone) return;
+  const rate = AMBIENCE_RATE_PER_SEC[zone] || 0.5;
+  if (Math.random() > rate * (delta / 1000)) return;
+  const style = AMBIENCE_STYLE[zone];
+  const cam = scene.cameras.main;
+  const margin = 80;
+  const x = cam.scrollX + Math.random() * cam.width;
+  const y = cam.scrollY + Math.random() * cam.height;
+  const obj = (style.shape === 'leaf')
+    ? scene.add.rectangle(x, y, style.size + 2, style.size, style.color, 0.7)
+        .setAngle(Math.random() * 360)
+    : scene.add.circle(x, y, style.size, style.color, 0.7);
+  obj.setDepth(15500);
+  scene.tweens.add({
+    targets: obj,
+    x: x + style.drift.x + (Math.random() * 20 - 10),
+    y: y + style.drift.y + (Math.random() * 10),
+    alpha: 0,
+    angle: (style.shape === 'leaf') ? (Math.random() * 360 - 180) : 0,
+    duration: 1800 + Math.random() * 800,
+    onComplete: () => obj.destroy(),
+  });
+}
+
 class LootDrop {
   constructor(scene, x, y, amount, kind = 'zeny') {
     this.scene = scene;
