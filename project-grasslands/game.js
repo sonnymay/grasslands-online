@@ -273,6 +273,13 @@ const ZONE_LABELS = {
   ruins:      'Ancient Ruins',
   riverside:  'Riverside',
 };
+const ZONE_DIFFICULTY = {
+  grasslands: { tag: 'Easy',    color: '#88ff88' },
+  riverside:  { tag: 'Easy',    color: '#88ddff' },
+  desert:     { tag: 'Medium',  color: '#ffd24a' },
+  ruins:      { tag: 'Medium',  color: '#cccccc' },
+  forest:     { tag: 'DANGER',  color: '#ff5555' },
+};
 let lastPlayerAttack = 0;
 let tileSliceW = 0;
 let tileSliceH = 0;
@@ -596,7 +603,7 @@ function update(time, delta) {
     const z = getZone(tile_r, tile_c);
     if (z !== currentZone) {
       currentZone = z;
-      showZoneBanner(player.scene, ZONE_LABELS[z] || z);
+      showZoneBanner(player.scene, ZONE_LABELS[z] || z, z);
     }
   }
 
@@ -606,16 +613,31 @@ function update(time, delta) {
       (!player.attackTarget || !player.attackTarget.alive) &&
       time - autopilotLastScan > 400) {
     autopilotLastScan = time;
-    let best = null, bestD = Infinity;
+    // Score = (distance penalty) - (density bonus). Lower wins.
+    // Density bonus counts safe live monsters within 400 px of the candidate,
+    // so autopilot prefers clusters over lone stragglers across the map.
+    let best = null, bestScore = Infinity;
     const safeCap = player.maxHP * 1.5;
-    for (const m of bloblings) {
-      if (!m.alive) continue;
+    const safe = (m) => {
+      if (!m.alive) return false;
       const cfg = m.cfg || {};
-      if (cfg.aggressive) continue;
-      if (cfg.expReward >= 90) continue;
-      if (m.maxHP > safeCap) continue;
+      if (cfg.aggressive) return false;
+      if (cfg.expReward >= 90) return false;
+      if (m.maxHP > safeCap) return false;
+      return true;
+    };
+    for (const m of bloblings) {
+      if (!safe(m)) continue;
       const d = Math.hypot(m.sprite.x - player.sprite.x, m.sprite.y - player.sprite.y);
-      if (d < bestD) { bestD = d; best = m; }
+      // Prefer the active quest target — gives autopilot a real goal.
+      const isQuestTarget = activeQuest && activeQuest.monsterTypeId === m.typeId;
+      let neighbors = 0;
+      for (const n of bloblings) {
+        if (n === m || !safe(n)) continue;
+        if (Math.hypot(n.sprite.x - m.sprite.x, n.sprite.y - m.sprite.y) < 400) neighbors++;
+      }
+      const score = d - neighbors * 120 - (isQuestTarget ? 800 : 0);
+      if (score < bestScore) { bestScore = score; best = m; }
     }
     if (best) player.startAttacking(best);
   }
@@ -1190,6 +1212,23 @@ class PlayerController {
     this.exp = Math.max(0, this.exp - penalty);
     ui.message(`You died. Lost ${penalty} EXP.`);
     sfxDeath();
+    // Death animation: fade + slight scale-down so it reads as KO.
+    this.scene.tweens.killTweensOf(this.sprite);
+    this.scene.tweens.add({ targets: this.sprite, alpha: 0.25, duration: 500, ease: 'Quad.out' });
+    // Center-screen "YOU DIED" + respawn countdown text.
+    const cdSecs = Math.round(PLAYER_RESPAWN_MS / 1000);
+    const youDied = this.scene.add.text(GAME_W / 2, GAME_H / 2 - 30, 'YOU DIED', {
+      fontSize: '46px', fontStyle: 'bold', color: '#ff4444',
+      stroke: '#000', strokeThickness: 6,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(15000);
+    const countdown = this.scene.add.text(GAME_W / 2, GAME_H / 2 + 30, `Respawning in ${cdSecs}…`, {
+      fontSize: '20px', color: '#ffffff', stroke: '#000', strokeThickness: 4,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(15000);
+    let left = cdSecs;
+    const tick = this.scene.time.addEvent({
+      delay: 1000, repeat: cdSecs - 1,
+      callback: () => { left -= 1; if (left > 0) countdown.setText(`Respawning in ${left}…`); },
+    });
     this.scene.time.delayedCall(PLAYER_RESPAWN_MS, () => {
       const cx = Math.floor(GRID_COLS / 2);
       const cy = Math.floor(GRID_ROWS / 2);
@@ -1201,6 +1240,11 @@ class PlayerController {
       this.stepFromY = this.stepToY = this.sprite.y;
       this.hp = this.maxHP;
       this.dead = false;
+      this.scene.tweens.killTweensOf(this.sprite);
+      this.sprite.setAlpha(1);
+      youDied.destroy();
+      countdown.destroy();
+      tick.remove();
     });
   }
 
@@ -1872,16 +1916,22 @@ class LootDrop {
   }
 }
 
-function showZoneBanner(scene, label) {
+function showZoneBanner(scene, label, zoneKey) {
   if (!scene || !label) return;
   const txt = scene.add.text(GAME_W / 2, 120, `Entering ${label}`, {
     fontSize: '32px', fontStyle: 'bold', color: '#ffe066',
     stroke: '#000', strokeThickness: 5,
   }).setOrigin(0.5).setScrollFactor(0).setDepth(10500).setAlpha(0);
+  const diff = ZONE_DIFFICULTY[zoneKey];
+  const diffTxt = diff ? scene.add.text(GAME_W / 2, 160, diff.tag, {
+    fontSize: '20px', fontStyle: 'bold', color: diff.color,
+    stroke: '#000', strokeThickness: 4,
+  }).setOrigin(0.5).setScrollFactor(0).setDepth(10500).setAlpha(0) : null;
+  const targets = diffTxt ? [txt, diffTxt] : [txt];
   scene.tweens.add({
-    targets: txt, alpha: 1, duration: 350,
-    yoyo: true, hold: 1200,
-    onComplete: () => txt.destroy(),
+    targets, alpha: 1, duration: 350,
+    yoyo: true, hold: 1400,
+    onComplete: () => targets.forEach(t => t.destroy()),
   });
 }
 
