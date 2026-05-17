@@ -2287,6 +2287,43 @@ class UIManager {
       player.levelUp();
     });
 
+    // +10 Levels cheat — bulk up for testing tier thresholds.
+    const lv10Y = lvY + btnH + 6;
+    this.lv10Bg = scene.add.rectangle(btnX, lv10Y, btnW, btnH, 0x444444, 0.85)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
+      .setStrokeStyle(2, 0xffffff, 0.7)
+      .setInteractive({ useHandCursor: true });
+    this.lv10Text = scene.add.text(btnX + btnW / 2, lv10Y + btnH / 2, '⇧ +10 Levels', {
+      fontSize: '13px', color: '#ffffff', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    this.lv10Bg.on('pointerdown', () => {
+      if (!player || player.dead) return;
+      for (let i = 0; i < 10; i++) player.levelUp();
+    });
+
+    // -1 Level cheat — reverses one level's per-level stat grant (20 HP /
+    // 3 ATK / 1 DEF). Tier bonuses are NOT refunded (they're permanent).
+    const lvMY = lv10Y + btnH + 6;
+    this.lvMBg = scene.add.rectangle(btnX, lvMY, btnW, btnH, 0x553333, 0.85)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
+      .setStrokeStyle(2, 0xffffff, 0.7)
+      .setInteractive({ useHandCursor: true });
+    this.lvMText = scene.add.text(btnX + btnW / 2, lvMY + btnH / 2, '⇩ -1 Level', {
+      fontSize: '13px', color: '#ffaaaa', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    this.lvMBg.on('pointerdown', () => {
+      if (!player || player.dead || player.level <= 1) return;
+      player.level -= 1;
+      player.maxHP = Math.max(1, player.maxHP - 20);
+      player.atk  = Math.max(1, player.atk  - 3);
+      player.def  = Math.max(0, player.def  - 1);
+      player.hp = Math.min(player.hp, player.maxHP);
+      player.exp = 0;
+      player._refreshNameTag();
+      ui.message(`Level down. Now Lv.${player.level}.`);
+      saveGame();
+    });
+
     // Boss HP bar (top of screen, hidden until a boss is engaged).
     const bbW = 520, bbH = 22;
     const bbX = (GAME_W - bbW) / 2;
