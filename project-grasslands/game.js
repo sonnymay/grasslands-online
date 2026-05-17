@@ -227,6 +227,36 @@ let autopilotOn = false;
 let autopilotLastScan = 0;
 let classSelectOpen = false;
 let shopOpen = false;
+let activeQuest = null; // { monsterTypeId, monsterName, target, count, reward }
+
+const QUEST_MONSTER_POOL = ['blobling', 'mooham', 'moowaan', 'cactling'];
+
+function rollNewQuest() {
+  const id = QUEST_MONSTER_POOL[Math.floor(Math.random() * QUEST_MONSTER_POOL.length)];
+  const cfg = MONSTER_TYPES[id];
+  const target = 10;
+  const reward = Math.round((cfg.expReward || 10) * target * 1.5);
+  activeQuest = { monsterTypeId: id, monsterName: cfg.name, target, count: 0, reward };
+  if (typeof ui !== 'undefined' && ui) {
+    ui.message(`New quest: slay ${target} ${cfg.name} (${reward} zeny).`);
+  }
+  saveGame();
+}
+
+function onMonsterKilledForQuest(typeId) {
+  if (!activeQuest) return;
+  if (activeQuest.monsterTypeId !== typeId) return;
+  activeQuest.count += 1;
+  if (activeQuest.count >= activeQuest.target) {
+    const reward = activeQuest.reward;
+    const name = activeQuest.monsterName;
+    player.zeny += reward;
+    ui.message(`✓ Quest complete! Slayed ${activeQuest.target} ${name} (+${reward} zeny)`);
+    sfxLevelUp();
+    activeQuest = null;
+    rollNewQuest();
+  }
+}
 
 // Shop items. price = base * 1.5^bought.
 const SHOP_ITEMS = [
@@ -550,6 +580,7 @@ function create() {
     ui.message('Click monsters to attack. Click ground to walk.');
     ui.message('Click monsters to auto-fight. Tab targets nearest. Shift+R resets save.');
   }
+  if (!activeQuest) rollNewQuest();
 }
 
 // ---------- Update loop ----------
@@ -1330,6 +1361,7 @@ function saveGame() {
       kills: player.kills,
       classId: player.classId, classTier: player.classTier,
       shopBought: player.shopBought,
+      activeQuest: activeQuest,
       cellCol: player.cellCol, cellRow: player.cellRow,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -1357,6 +1389,7 @@ function applySave() {
   player.classId   = save.classId   ?? null;
   player.classTier = save.classTier ?? 0;
   player.shopBought = Object.assign({ hp:0, atk:0, def:0, pot:0 }, save.shopBought || {});
+  activeQuest = save.activeQuest || null;
   // Reapply class tint on sprite + refresh name tag color/title.
   if (player.classId && CLASS_DEFS[player.classId]) {
     player.sprite.setTint(CLASS_DEFS[player.classId].tint);
@@ -1745,6 +1778,7 @@ class MonsterController {
     }
     if (this.auraRing) { this.scene.tweens.killTweensOf(this.auraRing); this.auraRing.destroy(); this.auraRing = null; }
     player.kills += 1;
+    onMonsterKilledForQuest(this.typeId);
     // Heal on kill: 8% of maxHP, scaled up for bosses (expReward >= 90)
     // and rare kills (always full heal).
     const healPct = this.cfg.levelsAward ? 1.0 : (this.expReward >= 90 ? 0.30 : 0.08);
@@ -2512,6 +2546,16 @@ class UIManager {
       showShop(scene);
     });
 
+    // Quest tracker — top-left badge.
+    this.questBg = scene.add.rectangle(10, 10, 300, 32, 0x000000, 0.65)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
+      .setStrokeStyle(2, 0xffe066, 0.9);
+    this.questText = scene.add.text(20, 26, '', {
+      fontSize: '14px', color: '#ffffff', stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(10006);
+    this.questBg.setVisible(false);
+    this.questText.setVisible(false);
+
     // Boss HP bar (top of screen, hidden until a boss is engaged).
     const bbW = 520, bbH = 22;
     const bbX = (GAME_W - bbW) / 2;
@@ -2559,6 +2603,17 @@ class UIManager {
     // Always visible; the click handler gates by level.
     const wantedLbl = player.classId ? '✦ Change Class' : '✦ Choose Class';
     if (this.clText.text !== wantedLbl) this.clText.setText(wantedLbl);
+
+    // Quest tracker badge.
+    if (activeQuest) {
+      const txt = `Quest: ${activeQuest.count}/${activeQuest.target} ${activeQuest.monsterName}`;
+      if (this.questText.text !== txt) this.questText.setText(txt);
+      this.questBg.setVisible(true);
+      this.questText.setVisible(true);
+    } else {
+      this.questBg.setVisible(false);
+      this.questText.setVisible(false);
+    }
 
     // Boss bar — show whenever any aggressive / boss-tier monster is alive
     // anywhere in the world. Picks the closest one when several are around.
