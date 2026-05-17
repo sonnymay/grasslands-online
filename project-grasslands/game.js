@@ -22,6 +22,7 @@ const HP_REGEN_PCT = 0.02;          // 2% of maxHP per tick
 const PLAYER_DISPLAY_H = 96;
 const BLOBLING_DISPLAY_H = 64;
 const PLAYER_ATTACK_COOLDOWN = 1000;
+const SPECIAL_COOLDOWN_MS = 10000; // class auto-skill charges every 10s
 // Combat randomness — RO-style feel.
 const DAMAGE_VARIANCE = 0.2;       // ±20% on every hit
 const PLAYER_CRIT_CHANCE = 0.03;   // rare 3% crit
@@ -806,6 +807,9 @@ class PlayerController {
     this.dir = 'south';
     this.frame = 'idle';
     this.attackPoseUntil = 0;
+    this._specialReady = false;
+    this._specialChargeAt = 0; // ms; charge complete after SPECIAL_COOLDOWN
+    this._specialRing = null;
     this.stunUntil = 0;
     this.lastRegen = 0;
 
@@ -951,6 +955,25 @@ class PlayerController {
     }
 
     const stunned = time < this.stunUntil;
+
+    // Auto-skill charge: once SPECIAL_COOLDOWN_MS passes, the next attack
+    // gets a 2x damage buff with an upgraded class visual. Only kicks in
+    // after a class has been chosen.
+    if (this.classId && !this._specialReady &&
+        time - this._specialChargeAt >= SPECIAL_COOLDOWN_MS) {
+      this._specialReady = true;
+      if (!this._specialRing) {
+        this._specialRing = this.scene.add.circle(this.sprite.x, this.sprite.y, 26)
+          .setStrokeStyle(3, 0xffe066, 0.9).setFillStyle().setDepth(this.sprite.y - 5);
+      }
+      this._specialRing.setVisible(true);
+    }
+    if (this._specialRing && this._specialRing.visible) {
+      this._specialRing.setPosition(this.sprite.x, this.sprite.y + 10);
+      this._specialRing.setDepth(this.sprite.y - 5);
+      const pulse = 1 + Math.sin(time / 120) * 0.08;
+      this._specialRing.setScale(pulse);
+    }
 
     // Slow passive HP regen. Pauses while stunned (in combat hit recently).
     if (!stunned && this.hp < this.maxHP && time - this.lastRegen >= HP_REGEN_INTERVAL_MS) {
@@ -1861,55 +1884,70 @@ function attemptPlayerAttack(scene, target) {
   const crit = Math.random() < PLAYER_CRIT_CHANCE;
   const variance = 1 + (Math.random() * 2 - 1) * DAMAGE_VARIANCE;
   let dmg = Math.max(1, Math.round(player.atk * variance * (crit ? CRIT_MULTIPLIER : 1)));
-  spawnClassAttackFx(scene, player, target);
+  const special = !!player._specialReady;
+  if (special) {
+    dmg *= 2;
+    player._specialReady = false;
+    player._specialChargeAt = now;
+    if (player._specialRing) player._specialRing.setVisible(false);
+  }
+  spawnClassAttackFx(scene, player, target, special);
   target.takeDamage(dmg, { crit });
   if (crit) sfxCrit(); else sfxHit();
 }
 
 // Class-flavored attack visual. Cheap shapes, no art assets needed. Falls
 // back to a small white impact when no class is chosen yet.
-function spawnClassAttackFx(scene, pl, target) {
+function spawnClassAttackFx(scene, pl, target, special = false) {
   const px = pl.sprite.x, py = pl.sprite.y - 12;
   const tx = target.sprite.x, ty = target.sprite.y - 10;
   const id = pl.classId;
+  const mult = special ? 1.8 : 1;
+
+  if (special) {
+    spawnFloatText(scene, tx, ty - 36,
+      id === 'swordsman' ? 'BASH!' : id === 'mage' ? 'METEOR!' : 'TRIPLE SHOT!',
+      0xffe066, { fontSize: '22px' });
+  }
 
   if (id === 'swordsman') {
-    // Curved white slash at the target.
     const arc = scene.add.graphics().setDepth(ty + 50);
-    arc.lineStyle(6, 0xffffff, 1);
-    const rad = 36;
+    arc.lineStyle(6 * mult, special ? 0xffe066 : 0xffffff, 1);
+    const rad = 36 * mult;
     arc.beginPath();
     arc.arc(tx, ty, rad, Math.PI * 0.85, Math.PI * 1.55, false);
     arc.strokePath();
     scene.tweens.add({
-      targets: arc, alpha: 0, scale: 1.25, duration: 220,
+      targets: arc, alpha: 0, scale: 1.25, duration: 250,
       onComplete: () => arc.destroy(),
     });
   } else if (id === 'mage') {
-    // Blue fireball projectile flies player → target.
-    const orb = scene.add.circle(px, py, 9, 0x66aaff, 0.95)
-      .setStrokeStyle(2, 0xaaddff, 1).setDepth(ty + 50);
+    const orb = scene.add.circle(px, py, 9 * mult, special ? 0xff6633 : 0x66aaff, 0.95)
+      .setStrokeStyle(2, special ? 0xffcc66 : 0xaaddff, 1).setDepth(ty + 50);
     scene.tweens.add({
       targets: orb, x: tx, y: ty, duration: 140,
       onComplete: () => {
-        const burst = scene.add.circle(tx, ty, 12, 0x66aaff, 0.7).setDepth(ty + 50);
-        scene.tweens.add({ targets: burst, radius: 30, alpha: 0, duration: 200,
+        const burst = scene.add.circle(tx, ty, 12 * mult, special ? 0xff6633 : 0x66aaff, 0.7).setDepth(ty + 50);
+        scene.tweens.add({ targets: burst, radius: 30 * mult, alpha: 0, duration: 240,
           onComplete: () => burst.destroy() });
         orb.destroy();
       },
     });
   } else if (id === 'archer') {
-    // Yellow arrow streak.
-    const line = scene.add.graphics().setDepth(ty + 50);
-    line.lineStyle(3, 0xffee66, 1);
-    line.lineBetween(px, py, tx, ty);
-    const tip = scene.add.circle(tx, ty, 5, 0xffee66, 1).setDepth(ty + 50);
-    scene.tweens.add({
-      targets: [line, tip], alpha: 0, duration: 200,
-      onComplete: () => { line.destroy(); tip.destroy(); },
-    });
+    // Triple arrows on special, single on normal.
+    const shots = special ? 3 : 1;
+    for (let i = 0; i < shots; i++) {
+      const dy = (i - (shots - 1) / 2) * 12;
+      const line = scene.add.graphics().setDepth(ty + 50);
+      line.lineStyle(3, special ? 0xffaa33 : 0xffee66, 1);
+      line.lineBetween(px, py + dy, tx, ty + dy);
+      const tip = scene.add.circle(tx, ty + dy, 5, special ? 0xffaa33 : 0xffee66, 1).setDepth(ty + 50);
+      scene.tweens.add({
+        targets: [line, tip], alpha: 0, duration: 220,
+        onComplete: () => { line.destroy(); tip.destroy(); },
+      });
+    }
   } else {
-    // No class yet → small generic impact.
     const dot = scene.add.circle(tx, ty, 8, 0xffffff, 0.7).setDepth(ty + 50);
     scene.tweens.add({ targets: dot, scale: 2, alpha: 0, duration: 200,
       onComplete: () => dot.destroy() });
@@ -2053,6 +2091,32 @@ class UIManager {
       this.apBg.setFillStyle(autopilotOn ? 0x1f6b3a : 0x000000, 0.75);
       try { localStorage.setItem(AP_KEY, autopilotOn ? '1' : '0'); } catch (e) { /* ignore */ }
       ui.message(autopilotOn ? 'Autopilot ON — avoiding bosses + strong monsters.' : 'Autopilot OFF.');
+    });
+
+    // Return-to-spawn (Kafra warp). Instant teleport, no cost yet.
+    const rsY = apY + btnH + 6;
+    this.rsBg = scene.add.rectangle(btnX, rsY, btnW, btnH, 0x223366, 0.85)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
+      .setStrokeStyle(2, 0xffffff, 0.8)
+      .setInteractive({ useHandCursor: true });
+    this.rsText = scene.add.text(btnX + btnW / 2, rsY + btnH / 2, '⌂ Return Home', {
+      fontSize: '13px', color: '#ffffff', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    this.rsBg.on('pointerdown', () => {
+      if (!player || player.dead) return;
+      const cx = Math.floor(GRID_COLS / 2);
+      const cy = Math.floor(GRID_ROWS / 2);
+      player.attackTarget = null;
+      player.path = [];
+      player.cellCol = cx;
+      player.cellRow = cy;
+      const wx = cellCenterX(cx), wy = cellCenterY(cy);
+      player.sprite.setPosition(wx, wy);
+      player.groundY = wy;
+      player.stepFromX = player.stepToX = wx;
+      player.stepFromY = player.stepToY = wy;
+      ui.message('Warped home.');
+      sfxPickup();
     });
 
     // Boss HP bar (top of screen, hidden until a boss is engaged).
