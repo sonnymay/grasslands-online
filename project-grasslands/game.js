@@ -243,6 +243,33 @@ function scaledMonsterExp(monster) {
   return Math.max(1, Math.round(monster.expReward * mult));
 }
 
+function awardHotStreak(monster, earnedExp) {
+  if (!player || player.dead) return;
+  player.hotStreak = (player.hotStreak || 0) + 1;
+  if (player.hotStreak % 5 !== 0) return;
+  const tier = (player.hotStreak % 10 === 0) ? 10 : 5;
+  const bonus = Math.max(25, Math.round(earnedExp * tier * 1.2));
+  player.zeny += bonus;
+  const label = `HOT STREAK x${player.hotStreak}! +${fmt(bonus)}z`;
+  spawnFloatText(monster.scene, player.sprite.x, player.sprite.y - 58, label, 0xffd24a, { fontSize: tier === 10 ? '24px' : '20px' });
+  const banner = monster.scene.add.text(GAME_W / 2, 170, label, {
+    fontSize: tier === 10 ? '34px' : '28px',
+    fontStyle: 'bold',
+    color: '#ffe066',
+    stroke: '#5a3a00',
+    strokeThickness: 5,
+  }).setOrigin(0.5).setScrollFactor(0).setDepth(19000).setAlpha(0);
+  monster.scene.tweens.add({
+    targets: banner,
+    alpha: 1,
+    duration: 220,
+    yoyo: true,
+    hold: tier === 10 ? 1150 : 850,
+    onComplete: () => banner.destroy(),
+  });
+  if (tier === 10) sfxLevelUp(); else sfxPickup();
+}
+
 function rollNewQuest() {
   const id = QUEST_MONSTER_POOL[Math.floor(Math.random() * QUEST_MONSTER_POOL.length)];
   const cfg = MONSTER_TYPES[id];
@@ -922,6 +949,7 @@ class PlayerController {
     this.exp = 0;
     this.zeny = 0;
     this.kills = 0;
+    this.hotStreak = 0;
     this.classId = null;   // 'swordsman' | 'mage' | 'archer'
     this.classTier = 0;    // 0 = unselected, 1..4 once chosen
     this.shopBought = { hp: 0, atk: 0, def: 0, pot: 0 };
@@ -933,6 +961,7 @@ class PlayerController {
     this._specialReady = false;
     this._specialChargeAt = 0; // ms; charge complete after SPECIAL_COOLDOWN
     this._specialRing = null;
+    this._specialGlow = null;
     this.stunUntil = 0;
     this.lastRegen = 0;
 
@@ -1090,13 +1119,25 @@ class PlayerController {
         this._specialRing = this.scene.add.circle(this.sprite.x, this.sprite.y, 26)
           .setStrokeStyle(3, 0xffe066, 0.9).setFillStyle().setDepth(this.sprite.y - 5);
       }
+      if (!this._specialGlow) {
+        this._specialGlow = this.scene.add.circle(this.sprite.x, this.sprite.y + 10, 44, 0xffe066, 0.16)
+          .setDepth(this.sprite.y - 8);
+        this._specialGlow.setBlendMode(Phaser.BlendModes.ADD);
+      }
       this._specialRing.setVisible(true);
+      this._specialGlow.setVisible(true);
     }
     if (this._specialRing && this._specialRing.visible) {
       this._specialRing.setPosition(this.sprite.x, this.sprite.y + 10);
       this._specialRing.setDepth(this.sprite.y - 5);
       const pulse = 1 + Math.sin(time / 120) * 0.08;
       this._specialRing.setScale(pulse);
+      if (this._specialGlow) {
+        this._specialGlow.setPosition(this.sprite.x, this.sprite.y + 10);
+        this._specialGlow.setDepth(this.sprite.y - 8);
+        this._specialGlow.setScale(1 + Math.sin(time / 160) * 0.12);
+        this._specialGlow.setAlpha(0.12 + Math.sin(time / 180) * 0.04);
+      }
     }
 
     // Slow passive HP regen. Pauses while stunned (in combat hit recently).
@@ -1216,6 +1257,9 @@ class PlayerController {
 
   die() {
     this.dead = true;
+    this.hotStreak = 0;
+    if (this._specialRing) this._specialRing.setVisible(false);
+    if (this._specialGlow) this._specialGlow.setVisible(false);
     this.path = [];
     this.stepT = 1;
     this.attackTarget = null;
@@ -1416,7 +1460,7 @@ function saveGame() {
       level: player.level, exp: player.exp,
       hp: player.hp, maxHP: player.maxHP,
       atk: player.atk, def: player.def, zeny: player.zeny,
-      kills: player.kills,
+      kills: player.kills, hotStreak: player.hotStreak,
       classId: player.classId, classTier: player.classTier,
       shopBought: player.shopBought,
       activeQuest: activeQuest,
@@ -1444,6 +1488,7 @@ function applySave() {
   player.def    = save.def    ?? player.def;
   player.zeny   = save.zeny   ?? 0;
   player.kills  = save.kills  ?? 0;
+  player.hotStreak = save.hotStreak ?? 0;
   player.classId   = save.classId   ?? null;
   player.classTier = save.classTier ?? 0;
   player.shopBought = Object.assign({ hp:0, atk:0, def:0, pot:0 }, save.shopBought || {});
@@ -1838,6 +1883,7 @@ class MonsterController {
     }
     if (this.auraRing) { this.scene.tweens.killTweensOf(this.auraRing); this.auraRing.destroy(); this.auraRing = null; }
     player.kills += 1;
+    awardHotStreak(this, earnedExp);
     onMonsterKilledForQuest(this.typeId);
     // Center-screen banner when a boss-tier monster (or aggressive) dies.
     const cfg = this.cfg || {};
@@ -2343,6 +2389,7 @@ function attemptPlayerAttack(scene, target) {
     player._specialReady = false;
     player._specialChargeAt = now;
     if (player._specialRing) player._specialRing.setVisible(false);
+    if (player._specialGlow) player._specialGlow.setVisible(false);
   }
   spawnClassAttackFx(scene, player, target, special);
   target.takeDamage(dmg, { crit, variance });
