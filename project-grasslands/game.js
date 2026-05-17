@@ -29,6 +29,8 @@ const CRIT_MULTIPLIER = 2;
 const PLAYER_MISS_CHANCE = 0.05;   // 5% whiff
 const MONSTER_MISS_CHANCE = 0.10;  // 10% monsters miss player
 const LOOT_PICKUP_RADIUS = 28;
+const LOOT_MAGNET_RADIUS = 320; // auto-collect: loot drifts toward player when within this range
+const LOOT_MAGNET_SPEED  = 700; // px/s pull velocity
 const BLOBLING_ATTACK_COOLDOWN = 1500;
 const BLOBLING_AGGRO_RANGE = 200;
 const BLOBLING_ATTACK_RANGE = 80;
@@ -153,6 +155,8 @@ let lastSaveAt = 0;
 const SAVE_KEY = 'grasslands_save_v2';
 const SAVE_INTERVAL_MS = 3000;
 let ui;
+let autopilotOn = false;
+let autopilotLastScan = 0;
 let lastPlayerAttack = 0;
 let tileSliceW = 0;
 let tileSliceH = 0;
@@ -445,8 +449,29 @@ function update(time, delta) {
   player.update(time, delta);
   for (const b of bloblings) b.update(time, delta);
 
-  // Loot pickup: walk over a coin to grab it.
+  // Autopilot: when on, pick the nearest safe live monster as attack target.
+  // "Safe" = not aggressive, not boss-tier reward, maxHP not >1.5x player.
+  if (autopilotOn && !player.dead &&
+      (!player.attackTarget || !player.attackTarget.alive) &&
+      time - autopilotLastScan > 400) {
+    autopilotLastScan = time;
+    let best = null, bestD = Infinity;
+    const safeCap = player.maxHP * 1.5;
+    for (const m of bloblings) {
+      if (!m.alive) continue;
+      const cfg = m.cfg || {};
+      if (cfg.aggressive) continue;
+      if (cfg.expReward >= 90) continue;
+      if (m.maxHP > safeCap) continue;
+      const d = Math.hypot(m.sprite.x - player.sprite.x, m.sprite.y - player.sprite.y);
+      if (d < bestD) { bestD = d; best = m; }
+    }
+    if (best) player.startAttacking(best);
+  }
+
+  // Loot magnet + pickup: coins drift toward player, then auto-collect.
   if (player && !player.dead) {
+    for (const l of loots) l.tickMagnet(player.sprite.x, player.sprite.y, delta);
     for (const l of loots) {
       if (l.tryPickup(player.sprite.x, player.sprite.y)) {
         if (l.kind === 'heal') {
@@ -1512,6 +1537,22 @@ class LootDrop {
     });
   }
 
+  tickMagnet(px, py, delta) {
+    if (!this.alive) return;
+    // Wait for bounce to settle before pulling.
+    if (this.scene.time.now - this.bornAt < 250) return;
+    const dx = px - this.x, dy = py - this.y;
+    const d = Math.hypot(dx, dy);
+    if (d > LOOT_MAGNET_RADIUS || d < 1) return;
+    const step = LOOT_MAGNET_SPEED * (delta / 1000);
+    const k = Math.min(step / d, 1);
+    this.x += dx * k;
+    this.y += dy * k;
+    this.coin.x = this.x;
+    this.coin.y = this.y;
+    this.coin.setDepth(this.y);
+  }
+
   tryPickup(px, py) {
     if (!this.alive) return false;
     // Brief grace so it doesn't snap into pickup mid-bounce.
@@ -1702,6 +1743,27 @@ class UIManager {
       }
       this.muteText.setText(bgm.mute ? '♪ Music: OFF' : '♪ Music: ON');
       try { localStorage.setItem(MUTE_KEY, bgm.mute ? '1' : '0'); } catch (e) { /* ignore */ }
+    });
+
+    // Autopilot toggle — auto-targets nearest safe monster, avoids bosses
+    // and overleveled enemies. Sits right below the mute button.
+    const apY = btnY + btnH + 6;
+    const AP_KEY = 'grasslands_autopilot_v1';
+    try { autopilotOn = localStorage.getItem(AP_KEY) === '1'; } catch (e) { autopilotOn = false; }
+    this.apBg = scene.add.rectangle(btnX, apY, btnW, btnH, autopilotOn ? 0x1f6b3a : 0x000000, 0.75)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
+      .setStrokeStyle(2, 0xffffff, 0.8)
+      .setInteractive({ useHandCursor: true });
+    this.apText = scene.add.text(btnX + btnW / 2, apY + btnH / 2,
+      autopilotOn ? '⚙ Auto: ON' : '⚙ Auto: OFF', {
+      fontSize: '13px', color: '#ffffff', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    this.apBg.on('pointerdown', () => {
+      autopilotOn = !autopilotOn;
+      this.apText.setText(autopilotOn ? '⚙ Auto: ON' : '⚙ Auto: OFF');
+      this.apBg.setFillStyle(autopilotOn ? 0x1f6b3a : 0x000000, 0.75);
+      try { localStorage.setItem(AP_KEY, autopilotOn ? '1' : '0'); } catch (e) { /* ignore */ }
+      ui.message(autopilotOn ? 'Autopilot ON — avoiding bosses + strong monsters.' : 'Autopilot OFF.');
     });
 
     // Chat box
