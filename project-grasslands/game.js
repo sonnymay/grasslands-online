@@ -264,6 +264,7 @@ let shopOpen = false;
 let travelOpen = false;
 let trophyOpen = false;
 let hardMode = false; // doubles monster damage, EXP, and zeny drops
+let hudCompact = false;
 let activeQuests = []; // [{ monsterTypeId, monsterName, target, count, reward }]
 let questChain = 0;
 let bossRespawns = {};
@@ -3685,6 +3686,27 @@ class UIManager {
     });
     addTip(this.shBg, 'Spend zeny on upgrades', btnX, shY + btnH / 2);
 
+    // Compact HUD toggle — hides secondary progress chips and shortens chat.
+    const HUD_KEY = 'grasslands_hud_compact_v1';
+    try { hudCompact = localStorage.getItem(HUD_KEY) === '1'; } catch (e) { hudCompact = false; }
+    const huY = shY + btnH + 6;
+    this.compactBg = scene.add.rectangle(btnX, huY, btnW, btnH, hudCompact ? 0x224422 : 0x222222, 0.9)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
+      .setStrokeStyle(2, hudCompact ? 0x99ff99 : 0x888888, 0.95)
+      .setInteractive({ useHandCursor: true });
+    this.compactText = scene.add.text(btnX + btnW / 2, huY + btnH / 2,
+      hudCompact ? 'HUD: Compact' : 'HUD: Full', {
+      fontSize: '12px', color: hudCompact ? '#ddffdd' : '#dddddd',
+      stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    this.compactBg.on('pointerdown', () => {
+      hudCompact = !hudCompact;
+      this.applyCompactHud();
+      try { localStorage.setItem(HUD_KEY, hudCompact ? '1' : '0'); } catch (e) { /* ignore */ }
+      ui.message(hudCompact ? 'HUD compact mode ON.' : 'HUD compact mode OFF.');
+    });
+    addTip(this.compactBg, 'Hide extra HUD chips + shrink chat', btnX, huY + btnH / 2);
+
     // Quest tracker — top-left badge.
     this.questBg = scene.add.rectangle(10, 10, 330, 54, 0x000000, 0.65)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
@@ -3774,12 +3796,35 @@ class UIManager {
     this.chatText = scene.add.text(18, GAME_H - 215, '', {
       fontSize: '12px', color: '#ffffff', wordWrap: { width: 300 },
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10001);
+    this.applyCompactHud();
   }
 
   message(msg) {
     this.messages.push(msg);
     if (this.messages.length > 10) this.messages.shift();
-    this.chatText.setText(this.messages.join('\n'));
+    this.chatText.setText(this.visibleMessages().join('\n'));
+  }
+
+  visibleMessages() {
+    return this.messages.slice(hudCompact ? -6 : -10);
+  }
+
+  applyCompactHud() {
+    const compact = !!hudCompact;
+    const chatH = compact ? 92 : 150;
+    const chatY = GAME_H - 70 - chatH;
+    this.chatBg.y = chatY;
+    this.chatBg.height = chatH;
+    this.chatBg.displayHeight = chatH;
+    this.chatText.y = chatY + 5;
+    this.chatText.setText(this.visibleMessages().join('\n'));
+    this.compactText.setText(compact ? 'HUD: Compact' : 'HUD: Full');
+    this.compactText.setColor(compact ? '#ddffdd' : '#dddddd');
+    this.compactBg.setFillStyle(compact ? 0x224422 : 0x222222, 0.9);
+    this.compactBg.setStrokeStyle(2, compact ? 0x99ff99 : 0x888888, 0.95);
+    for (const obj of [this.bossTickerBg, this.bossTickerText, this.streakBg, this.streakText, this.discoveryBg, this.discoveryText]) {
+      obj.setVisible(false);
+    }
   }
 
   update() {
@@ -3856,7 +3901,7 @@ class UIManager {
         }
       }
     }
-    if (tickerLine) {
+    if (tickerLine && !hudCompact) {
       if (this.bossTickerText.text !== tickerLine) this.bossTickerText.setText(tickerLine);
       this.bossTickerBg.setVisible(true);
       this.bossTickerText.setVisible(true);
@@ -3867,7 +3912,7 @@ class UIManager {
 
     // Hot-streak counter.
     const streak = player.hotStreak || 0;
-    if (streak > 0) {
+    if (streak > 0 && !hudCompact) {
       const next = 5 - (streak % 5);
       const best = player.bestStreak || streak;
       const label = `🔥 ×${streak}   next +${next === 5 ? 5 : next}   best ×${best}`;
@@ -3884,6 +3929,8 @@ class UIManager {
     const discMax = (typeof landmarkTiles === 'function') ? landmarkTiles().length : 5;
     const discLabel = `★ Biomes ${discN}/${discMax}`;
     if (this.discoveryText.text !== discLabel) this.discoveryText.setText(discLabel);
+    this.discoveryBg.setVisible(!hudCompact);
+    this.discoveryText.setVisible(!hudCompact);
 
     // Boss bar — show whenever any aggressive / boss-tier monster is alive
     // anywhere in the world. Picks the closest one when several are around.
