@@ -1859,8 +1859,17 @@ function showClassSelect(scene) {
 function selectClass(scene, id, container) {
   const cdef = CLASS_DEFS[id];
   if (!cdef) return;
+  const isSwap = !!player.classId;
   player.classId = id;
-  player.classTier = 1;
+  // First-time: set tier from current level's threshold (1 baseline, plus
+  // any higher tier the player already qualifies for). On swap, recompute
+  // the tier the same way so the title matches the player's level —
+  // stats are NOT re-granted (tier bonuses are one-time per level).
+  let tier = 1;
+  for (const t of CLASS_TIER_THRESHOLDS) {
+    if (player.level >= t.level) tier = Math.max(tier, t.tier);
+  }
+  player.classTier = tier;
   player.sprite.setTint(cdef.tint);
   player._refreshNameTag();
 
@@ -1874,7 +1883,8 @@ function selectClass(scene, id, container) {
 
   container.destroy();
   classSelectOpen = false;
-  ui.message(`You became a ${cdef.tierNames[0]}!`);
+  const tierTitle = cdef.tierNames[tier - 1];
+  ui.message(isSwap ? `You changed to ${tierTitle}!` : `You became a ${tierTitle}!`);
   sfxLevelUp();
   saveGame();
 }
@@ -2203,24 +2213,22 @@ class UIManager {
       sfxPickup();
     });
 
-    // Class button — open the class chooser anytime (or report current class).
+    // Change Class button — appears at Lv 10 and stays. Click to open the
+    // chooser anytime; user can switch class freely.
     const clY = rsY + btnH + 6;
-    this.clBg = scene.add.rectangle(btnX, clY, btnW, btnH, 0x664422, 0.85)
+    this.clBg = scene.add.rectangle(btnX, clY, btnW, btnH, 0x664422, 0.9)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
-      .setStrokeStyle(2, 0xffe066, 0.9)
+      .setStrokeStyle(2, 0xffe066, 1)
       .setInteractive({ useHandCursor: true });
-    this.clText = scene.add.text(btnX + btnW / 2, clY + btnH / 2, '✦ Class', {
+    this.clText = scene.add.text(btnX + btnW / 2, clY + btnH / 2, '✦ Change Class', {
       fontSize: '13px', color: '#ffe066', stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    // Hidden until player hits Lv 10.
+    this.clBg.setVisible(false);
+    this.clText.setVisible(false);
     this.clBg.on('pointerdown', () => {
       if (!player) return;
-      if (player.classId) {
-        const cdef = CLASS_DEFS[player.classId];
-        const tierIdx = Math.max(0, Math.min(cdef.tierNames.length - 1, player.classTier - 1));
-        ui.message(`You are a ${cdef.tierNames[tierIdx]} (Tier ${player.classTier}). Class locked once chosen.`);
-      } else {
-        showClassSelect(scene);
-      }
+      showClassSelect(scene);
     });
 
     // Boss HP bar (top of screen, hidden until a boss is engaged).
@@ -2265,6 +2273,18 @@ class UIManager {
 
     this.lvlText.setText(`Lv.${player.level}`);
     this.zenyText.setText(`Zeny: ${player.zeny}`);
+
+    // Reveal class button once eligible. Hidden until then to keep UI clean.
+    const classBtnEligible = player.level >= 10;
+    if (this.clBg.visible !== classBtnEligible) {
+      this.clBg.setVisible(classBtnEligible);
+      this.clText.setVisible(classBtnEligible);
+      // Update label so it reads correctly once a class is chosen.
+      this.clText.setText(player.classId ? '✦ Change Class' : '✦ Choose Class');
+    } else if (classBtnEligible) {
+      const wanted = player.classId ? '✦ Change Class' : '✦ Choose Class';
+      if (this.clText.text !== wanted) this.clText.setText(wanted);
+    }
 
     // Boss bar — show whenever any aggressive / boss-tier monster is alive
     // anywhere in the world. Picks the closest one when several are around.
