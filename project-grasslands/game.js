@@ -83,6 +83,7 @@ const MONSTER_TYPES = {
     nameColor: '#ff4444', count: BIGFOOT_COUNT, scaleMult: 2.2,
     fixedLevel: 50, noLevelScaling: true, aggressive: true, aggroRange: 520, oneShotBelowLevel: 50,
     zones: ['forest'],
+    minSpawnDistance: 2400, // keep him in far forest so new players don't walk into a one-shot
   },
 };
 
@@ -302,12 +303,15 @@ function create() {
 
   // Slice every 4x4 tileset into 16 frames named `tile_0`..`tile_15` on that
   // texture key. buildMap picks which tileset key to draw from per zone.
+  // Grass tileset has a baked white separator → 4% inset crops it. Sand
+  // tileset is flush, so inset=0 to avoid revealing the canvas behind.
+  const TILESET_INSET_PCT = { grass_tileset: 0.04, sand_tileset: 0 };
   const sliceTileset = (texKey) => {
     if (!scene.textures.exists(texKey)) return;
     const img = scene.textures.get(texKey).getSourceImage();
     const sw = Math.floor(img.width / 4);
     const sh = Math.floor(img.height / 4);
-    const inset = Math.floor(sw * 0.04);
+    const inset = Math.floor(sw * (TILESET_INSET_PCT[texKey] ?? 0.04));
     for (let r = 0; r < 4; r++) {
       for (let c = 0; c < 4; c++) {
         const idx = r * 4 + c;
@@ -1509,7 +1513,8 @@ function spawnMonster(scene, typeId) {
   while (!ok && tries++ < 60) {
     x = 200 + Math.random() * (WORLD_W - 400);
     y = 200 + Math.random() * (WORLD_H - 400);
-    if (player && Math.hypot(x - player.sprite.x, y - player.sprite.y) < 300) continue;
+    const minDist = cfg.minSpawnDistance || 300;
+    if (player && Math.hypot(x - player.sprite.x, y - player.sprite.y) < minDist) continue;
     if (allowedZones) {
       const tile_c = Math.floor(x / TILE_SIZE);
       const tile_r = Math.floor(y / TILE_SIZE);
