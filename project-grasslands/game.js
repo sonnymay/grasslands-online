@@ -234,6 +234,15 @@ const QUEST_MONSTER_POOL = ['blobling', 'mooham', 'moowaan', 'cactling'];
 // Compact thousands-separator. Used wherever zeny is printed.
 function fmt(n) { return Math.floor(n).toLocaleString('en-US'); }
 
+function scaledMonsterExp(monster) {
+  const cfg = monster.cfg || {};
+  if (cfg.aggressive || cfg.expReward >= 90 || cfg.levelsAward) return monster.expReward;
+  const typicalLevel = monster.level || 1;
+  const levelsOver = Math.max(0, player.level - typicalLevel);
+  const mult = Math.max(0.3, Math.pow(0.7, levelsOver));
+  return Math.max(1, Math.round(monster.expReward * mult));
+}
+
 function rollNewQuest() {
   const id = QUEST_MONSTER_POOL[Math.floor(Math.random() * QUEST_MONSTER_POOL.length)];
   const cfg = MONSTER_TYPES[id];
@@ -1790,7 +1799,7 @@ class MonsterController {
     // Getting hit provokes the monster for 5s.
     this.provoked = true;
     this.provokedUntil = this.scene.time.now + 5000;
-    const color = opts.crit ? 0xffe14a : 0xff5555;
+    const color = opts.crit ? 0xffe14a : (opts.variance >= 1.12 ? 0xff9b3d : opts.variance <= 0.88 ? 0xffffff : 0xff5555);
     spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 20, amount, color, { crit: !!opts.crit });
     this._setTex(this.cfg.hitKey);
     this.scene.time.delayedCall(120, () => {
@@ -1809,6 +1818,7 @@ class MonsterController {
     this.nameTag.setVisible(false);
     spawnDeathBurst(this.scene, this.sprite.x, this.sprite.y + 8, this.cfg.tint || this.cfg.nameColor || 0xffffff);
     // Rare variant: grant N levels worth of EXP in one shot + huge fanfare.
+    const earnedExp = this.cfg.levelsAward ? this.expReward : scaledMonsterExp(this);
     if (this.cfg.levelsAward) {
       const want = this.cfg.levelsAward;
       let total = 0;
@@ -1824,7 +1834,7 @@ class MonsterController {
         onComplete: () => banner.destroy(),
       });
     } else {
-      player.gainExp(this.expReward);
+      player.gainExp(earnedExp);
     }
     if (this.auraRing) { this.scene.tweens.killTweensOf(this.auraRing); this.auraRing.destroy(); this.auraRing = null; }
     player.kills += 1;
@@ -1849,8 +1859,8 @@ class MonsterController {
       spawnFloatText(this.scene, player.sprite.x, player.sprite.y - 20, `+${fmt(healAmt)} HP`, 0x66ff88);
       sfxHeal();
     }
-    ui.message(`Killed ${this.cfg.name} (+${this.expReward} EXP, +${healAmt} HP)`);
-    spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 30, `+${fmt(this.expReward)} EXP`, 0x66ff66, { fontSize: '14px' });
+    ui.message(`Killed ${this.cfg.name} (+${earnedExp} EXP, +${healAmt} HP)`);
+    spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 30, `+${fmt(earnedExp)} EXP`, 0x66ff66, { fontSize: '14px' });
 
     // Drop a small zeny pile — scaled to monster reward.
     const zenyDrop = Math.max(1, Math.round(this.expReward * Phaser.Math.FloatBetween(0.6, 1.6)));
@@ -2335,7 +2345,7 @@ function attemptPlayerAttack(scene, target) {
     if (player._specialRing) player._specialRing.setVisible(false);
   }
   spawnClassAttackFx(scene, player, target, special);
-  target.takeDamage(dmg, { crit });
+  target.takeDamage(dmg, { crit, variance });
   if (crit) sfxCrit(); else sfxHit();
 }
 
@@ -2480,11 +2490,42 @@ class UIManager {
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10012)
       .setStrokeStyle(2, 0xffffff, 0.9).setFillStyle();
     this.miniGfx = scene.add.graphics().setScrollFactor(0).setDepth(10011);
+    const miniHpY = this.miniY + this.miniH + 6;
+    this.miniHpBg = scene.add.rectangle(this.miniX, miniHpY, this.miniW, 16, 0x1b1b1b, 0.85)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
+      .setStrokeStyle(1, 0xffffff, 0.7);
+    this.miniHpFill = scene.add.rectangle(this.miniX + 2, miniHpY + 2, this.miniW - 4, 12, 0xcc2222, 0.95)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10011);
+    this.miniHpText = scene.add.text(this.miniX + this.miniW / 2, miniHpY + 8, '', {
+      fontSize: '11px', color: '#ffffff', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10012);
+
+    this.tipBg = scene.add.rectangle(0, 0, 10, 22, 0x000000, 0.86)
+      .setOrigin(1, 0.5).setScrollFactor(0).setDepth(12000)
+      .setStrokeStyle(1, 0xffe066, 0.9).setVisible(false);
+    this.tipText = scene.add.text(0, 0, '', {
+      fontSize: '12px', color: '#fff4bb', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(12001).setVisible(false);
+    const addTip = (target, label, x, y) => {
+      target.on('pointerover', () => {
+        this.tipText.setText(label);
+        this.tipText.setPosition(x - 8, y);
+        this.tipBg.setPosition(x - 4, y);
+        this.tipBg.width = this.tipText.width + 14;
+        this.tipBg.height = 24;
+        this.tipBg.setVisible(true);
+        this.tipText.setVisible(true);
+      });
+      target.on('pointerout', () => {
+        this.tipBg.setVisible(false);
+        this.tipText.setVisible(false);
+      });
+    };
 
     // Music mute toggle — small button under the minimap.
     const btnW = 90, btnH = 26;
     const btnX = this.miniX + this.miniW - btnW;
-    const btnY = this.miniY + this.miniH + 6;
+    const btnY = miniHpY + 22;
     this.muteBg = scene.add.rectangle(btnX, btnY, btnW, btnH, 0x000000, 0.7)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
       .setStrokeStyle(2, 0xffffff, 0.8)
@@ -2514,6 +2555,7 @@ class UIManager {
       this.muteText.setText(bgm.mute ? '♪ Music: OFF' : '♪ Music: ON');
       try { localStorage.setItem(MUTE_KEY, bgm.mute ? '1' : '0'); } catch (e) { /* ignore */ }
     });
+    addTip(this.muteBg, 'Toggle background music', btnX, btnY + btnH / 2);
 
     // Autopilot toggle — auto-targets nearest safe monster, avoids bosses
     // and overleveled enemies. Sits right below the mute button.
@@ -2536,6 +2578,7 @@ class UIManager {
       try { localStorage.setItem(AP_KEY, autopilotOn ? '1' : '0'); } catch (e) { /* ignore */ }
       ui.message(autopilotOn ? 'Autopilot ON — avoiding bosses + strong monsters.' : 'Autopilot OFF.');
     });
+    addTip(this.apBg, 'Auto-target safe quest monsters', btnX, apY + btnH / 2);
 
     // Return-to-spawn (Kafra warp). Instant teleport, no cost yet.
     const rsY = apY + btnH + 6;
@@ -2562,6 +2605,7 @@ class UIManager {
       ui.message('Warped home.');
       sfxPickup();
     });
+    addTip(this.rsBg, 'Warp back to spawn', btnX, rsY + btnH / 2);
 
     // Change Class button — always visible. Below Lv 10 it just tells the
     // player to keep leveling. At Lv 10+ it opens the class chooser
@@ -2582,6 +2626,7 @@ class UIManager {
       }
       showClassSelect(scene);
     });
+    addTip(this.clBg, 'Choose or change class', btnX, clY + btnH / 2);
 
     // Cheat button — manually bump level by 1. Triggers normal levelUp() so
     // tier upgrades + class select prompt fire as if earned organically.
@@ -2597,6 +2642,7 @@ class UIManager {
       if (!player || player.dead) return;
       player.levelUp();
     });
+    addTip(this.lvBg, 'Debug: gain 1 level', btnX, lvY + btnH / 2);
 
     // +10 Levels cheat — bulk up for testing tier thresholds.
     const lv10Y = lvY + btnH + 6;
@@ -2611,6 +2657,7 @@ class UIManager {
       if (!player || player.dead) return;
       for (let i = 0; i < 10; i++) player.levelUp();
     });
+    addTip(this.lv10Bg, 'Debug: gain 10 levels', btnX, lv10Y + btnH / 2);
 
     // -1 Level cheat — reverses one level's per-level stat grant (20 HP /
     // 3 ATK / 1 DEF). Tier bonuses are NOT refunded (they're permanent).
@@ -2634,6 +2681,7 @@ class UIManager {
       ui.message(`Level down. Now Lv.${player.level}.`);
       saveGame();
     });
+    addTip(this.lvMBg, 'Debug: lower level by 1', btnX, lvMY + btnH / 2);
 
     // Shop button — spend zeny on permanent upgrades + full-heal potion.
     const shY = lvMY + btnH + 6;
@@ -2648,6 +2696,7 @@ class UIManager {
       if (!player || player.dead) return;
       showShop(scene);
     });
+    addTip(this.shBg, 'Spend zeny on upgrades', btnX, shY + btnH / 2);
 
     // Quest tracker — top-left badge.
     this.questBg = scene.add.rectangle(10, 10, 300, 32, 0x000000, 0.65)
@@ -2694,6 +2743,8 @@ class UIManager {
     const hpPct = Math.max(0, player.hp / player.maxHP);
     this.hpFill.width = 200 * hpPct;
     this.hpText.setText(`HP ${player.hp}/${player.maxHP}`);
+    this.miniHpFill.width = (this.miniW - 4) * hpPct;
+    this.miniHpText.setText(`HP ${player.hp}/${player.maxHP}`);
 
     const expPct = Math.max(0, Math.min(1, player.exp / player.expNeeded()));
     this.expFill.width = 300 * expPct;
