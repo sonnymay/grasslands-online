@@ -255,6 +255,7 @@ function onMonsterKilledForQuest(typeId) {
     const name = activeQuest.monsterName;
     player.zeny += reward;
     ui.message(`✓ Quest complete! Slayed ${activeQuest.target} ${name} (+${fmt(reward)} zeny)`);
+    spawnFloatText(player.scene, player.sprite.x, player.sprite.y - 42, `+${fmt(reward)}z`, 0xffd24a, { fontSize: '18px' });
     sfxLevelUp();
     activeQuest = null;
     rollNewQuest();
@@ -1028,6 +1029,7 @@ class PlayerController {
     this.stepIndex += 1;
     this.dir = pickDirection(this.stepToX - this.stepFromX, this.stepToY - this.stepFromY);
     sfxFootstep();
+    spawnFootstepDust(this.scene, this.stepFromX, this.stepFromY, this.cellCol, this.cellRow);
   }
 
   // Pick which walk frame to show for the current step progress t∈[0,1].
@@ -1805,6 +1807,7 @@ class MonsterController {
     this.hpBar.setVisible(false);
     this.hpBarBg.setVisible(false);
     this.nameTag.setVisible(false);
+    spawnDeathBurst(this.scene, this.sprite.x, this.sprite.y + 8, this.cfg.tint || this.cfg.nameColor || 0xffffff);
     // Rare variant: grant N levels worth of EXP in one shot + huge fanfare.
     if (this.cfg.levelsAward) {
       const want = this.cfg.levelsAward;
@@ -1843,11 +1846,11 @@ class MonsterController {
     const healAmt = Math.max(1, Math.round(player.maxHP * healPct));
     if (!player.dead && player.hp < player.maxHP) {
       player.hp = Math.min(player.maxHP, player.hp + healAmt);
-      spawnFloatText(this.scene, player.sprite.x, player.sprite.y - 20, `+${healAmt}`, 0x66ff88);
+      spawnFloatText(this.scene, player.sprite.x, player.sprite.y - 20, `+${fmt(healAmt)} HP`, 0x66ff88);
       sfxHeal();
     }
     ui.message(`Killed ${this.cfg.name} (+${this.expReward} EXP, +${healAmt} HP)`);
-    spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 30, `+${this.expReward} EXP`, 0x66ff66, { fontSize: '14px' });
+    spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 30, `+${fmt(this.expReward)} EXP`, 0x66ff66, { fontSize: '14px' });
 
     // Drop a small zeny pile — scaled to monster reward.
     const zenyDrop = Math.max(1, Math.round(this.expReward * Phaser.Math.FloatBetween(0.6, 1.6)));
@@ -2268,6 +2271,42 @@ function spawnPuff(scene, x, y) {
     duration: 450,
     onComplete: () => c.destroy(),
   });
+}
+
+function spawnFootstepDust(scene, x, y, cellCol, cellRow) {
+  const zone = getZone(Math.floor((cellRow * CELL_SIZE) / TILE_SIZE), Math.floor((cellCol * CELL_SIZE) / TILE_SIZE));
+  const color = (zone === 'desert' || zone === 'ruins') ? 0x886644 : 0xa8d088;
+  const dust = scene.add.circle(x, y + 12, Phaser.Math.Between(3, 5), color, 0.38);
+  dust.setDepth(y - 2);
+  scene.tweens.add({
+    targets: dust,
+    x: x + Phaser.Math.Between(-6, 6),
+    y: y + 16,
+    scale: 1.8,
+    alpha: 0,
+    duration: 320,
+    ease: 'Quad.out',
+    onComplete: () => dust.destroy(),
+  });
+}
+
+function spawnDeathBurst(scene, x, y, color) {
+  for (let i = 0; i < 10; i++) {
+    const angle = (Math.PI * 2 * i) / 10 + Phaser.Math.FloatBetween(-0.18, 0.18);
+    const dist = Phaser.Math.Between(18, 42);
+    const dot = scene.add.circle(x, y, Phaser.Math.Between(3, 6), color, 0.75);
+    dot.setDepth(y + 20);
+    scene.tweens.add({
+      targets: dot,
+      x: x + Math.cos(angle) * dist,
+      y: y + Math.sin(angle) * dist,
+      scale: 0.2,
+      alpha: 0,
+      duration: 420,
+      ease: 'Quad.out',
+      onComplete: () => dot.destroy(),
+    });
+  }
 }
 
 function attemptPlayerAttack(scene, target) {

@@ -1,8 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 3:15am CDT (post session 7,
-> RO-feel pass).
+> coding sessions. Last refresh: 2026-05-17 1:05pm CDT (post session 9,
+> quick polish pass: footstep dust, death burst, comma float text).
 
 ---
 
@@ -186,7 +186,178 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 7 (latest, in order)
+## 3. What we did in session 9 (latest, in order)
+
+Quick follow-up to the session 8 RO-polish batch. Cache now at **`?v=70`**.
+
+1. **Footstep dust particles** added in `PlayerController._beginNextStep()`.
+   Each cell-step now emits a small fading ground puff at the step origin.
+   Dust color is zone-aware: desert / ruins use brown (`0x886644`), all
+   other zones use soft green (`0xa8d088`).
+2. **Monster-death particles** added in `MonsterController.die()`.
+   Death now emits a 10-dot radial burst tinted from `cfg.tint` or
+   `cfg.nameColor`, so rare monsters and themed enemies pop more clearly.
+3. **Comma float text audit pass**:
+   - Quest completion now floats `+N z` above the player with `fmt(...)`.
+   - Kill-heal float now says `+N HP` with `fmt(...)`.
+   - Monster EXP float now uses `fmt(...)` for large values.
+4. **Cache bust bumped** in `project-grasslands/index.html` from `?v=69`
+   to `?v=70`.
+5. **Verification**:
+   - `node -c project-grasslands/game.js` exited 0.
+   - Local preview server required escalated permission because sandbox bind
+     hit `PermissionError: [Errno 1] Operation not permitted`.
+   - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`,
+     and served `index.html` references `game.js?v=70`.
+   - In-app Browser plugin was attempted for visual verification but rejected
+     the bundled `browser-client` path as untrusted, so no screenshot was
+     captured in this session.
+
+## 4. Next steps (pick any)
+
+The user invited Codex to continue this batch. Quick wins #1, #2, and #5
+from the previous list are now done.
+
+**Quick polish (5–15 min each):**
+1. **Hover tooltips** on the UI buttons (mute / auto / return /
+   shop / class / cheats). Phaser tooltips = a Text the button
+   shows on `pointerover` and hides on `pointerout`.
+2. **EXP scaling vs player level** — at higher levels low-tier
+   monsters give pennies. Try `effectiveExp = expReward *
+   max(0.3, 1 - 0.05 * max(0, playerLevel - monsterTypicalLevel))`
+   inside the `gainExp` call in `MonsterController.die()`.
+3. **Per-class attack visual for `attack`/`dead` poses** — once
+   per-class attack/dead sprites exist, `pickPlayerTextureKey`
+   already tries the class key first.
+
+**Gameplay (15–30 min):**
+4. **Multiple simultaneous quests** — convert `activeQuest`
+   global to `activeQuests: Quest[]`. UI lists each.
+5. **Hot-streak kill counter** — every Nth kill in a row grants
+   bonus zeny (`HOT STREAK x5! +120z`).
+6. **Sell loot back at the shop** — herb stacks → zeny.
+7. **Mini-boss per biome** — currently only forest has Bigfoot.
+   Add a unique boss to desert/ruins/riverside (sand-mooham,
+   rock golem, water blob). Same wiring as Bigfoot.
+
+**Bigger features (1–2 hours):**
+8. **NPC merchant** sprite at spawn cell. Clicking it (within
+   range) opens the shop. Visual town-feel.
+9. **Equipment drops** — Boss MooHam drops a weapon (+5 ATK),
+   Bigfoot drops armor (+10 DEF), etc. Slot system in
+   `player.equipment = { weapon, armor }`.
+10. **Boss respawn timer broadcast** at top of screen
+    ("Bigfoot in 2:30").
+11. **Multi-stage first-time tutorial** with arrows pointing at
+    UI elements.
+
+**Asset / art TODOs (when Codex generates more art):**
+12. Per-class **walk2/3/4 south frames** + non-south directions
+    (north / east / southeast / northeast) for each of swordsman /
+    mage / archer.
+13. Per-class **attack** and **dead** sprites.
+14. Real **forest tileset** + **ruins tileset** + **riverside
+    tileset** to replace the tinted-grass placeholders. Wire same
+    as `sand_tileset` (preload, branch in `buildMap`, skip the tint
+    pass for that zone).
+15. Hand-slice `desert_props.png` (skull / bones / signpost). Sheet
+    is 512 × 512 with 7 irregular props. Needs manual frame coords
+    per prop, then a placement pass in the desert decoration block.
+
+## 5. (legacy) What we did in session 8 (in order)
+
+Big push focused on user feedback + RO-feel polish. Cache now at
+**`?v=69`**.
+
+1. **Tier-1 class sprites wired** (`swordsman/mage/archer
+   _{idle,walk}_south.png`). New helper `pickPlayerTextureKey`
+   resolves the best texture per (class, dir, frame) with a strict
+   class-first chain — once a class is chosen, missing directions
+   fall back to the **class south sprite**, never to rookie art.
+   Final rookie fallback only if class has zero art (shouldn't
+   happen). Hardcoded `rookie_attack` / `rookie_dead` `setTexture`
+   calls replaced with `applyRookieTexture(..., 'attack'|'dead')`.
+   `selectClass` immediately re-applies texture so the swap is
+   instant. Class card art (`*_card.png`) preloaded + rendered on
+   the chooser.
+2. **Class chooser overhauled**:
+   - Card hit areas fixed (Phaser bug: default hit area ignores
+     origin → centered objects were unclickable). Now uses explicit
+     `Phaser.Geom.Rectangle.Contains` with `(-w/2, -h/2, w, h)`.
+   - Container.setScrollFactor(0) does NOT propagate to children for
+     input — each card + close X now calls `setScrollFactor(0)`
+     individually so hit-test maps to screen coords correctly.
+   - Closable via ✕ button or by Change-Class re-pick. classTier is
+     recomputed from level on swap; per-level stats never re-grant.
+   - Cards now show a yellow one-line role hint
+     (`Melee tank — big slash, +HP` etc).
+3. **Always-visible ✦ Change Class button** in the right UI stack.
+   Clicking it below Lv 10 prints a "Reach Lv.10" chat hint;
+   otherwise opens the chooser. Auto-pop at Lv 10 stays as a nudge.
+4. **Cheat row** under Change Class: ⇧ +1 Level, ⇧ +10 Levels,
+   ⇩ -1 Level. +N uses the real `levelUp()` so tier upgrades + class
+   prompt fire normally. -1 reverses the per-level stat grant
+   (20 HP / 3 ATK / 1 DEF) but leaves any tier bonuses applied.
+5. **Rare monsters added**: `rare_mooham` (Golden, grasslands/ruins)
+   and `rare_moowaan` (Emerald, forest/riverside). 1 % chance every
+   regular `mooham` / `moowaan` spawn re-rolls into the rare via
+   `RARE_VARIANTS`. Rare entries have `count: 0` so they never
+   spawn directly. Persistent pulsing aura ring on spawn + screen
+   flash + center banner + chime. On kill: grants enough exp for
+   `cfg.levelsAward` (5) levels + full heal + giant `★ +5 LEVELS!
+   ★` banner.
+6. **Zeny shop** (⚒ Shop button, opens 4-row overlay):
+   `+20 Max HP / +5 ATK / +1 DEF` each scale price 1.5× per buy;
+   `Full Heal` flat 50z. `player.shopBought` saved to localStorage.
+   Same overlay pattern as class chooser (explicit hit areas +
+   scrollFactor 0).
+7. **Quest stub**: one active quest, "Slay 10 [random non-boss
+   monster]" rewarding `expReward × 10 × 1.5` zeny. Counter ticks
+   in `MonsterController.die()`. Top-left badge in UI shows
+   `Quest: N/10 [Name]`. On complete: reward + chime + auto-roll a
+   new quest. Persists in `activeQuest` save field.
+8. **Autopilot** ON-toggle now resets `autopilotLastScan = 0` so
+   the first scan fires immediately. Scoring overhauled: each
+   candidate gets `score = distance - 120 × safeNeighbors400px -
+   (isQuestTarget ? 800 : 0)`. Effect: autopilot heads to dense
+   clusters and prefers the current quest mob.
+9. **Death animation**: sprite fades to 25 % alpha, center
+   `YOU DIED` red text + `Respawning in N…` countdown, then full
+   alpha restored on respawn.
+10. **Zone banner difficulty tag** below the name: Grasslands /
+    Riverside = green Easy, Desert / Ruins = yellow Medium, Forest
+    = red DANGER. `showZoneBanner(scene, label, zoneKey)`.
+11. **Boss kill announce** — center `[Name] slain!` banner + chime
+    when any aggressive / `expReward >= 90` monster dies.
+12. **Loot magnet → float popups** — `+N HP` (green) or `+Nz`
+    (gold) floats above player on pickup, replacing the chat-only
+    log. Magnet itself shipped in session 7 (320 px radius,
+    700 px/s pull) along with the autopilot toggle.
+13. **Currency formatter** `fmt(n)` — every zeny display now uses
+    `1,234` thousands separators.
+14. **Bug fixes from feedback round**:
+    - Tutorial chat lines only print on first session (no save),
+      stopping 3× spam on reload.
+    - Monster click hitbox 50 → 80 px; hover hitbox 40 → 70 px.
+    - Phaser `scale: { mode: FIT, autoCenter: CENTER_BOTH }` so the
+      canvas centers in the viewport.
+    - Scene `pointerdown` early-returns when `classSelectOpen` or
+      `shopOpen`, and `scene.input.hitTestPointer(pointer)` is used
+      to skip world-clicks that landed on a UI button.
+    - Pond `blockRadius` 3 → 6/7 so A* routes around the full
+      visual footprint.
+    - Bigfoot `minSpawnDistance: 2400` keeps the forest boss far
+      from spawn.
+    - Monster `_setTex(key)` helper recomputes scale per texture so
+      Bigfoot no longer shrinks when swapping chase / attack sprites
+      (idle is 1254 px, others 512 px after sips downscale).
+    - Mute preference + autopilot toggle persist in localStorage
+      (`grasslands_mute_v1`, `grasslands_autopilot_v1`).
+    - Tier 2 / 3 / 4 class upgrades grant +50/+15, +100/+30,
+      +200/+60 HP/ATK on hitting Lv 30 / 60 / 100. Tier 4 floats
+      `LEGENDARY CLASS!` above the player.
+
+## 6. (legacy) What we did in session 7 (in order)
 
 1. **Class selection system added.** New `CLASS_DEFS` table for
    `swordsman` / `mage` / `archer`, each with a 4-tier name ladder, tint
@@ -234,28 +405,7 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
     back to spawn, clears path/target.
 14. Cache bumped to **`?v=52`**.
 
-## 4. Next steps (pick any)
-
-1. **Real per-class player sprites.** Generate `swordsman_idle_<dir>`,
-   `swordsman_walk{,2,3,4}_<dir>` (same 8-dir × 5-frame layout as
-   rookie), then mage and archer. Update `applyRookieTexture` to
-   prefix from `CLASS_DEFS[player.classId].spritePrefix` (fall back to
-   `rookie_` if the texture doesn't exist). Currently still tinted
-   rookie.
-2. **Slice `desert_props.png` by hand** — non-uniform 512×512 sheet
-   with skull/bones/skeleton/rocks/signpost. Add manual `{x,y,w,h}`
-   per frame in `preload()`, then drop into the desert scatter pass.
-3. **Forest tileset.** Same pattern as desert (real tiles + skip
-   tint). Ruins and riverside next.
-4. **Boss kill announcement** — big center-screen text + chime when a
-   boss-tier monster dies. Reuses `expReward >= 90` test.
-5. **Death respawn countdown** — currently silent 3s; add
-   "Respawning in 3..." text and dim overlay.
-6. **Item drops beyond zeny** — potions and accessories with simple
-   inventory + auto-equip when ATK higher. Bigger feature.
-7. **Skill / item shop NPC** at spawn — buy temporary buffs with zeny.
-
-## 5. (legacy) What we did in session 6 (in order)
+## 7. (legacy) What we did in session 6 (in order)
 
 1. **Wired real desert art** — `sand_tileset.png` loaded + sliced
    identically to grass tileset; `buildMap` picks `sand_tileset` for
@@ -277,7 +427,7 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
    512×512 sheet) is **still untracked-wired** — layout is irregular,
    needs hand-tuned per-prop frame coords. Noted in §4.
 
-## 6. (legacy) What we did in session 5 (in order)
+## 8. (legacy) What we did in session 5 (in order)
 
 1. **World doubled** to 6400×6400 (200×200 cells, 50×50 tiles). A* iter
    cap 8 000 → 32 000.
@@ -317,7 +467,7 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 7. Known issues / quirks
+## 9. Known issues / quirks
 
 - **Asset weight** — now **~34 MB** of PNGs (down from 96 MB after
   sips downscale in session 5). Acceptable on broadband; mobile / slow
@@ -344,13 +494,13 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=43`**. Next change should use `?v=44`.
+  change. Current: **`?v=70`**. Next change should use `?v=71`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
 ---
 
-## 8. File structure
+## 10. File structure
 
 ```
 Grasslands Online/                                  ← git repo root
@@ -409,7 +559,7 @@ Grasslands Online/                                  ← git repo root
 
 ---
 
-## 9. Assets
+## 11. Assets
 
 ### Sprites — `project-grasslands/assets/sprites/`
 
@@ -461,13 +611,13 @@ Always include `transparent background PNG with alpha channel`. The
 
 ---
 
-## 10. GitHub + Vercel workflow (enforced)
+## 12. GitHub + Vercel workflow (enforced)
 
 - Commit **after every meaningful change**.
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=43`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=70`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.
@@ -475,7 +625,7 @@ Always include `transparent background PNG with alpha channel`. The
 
 ---
 
-## 11. How to continue (do this first in a new session)
+## 13. How to continue (do this first in a new session)
 
 1. **Read this file in full.** No skimming.
 2. From repo root run `git status` and `git log --oneline -10` to confirm
@@ -495,7 +645,7 @@ Always include `transparent background PNG with alpha channel`. The
 
 ---
 
-## 12. Constraints (do NOT re-add)
+## 14. Constraints (do NOT re-add)
 
 The user has explicitly cut these features. Re-adding them is regressive:
 
