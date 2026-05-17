@@ -2213,8 +2213,9 @@ class UIManager {
       sfxPickup();
     });
 
-    // Change Class button — appears at Lv 10 and stays. Click to open the
-    // chooser anytime; user can switch class freely.
+    // Change Class button — always visible. Below Lv 10 it just tells the
+    // player to keep leveling. At Lv 10+ it opens the class chooser
+    // (re-pickable at any time).
     const clY = rsY + btnH + 6;
     this.clBg = scene.add.rectangle(btnX, clY, btnW, btnH, 0x664422, 0.9)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
@@ -2223,11 +2224,12 @@ class UIManager {
     this.clText = scene.add.text(btnX + btnW / 2, clY + btnH / 2, '✦ Change Class', {
       fontSize: '13px', color: '#ffe066', stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
-    // Hidden until player hits Lv 10.
-    this.clBg.setVisible(false);
-    this.clText.setVisible(false);
     this.clBg.on('pointerdown', () => {
       if (!player) return;
+      if (player.level < 10) {
+        ui.message(`Reach Lv.10 to choose a class. (Currently Lv.${player.level})`);
+        return;
+      }
       showClassSelect(scene);
     });
 
@@ -2274,17 +2276,10 @@ class UIManager {
     this.lvlText.setText(`Lv.${player.level}`);
     this.zenyText.setText(`Zeny: ${player.zeny}`);
 
-    // Reveal class button once eligible. Hidden until then to keep UI clean.
-    const classBtnEligible = player.level >= 10;
-    if (this.clBg.visible !== classBtnEligible) {
-      this.clBg.setVisible(classBtnEligible);
-      this.clText.setVisible(classBtnEligible);
-      // Update label so it reads correctly once a class is chosen.
-      this.clText.setText(player.classId ? '✦ Change Class' : '✦ Choose Class');
-    } else if (classBtnEligible) {
-      const wanted = player.classId ? '✦ Change Class' : '✦ Choose Class';
-      if (this.clText.text !== wanted) this.clText.setText(wanted);
-    }
+    // Label flips between Choose / Change based on whether a class is set.
+    // Always visible; the click handler gates by level.
+    const wantedLbl = player.classId ? '✦ Change Class' : '✦ Choose Class';
+    if (this.clText.text !== wantedLbl) this.clText.setText(wantedLbl);
 
     // Boss bar — show whenever any aggressive / boss-tier monster is alive
     // anywhere in the world. Picks the closest one when several are around.
