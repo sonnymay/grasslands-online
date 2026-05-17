@@ -61,12 +61,11 @@ const MONSTER_TYPES = {
     nameColor: '#d6ffd0', count: MOOWAAN_COUNT, scaleMult: 0.9,
     zones: ['forest', 'riverside'],
   },
-  dune_blob: {
-    name: 'Dune Blob',
-    idleKey: 'blobling_idle', hitKey: 'blobling_hit', deadKey: 'blobling_dead',
+  cactling: {
+    name: 'Cactling',
+    idleKey: 'cactling_idle', hitKey: 'cactling_hit', deadKey: 'cactling_dead',
     maxHP: 70, atk: 7, expReward: 16, speed: 85,
-    nameColor: '#f5d98a', count: DUNE_BLOB_COUNT, scaleMult: 1.0,
-    tint: 0xe8c878,
+    nameColor: '#bce86a', count: DUNE_BLOB_COUNT, scaleMult: 1.0,
     zones: ['desert'],
   },
   boss_mooham: {
@@ -221,6 +220,13 @@ function preload() {
   this.load.image('bigfoot_attack', 'assets/sprites/bigfoot_attack.png');
   this.load.image('bigfoot_hit', 'assets/sprites/bigfoot_hit.png');
   this.load.image('bigfoot_dead', 'assets/sprites/bigfoot_dead.png');
+  // Desert biome — Cactling monster + sand tileset + cactus / dune deco.
+  this.load.image('cactling_idle', 'assets/sprites/cactling_idle.png');
+  this.load.image('cactling_hit', 'assets/sprites/cactling_hit.png');
+  this.load.image('cactling_dead', 'assets/sprites/cactling_dead.png');
+  this.load.image('sand_tileset', 'assets/tiles/sand_tileset.png');
+  this.load.image('cactus_set', 'assets/decorations/cactus_set.png');
+  this.load.image('deco_sand_dune', 'assets/decorations/deco_sand_dune.png');
   // Decorations
   for (let i = 1; i <= 4; i++) this.load.image(`deco_flower_cluster_0${i}`, `assets/decorations/deco_flower_cluster_0${i}.png`);
   for (let i = 1; i <= 3; i++) this.load.image(`deco_rock_0${i}`, `assets/decorations/deco_rock_0${i}.png`);
@@ -282,6 +288,8 @@ function create() {
     'mooham_idle','mooham_hit','mooham_dead',
     'moowaan_idle','moowaan_hit','moowaan_dead',
     'bigfoot_idle','bigfoot_aggro','bigfoot_chase','bigfoot_attack','bigfoot_hit','bigfoot_dead',
+    'cactling_idle','cactling_hit','cactling_dead',
+    'cactus_set','deco_sand_dune',
     'deco_flower_cluster_01','deco_flower_cluster_02','deco_flower_cluster_03','deco_flower_cluster_04',
     'deco_rock_01','deco_rock_02','deco_rock_03',
     'deco_tallgrass_01','deco_tallgrass_02','deco_tallgrass_03',
@@ -292,22 +300,30 @@ function create() {
   ];
   for (const k of spriteKeys) keyOutWhite(scene, k);
 
-  // Slice tileset into 16 frames (4x4) using actual image dimensions
-  const tilesetImg = scene.textures.get('grass_tileset').getSourceImage();
-  tileSliceW = Math.floor(tilesetImg.width / 4);
-  tileSliceH = Math.floor(tilesetImg.height / 4);
-  // Inset crop trims the thin white separator the source tileset bakes between tiles.
-  const tileInset = Math.floor(tileSliceW * 0.04);
-  for (let r = 0; r < 4; r++) {
-    for (let c = 0; c < 4; c++) {
-      const idx = r * 4 + c;
-      scene.textures.get('grass_tileset').add(
-        `tile_${idx}`, 0,
-        c * tileSliceW + tileInset, r * tileSliceH + tileInset,
-        tileSliceW - tileInset * 2, tileSliceH - tileInset * 2
-      );
+  // Slice every 4x4 tileset into 16 frames named `tile_0`..`tile_15` on that
+  // texture key. buildMap picks which tileset key to draw from per zone.
+  const sliceTileset = (texKey) => {
+    if (!scene.textures.exists(texKey)) return;
+    const img = scene.textures.get(texKey).getSourceImage();
+    const sw = Math.floor(img.width / 4);
+    const sh = Math.floor(img.height / 4);
+    const inset = Math.floor(sw * 0.04);
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        const idx = r * 4 + c;
+        scene.textures.get(texKey).add(
+          `tile_${idx}`, 0,
+          c * sw + inset, r * sh + inset,
+          sw - inset * 2, sh - inset * 2
+        );
+      }
     }
-  }
+    // Cache slice dims off the first tileset for any legacy reads.
+    tileSliceW = sw;
+    tileSliceH = sh;
+  };
+  sliceTileset('grass_tileset');
+  sliceTileset('sand_tileset');
 
   // World bounds + camera
   scene.physics.world.setBounds(0, 0, WORLD_W, WORLD_H);
@@ -539,10 +555,15 @@ function buildMap(scene) {
         idx = (Math.random() < 0.5) ? TILE.GRASS : TILE.THICK_GRASS;
       }
 
+      // Pick tileset key by zone. Desert uses real sand tiles; other biomes
+      // still tint grass until per-biome tilesets ship.
+      const tilesetKey = (zone === 'desert' && scene.textures.exists('sand_tileset'))
+        ? 'sand_tileset' : 'grass_tileset';
+
       const img = scene.add.image(
         c * TILE_SIZE + TILE_SIZE / 2,
         r * TILE_SIZE + TILE_SIZE / 2,
-        'grass_tileset', `tile_${idx}`
+        tilesetKey, `tile_${idx}`
       );
       img.setDisplaySize(TILE_SIZE + 2, TILE_SIZE + 2);
       // Random flip + 180° rotation break grid repetition for free.
@@ -550,10 +571,12 @@ function buildMap(scene) {
         if (Math.random() < 0.5) img.setFlipX(true);
         if (Math.random() < 0.5) img.setFlipY(true);
       }
-      // Zone tint: non-grasslands biomes recolor the shared tileset until real
-      // per-biome tilesets ship. Path tiles also tint so dirt blends with biome.
-      const tint = ZONE_TINTS[zone];
-      if (tint && tint !== 0xffffff) img.setTint(tint);
+      // Zone tint only when we're still drawing the grass tileset for a
+      // non-grasslands biome. Real desert tiles are already the right palette.
+      if (tilesetKey === 'grass_tileset') {
+        const tint = ZONE_TINTS[zone];
+        if (tint && tint !== 0xffffff) img.setTint(tint);
+      }
       img.setDepth(-1000);
     }
   }
@@ -642,10 +665,12 @@ function buildDecorations(scene) {
   for (let i = 0; i < 220; i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  48, { maxAngle: 10, zoneFilter: 'forest' });
   for (let i = 0; i < 200; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     54, { alpha: 0.9, maxAngle: 18, zoneFilter: 'forest', tint: forestTint });
 
-  // Desert (south) — sparse, lots of rocks, no flowers/trees/bushes.
-  const desertTint = 0xd9c08a;
-  for (let i = 0; i < 260; i++) place(Phaser.Utils.Array.GetRandom(rockKeys),      54, { maxAngle: 12, alignBottom: true, blockRadius: 1, zoneFilter: 'desert', tint: desertTint });
-  for (let i = 0; i <  90; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     40, { alpha: 0.6, maxAngle: 20, zoneFilter: 'desert', tint: 0xd6c178 });
+  // Desert (south) — real sand tiles below, scatter cacti + dunes + sun-bleached rocks.
+  const desertRockTint = 0xd9c08a;
+  for (let i = 0; i < 200; i++) place(Phaser.Utils.Array.GetRandom(rockKeys),      54, { maxAngle: 12, alignBottom: true, blockRadius: 1, zoneFilter: 'desert', tint: desertRockTint });
+  for (let i = 0; i < 140; i++) place('cactus_set',                                90, { maxAngle:  6, alignBottom: true, blockRadius: 1, zoneFilter: 'desert' });
+  for (let i = 0; i <  60; i++) place('deco_sand_dune',                           120, { maxAngle:  0, alpha: 0.85, zoneFilter: 'desert', allowFlip: false });
+  for (let i = 0; i <  40; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     32, { alpha: 0.4, maxAngle: 20, zoneFilter: 'desert', tint: 0xd6c178 });
 
   // Ruins (west) — heavy rocks, occasional dead bush. Greyish.
   const ruinTint = 0xc8c0b0;
@@ -786,7 +811,7 @@ class PlayerController {
   // two frames that face the correct way for each direction.
   _pickWalkFrame(time, dir) {
     const cycleByDir = {
-      south: ['walk2', 'idle', 'walk3', 'idle'],
+      south: ['walk2', 'idle', 'walk2', 'idle'],
       north: ['walk2', 'idle', 'walk3', 'idle'],
       east: ['walk', 'idle', 'walk2', 'idle'],
       west: ['walk', 'idle', 'walk2', 'idle'],
@@ -1682,7 +1707,7 @@ class UIManager {
       let outline = null;
       if (m.typeId === 'mooham') color = 0xffaa55;
       else if (m.typeId === 'moowaan') color = 0x55ff88;
-      else if (m.typeId === 'dune_blob') color = 0xf5d98a;
+      else if (m.typeId === 'cactling') color = 0xbce86a;
       else if (m.typeId === 'boss_mooham') { color = 0xffff44; r = 4; }
       else if (m.typeId === 'bigfoot') { color = 0xff2222; r = 5; outline = 0x000000; }
       g.fillStyle(color, 1);
