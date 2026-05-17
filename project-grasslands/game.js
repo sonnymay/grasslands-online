@@ -2735,6 +2735,53 @@ function showShop(scene) {
       saveGame();
     });
   });
+
+  // Auto-buy footer: pick the cheapest affordable non-potion upgrade and buy
+  // it. Repeat-click to chain. Saves clicking through rows during fast farms.
+  const ay = startY + SHOP_ITEMS.length * (rowH + 12) + 8;
+  const aw = 220, ah = 34;
+  const ax = (GAME_W - aw) / 2;
+  const autoCard = scene.add.rectangle(ax + aw/2, ay + ah/2, aw, ah, 0x224422, 0.95)
+    .setStrokeStyle(2, 0x99ff99, 0.9).setScrollFactor(0);
+  autoCard.setInteractive(
+    new Phaser.Geom.Rectangle(-aw/2, -ah/2, aw, ah),
+    Phaser.Geom.Rectangle.Contains
+  );
+  autoCard.input.cursor = 'pointer';
+  const autoText = scene.add.text(ax + aw/2, ay + ah/2, '⚡ Auto-buy cheapest', {
+    fontSize: '14px', fontStyle: 'bold', color: '#ddffdd',
+    stroke: '#000', strokeThickness: 2,
+  }).setOrigin(0.5).setScrollFactor(0);
+  cont.add([autoCard, autoText]);
+  autoCard.on('pointerdown', () => {
+    // Skip the potion row (item.flat true) — auto-buy is for permanent stats.
+    let best = null, bestCost = Infinity;
+    for (let i = 0; i < SHOP_ITEMS.length; i++) {
+      const it = SHOP_ITEMS[i];
+      if (it.flat) continue;
+      const cost = shopItemPrice(it, player.shopBought[it.id] || 0);
+      if (cost <= player.zeny && cost < bestCost) { best = { it, cost, i }; bestCost = cost; }
+    }
+    if (!best) {
+      ui.message(`Not enough zeny for any upgrade (have ${fmt(player.zeny)}z).`);
+      sfxMiss();
+      return;
+    }
+    player.zeny -= best.cost;
+    best.it.apply(player);
+    player.shopBought[best.it.id] = (player.shopBought[best.it.id] || 0) + 1;
+    sfxLevelUp();
+    ui.message(`Auto-bought ${best.it.label} for ${fmt(best.cost)} zeny.`);
+    // Refresh the matching row in-place.
+    const row = rows[best.i];
+    if (row) {
+      const nb = player.shopBought[best.it.id];
+      const np = shopItemPrice(best.it, nb);
+      row.priceText.setText(`${fmt(np)} zeny${best.it.flat ? '' : `   (bought ${nb})`}`);
+    }
+    zenyTxt.setText(`Zeny: ${fmt(player.zeny)}`);
+    saveGame();
+  });
 }
 
 function checkClassTierUpgrade(player) {
@@ -3301,6 +3348,16 @@ class UIManager {
     this.bossTickerBg.setVisible(false);
     this.bossTickerText.setVisible(false);
 
+    // Discovery progress badge — show "Biomes: N/5" so player has a clear
+    // completionist hook for visiting every landmark plaza.
+    this.discoveryBg = scene.add.rectangle(10, 168, 200, 22, 0x113322, 0.65)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
+      .setStrokeStyle(1, 0x66ff99, 0.7);
+    this.discoveryText = scene.add.text(20, 172, '', {
+      fontSize: '11px', fontStyle: 'bold', color: '#aaffcc',
+      stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
+
     // Hot-streak indicator — only visible when streak > 0.
     this.streakBg = scene.add.rectangle(10, 142, 200, 24, 0x331100, 0.7)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
@@ -3433,6 +3490,12 @@ class UIManager {
       this.streakBg.setVisible(false);
       this.streakText.setVisible(false);
     }
+
+    // Discovery badge — count of unique landmarks visited (total = 5).
+    const discN = Object.keys(player.visitedLandmarks || {}).length;
+    const discMax = (typeof landmarkTiles === 'function') ? landmarkTiles().length : 5;
+    const discLabel = `★ Biomes ${discN}/${discMax}`;
+    if (this.discoveryText.text !== discLabel) this.discoveryText.setText(discLabel);
 
     // Boss bar — show whenever any aggressive / boss-tier monster is alive
     // anywhere in the world. Picks the closest one when several are around.
