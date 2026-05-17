@@ -1,8 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 6:50pm CDT (post session 24,
-> Tier-2 Knight asset import).
+> coding sessions. Last refresh: 2026-05-17 6:55pm CDT (post session 25,
+> Tier-2 Knight browser verification).
 
 ---
 
@@ -186,7 +186,28 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 24 (latest, in order)
+## 3. What we did in session 25 (latest, in order)
+
+Verification-only follow-up for the Tier-2 Knight work. No cache bump or code
+change.
+
+1. **Browser runtime verified** — used Playwright against the local preview
+   to seed a Lv30 Swordsman save (`classId: swordsman`, `classTier: 2`) and
+   reload `index.html?debug=1`.
+2. **Runtime state confirmed**:
+   - `classId: "swordsman"`
+   - `classTier: 2`
+   - `level: 30`
+   - name tag/title: `Knight Lv.30`
+   - active texture key: `knight_idle_south`
+   - `knight_idle_south` and `knight_walk_northeast` both exist in Phaser's
+     texture manager.
+3. **Visual screenshot captured** — `/private/tmp/grasslands-knight-tier2.png`
+   shows the Knight sprite in-game at spawn with title `Knight Lv.30`.
+4. **Browser errors** — none captured from console/pageerror during the
+   verification run.
+
+### (legacy) session 24
 
 Follow-up to session 23. Cache now at **`?v=96`**.
 
