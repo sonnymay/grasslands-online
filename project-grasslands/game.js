@@ -1806,7 +1806,15 @@ function showClassSelect(scene) {
   const closeBtn = scene.add.text(GAME_W - 40, 30, '✕', {
     fontSize: '32px', fontStyle: 'bold', color: '#ffffff',
     stroke: '#000', strokeThickness: 4,
-  }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+  }).setOrigin(0.5);
+  // Explicit hit area: Phaser's default hit-area generator ignores origin,
+  // so origin-centered objects need a hand-supplied Geom.Rectangle.
+  closeBtn.setInteractive(
+    new Phaser.Geom.Rectangle(-22, -22, 44, 44),
+    Phaser.Geom.Rectangle.Contains
+  );
+  closeBtn.input.cursor = 'pointer';
+  closeBtn.setScrollFactor(0); // container scrollFactor doesn't propagate to children for input
   closeBtn.on('pointerover', () => closeBtn.setColor('#ffe066'));
   closeBtn.on('pointerout',  () => closeBtn.setColor('#ffffff'));
   closeBtn.on('pointerdown', () => { closeOverlay(); ui.message('Stayed as a Rookie. Open the Class button anytime.'); });
@@ -1838,8 +1846,14 @@ function showClassSelect(scene) {
 
     // Card body — placeholder colored panel until real card images ship.
     const card = scene.add.rectangle(cx + cardW / 2, cy + cardH / 2, cardW, cardH, cdef.tint, 0.85)
-      .setStrokeStyle(3, 0xffffff, 0.9)
-      .setInteractive({ useHandCursor: true });
+      .setStrokeStyle(3, 0xffffff, 0.9);
+    // Explicit hit area centered on the rectangle's origin (0.5, 0.5).
+    card.setInteractive(
+      new Phaser.Geom.Rectangle(-cardW / 2, -cardH / 2, cardW, cardH),
+      Phaser.Geom.Rectangle.Contains
+    );
+    card.input.cursor = 'pointer';
+    card.setScrollFactor(0);
 
     // Optional real card image if it was preloaded.
     let img = null;
