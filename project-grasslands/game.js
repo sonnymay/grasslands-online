@@ -262,6 +262,7 @@ let autopilotLastScan = 0;
 let classSelectOpen = false;
 let shopOpen = false;
 let travelOpen = false;
+let trophyOpen = false;
 let hardMode = false; // doubles monster damage, EXP, and zeny drops
 let activeQuests = []; // [{ monsterTypeId, monsterName, target, count, reward }]
 let questChain = 0;
@@ -456,6 +457,17 @@ function gearSummary() {
   const trophies = Object.values(player.bossTrophies || {}).reduce((sum, n) => sum + n, 0);
   const next = TROPHY_MILESTONES.find(m => trophies < m.total);
   return `Gear: ${w} / ${a}\nTrophies: ${trophies}${next ? `  Next: ${next.total}` : '  Max bonus'}`;
+}
+
+function bossTrophyRows() {
+  return Object.entries(MONSTER_TYPES)
+    .filter(([, cfg]) => isBossCfg(cfg))
+    .map(([id, cfg]) => ({ id, cfg, count: (player.bossTrophies && player.bossTrophies[id]) || 0 }))
+    .sort((a, b) => {
+      const az = (a.cfg.zones && a.cfg.zones[0]) || '';
+      const bz = (b.cfg.zones && b.cfg.zones[0]) || '';
+      return az.localeCompare(bz) || a.cfg.name.localeCompare(b.cfg.name);
+    });
 }
 
 // Auto-safety: when HP drops below PANIC_HP_PCT, spend PANIC_COST zeny on a
@@ -778,7 +790,7 @@ function create() {
   // Pointer: click a Blobling to fight it; click ground to walk there.
   scene.input.on('pointerdown', (pointer) => {
     // Block world clicks while any modal overlay is up.
-    if (classSelectOpen || shopOpen || travelOpen) return;
+    if (classSelectOpen || shopOpen || travelOpen || trophyOpen) return;
     // Ignore clicks that landed on a UI button (mute / autopilot / return /
     // class cards). Phaser's scene-level pointerdown fires regardless of
     // which interactive object was hit, so we check the hit list ourselves.
@@ -2789,6 +2801,98 @@ function showTravel(scene) {
   });
 }
 
+function showTrophyInspector(scene) {
+  if (trophyOpen) return;
+  trophyOpen = true;
+  const cont = scene.add.container(0, 0).setScrollFactor(0).setDepth(20000);
+  const close = () => { cont.destroy(); trophyOpen = false; };
+
+  const bg = scene.add.rectangle(0, 0, GAME_W, GAME_H, 0x000000, 0.78)
+    .setOrigin(0, 0).setScrollFactor(0).setInteractive();
+  bg.on('pointerdown', (p, lx, ly, ev) => { ev && ev.stopPropagation && ev.stopPropagation(); });
+  cont.add(bg);
+
+  const title = scene.add.text(GAME_W / 2, 58, '🏆 BOSS TROPHIES', {
+    fontSize: '34px', fontStyle: 'bold', color: '#ffe066',
+    stroke: '#5a3a00', strokeThickness: 5,
+  }).setOrigin(0.5).setScrollFactor(0);
+  cont.add(title);
+
+  const total = Object.values(player.bossTrophies || {}).reduce((sum, n) => sum + n, 0);
+  const next = TROPHY_MILESTONES.find(m => total < m.total);
+  const nextText = next
+    ? `Total ${total} / ${next.total} — next: ${next.label}`
+    : `Total ${total} — all milestone bonuses claimed`;
+  const subtitle = scene.add.text(GAME_W / 2, 98, nextText, {
+    fontSize: '16px', fontStyle: 'bold', color: next ? '#ffffff' : '#bce86a',
+    stroke: '#000', strokeThickness: 3,
+  }).setOrigin(0.5).setScrollFactor(0);
+  cont.add(subtitle);
+
+  const closeBtn = scene.add.text(GAME_W - 40, 30, '✕', {
+    fontSize: '32px', fontStyle: 'bold', color: '#ffffff',
+    stroke: '#000', strokeThickness: 4,
+  }).setOrigin(0.5).setScrollFactor(0);
+  closeBtn.setInteractive(
+    new Phaser.Geom.Rectangle(-22, -22, 44, 44),
+    Phaser.Geom.Rectangle.Contains
+  );
+  closeBtn.input.cursor = 'pointer';
+  closeBtn.on('pointerover', () => closeBtn.setColor('#ffe066'));
+  closeBtn.on('pointerout',  () => closeBtn.setColor('#ffffff'));
+  closeBtn.on('pointerdown', close);
+  cont.add(closeBtn);
+
+  const rowW = 620, rowH = 58;
+  const startY = 136;
+  const rows = bossTrophyRows();
+  rows.forEach((row, i) => {
+    const rx = (GAME_W - rowW) / 2;
+    const ry = startY + i * (rowH + 10);
+    const color = colorValue(row.cfg.nameColor, 0xffe066);
+    const fill = row.count > 0 ? 0x332711 : 0x1d1d1d;
+    const card = scene.add.rectangle(rx + rowW / 2, ry + rowH / 2, rowW, rowH, fill, 0.94)
+      .setStrokeStyle(2, row.count > 0 ? color : 0x555555, 0.9)
+      .setScrollFactor(0);
+    card.setInteractive(
+      new Phaser.Geom.Rectangle(-rowW / 2, -rowH / 2, rowW, rowH),
+      Phaser.Geom.Rectangle.Contains
+    );
+    card.input.cursor = 'pointer';
+
+    const zone = row.cfg.zones && row.cfg.zones[0] ? (ZONE_LABELS[row.cfg.zones[0]] || row.cfg.zones[0]) : 'Unknown';
+    const drop = EQUIPMENT_DROPS[row.id];
+    const reward = drop ? `${drop.name} ${drop.atk ? `+${drop.atk} ATK` : `+${drop.def || 0} DEF`}` : 'Trophy only';
+    const icon = row.count > 0 ? '🏆' : '□';
+    const name = scene.add.text(rx + 18, ry + 13, `${icon} ${row.cfg.name}`, {
+      fontSize: '18px', fontStyle: 'bold', color: row.count > 0 ? '#ffffff' : '#b8b8b8',
+      stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0, 0).setScrollFactor(0);
+    const meta = scene.add.text(rx + 18, ry + 35, `${zone}  •  ${reward}`, {
+      fontSize: '12px', color: '#cccccc', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0, 0).setScrollFactor(0);
+    const count = scene.add.text(rx + rowW - 24, ry + rowH / 2, `×${row.count}`, {
+      fontSize: '26px', fontStyle: 'bold', color: row.count > 0 ? '#ffe066' : '#777777',
+      stroke: '#000', strokeThickness: 4,
+    }).setOrigin(1, 0.5).setScrollFactor(0);
+    cont.add([card, name, meta, count]);
+    card.on('pointerover', () => card.setStrokeStyle(3, row.count > 0 ? 0xffffff : 0x999999, 1));
+    card.on('pointerout',  () => card.setStrokeStyle(2, row.count > 0 ? color : 0x555555, 0.9));
+    card.on('pointerdown', () => {
+      ui.message(`${row.cfg.name}: ${row.count} trophies. ${next ? `${Math.max(0, next.total - total)} more total to ${next.label}.` : 'Milestone track complete.'}`);
+    });
+  });
+
+  const footerY = startY + rows.length * (rowH + 10) + 8;
+  const claimed = TROPHY_MILESTONES
+    .map(m => `${total >= m.total ? '✓' : '○'} ${m.total}: ${m.label}`)
+    .join('   ');
+  const footer = scene.add.text(GAME_W / 2, footerY, claimed, {
+    fontSize: '13px', color: '#d8f7ff', stroke: '#000', strokeThickness: 2,
+  }).setOrigin(0.5).setScrollFactor(0);
+  cont.add(footer);
+}
+
 function showShop(scene) {
   if (shopOpen) return;
   shopOpen = true;
@@ -3525,10 +3629,12 @@ class UIManager {
       const a = player.equipment.armor;
       const wDesc = w ? `${w.name} (+${w.atk || 0} ATK)` : 'none';
       const aDesc = a ? `${a.name} (+${a.def || 0} DEF)` : 'none';
-      const trophies = Object.entries(player.bossTrophies || {})
-        .map(([id, n]) => `${(MONSTER_TYPES[id] && MONSTER_TYPES[id].name) || id}×${n}`)
+      const trophies = bossTrophyRows()
+        .filter(row => row.count > 0)
+        .map(row => `${row.cfg.name}×${row.count}`)
         .join(', ') || 'none';
       ui.message(`Weapon: ${wDesc}.  Armor: ${aDesc}.  Trophies: ${trophies}.`);
+      showTrophyInspector(scene);
     });
     this.gearText = scene.add.text(20, 78, '', {
       fontSize: '11px', color: '#d8f7ff', stroke: '#000', strokeThickness: 2,
