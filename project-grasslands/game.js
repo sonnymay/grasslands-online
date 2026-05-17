@@ -265,6 +265,7 @@ let travelOpen = false;
 let trophyOpen = false;
 let hardMode = false; // doubles monster damage, EXP, and zeny drops
 let hudCompact = false;
+let minimapZoom = 1;
 let activeQuests = []; // [{ monsterTypeId, monsterName, target, count, reward }]
 let questChain = 0;
 let bossRespawns = {};
@@ -3450,11 +3451,39 @@ class UIManager {
       });
     };
 
-    // Music mute toggle — small button under the minimap.
     const btnW = 90, btnH = 26;
     const btnX = this.miniX + this.miniW - btnW;
     const btnY = miniHpY + 22;
-    this.muteBg = scene.add.rectangle(btnX, btnY, btnW, btnH, 0x000000, 0.7)
+
+    // Mini-map zoom toggle — cycle from whole-world view to local detail.
+    const MAP_ZOOM_KEY = 'grasslands_minimap_zoom_v1';
+    const MAP_ZOOMS = [1, 2, 3];
+    let mapZoomIdx = 0;
+    try {
+      const saved = parseInt(localStorage.getItem(MAP_ZOOM_KEY), 10);
+      const idx = MAP_ZOOMS.indexOf(saved);
+      if (idx >= 0) mapZoomIdx = idx;
+    } catch (e) { mapZoomIdx = 0; }
+    minimapZoom = MAP_ZOOMS[mapZoomIdx];
+    this.mapZoomBg = scene.add.rectangle(btnX, btnY, btnW, btnH, 0x1c2f44, 0.86)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
+      .setStrokeStyle(2, 0x88ddff, 0.85)
+      .setInteractive({ useHandCursor: true });
+    this.mapZoomText = scene.add.text(btnX + btnW / 2, btnY + btnH / 2, `Map ${minimapZoom}x`, {
+      fontSize: '13px', color: '#aaddff', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    this.mapZoomBg.on('pointerdown', () => {
+      mapZoomIdx = (mapZoomIdx + 1) % MAP_ZOOMS.length;
+      minimapZoom = MAP_ZOOMS[mapZoomIdx];
+      this.mapZoomText.setText(`Map ${minimapZoom}x`);
+      try { localStorage.setItem(MAP_ZOOM_KEY, String(minimapZoom)); } catch (e) { /* ignore */ }
+      ui.message(`Mini-map zoom: ${minimapZoom}x.`);
+    });
+    addTip(this.mapZoomBg, 'Cycle mini-map zoom (1x/2x/3x)', btnX, btnY + btnH / 2);
+
+    // Music mute toggle — small button under the minimap.
+    const musicY = btnY + btnH + 6;
+    this.muteBg = scene.add.rectangle(btnX, musicY, btnW, btnH, 0x000000, 0.7)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
       .setStrokeStyle(2, 0xffffff, 0.8)
       .setInteractive({ useHandCursor: true });
@@ -3472,7 +3501,7 @@ class UIManager {
     };
     applyVol();
     const volLabel = () => `♪ Music ${Math.round(VOL_LEVELS[volIdx] * 100)}%`;
-    this.muteText = scene.add.text(btnX + btnW / 2, btnY + btnH / 2, volLabel(), {
+    this.muteText = scene.add.text(btnX + btnW / 2, musicY + btnH / 2, volLabel(), {
       fontSize: '13px', color: '#ffffff', stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
     this.muteBg.on('pointerdown', () => {
@@ -3491,11 +3520,11 @@ class UIManager {
       this.muteText.setText(volLabel());
       try { localStorage.setItem(VOL_KEY, String(volIdx)); } catch (e) { /* ignore */ }
     });
-    addTip(this.muteBg, 'Cycle music volume (0/25/50/75/100%)', btnX, btnY + btnH / 2);
+    addTip(this.muteBg, 'Cycle music volume (0/25/50/75/100%)', btnX, musicY + btnH / 2);
 
     // Autopilot toggle — auto-targets nearest safe monster, avoids bosses
     // and overleveled enemies. Sits right below the mute button.
-    const apY = btnY + btnH + 6;
+    const apY = musicY + btnH + 6;
     const AP_KEY = 'grasslands_autopilot_v1';
     try { autopilotOn = localStorage.getItem(AP_KEY) === '1'; } catch (e) { autopilotOn = false; }
     this.apBg = scene.add.rectangle(btnX, apY, btnW, btnH, autopilotOn ? 0x1f6b3a : 0x000000, 0.75)
@@ -3974,8 +4003,22 @@ class UIManager {
   drawMinimap() {
     const g = this.miniGfx;
     g.clear();
-    const sx = this.miniW / WORLD_W;
-    const sy = this.miniH / WORLD_H;
+    const zoom = minimapZoom || 1;
+    const viewW = WORLD_W / zoom;
+    const viewH = WORLD_H / zoom;
+    const maxLeft = Math.max(0, WORLD_W - viewW);
+    const maxTop = Math.max(0, WORLD_H - viewH);
+    const left = Math.max(0, Math.min(maxLeft, player.sprite.x - viewW / 2));
+    const top = Math.max(0, Math.min(maxTop, player.sprite.y - viewH / 2));
+    const sx = this.miniW / viewW;
+    const sy = this.miniH / viewH;
+    const toMini = (wx, wy) => ({
+      x: this.miniX + (wx - left) * sx,
+      y: this.miniY + (wy - top) * sy,
+    });
+    const inMini = (p, pad = 0) =>
+      p.x >= this.miniX - pad && p.x <= this.miniX + this.miniW + pad &&
+      p.y >= this.miniY - pad && p.y <= this.miniY + this.miniH + pad;
     // Zone backdrop — 5×5 sample grid blended with the dark bg so biomes read
     // at a glance without dominating the map.
     const samples = 16;
@@ -3990,8 +4033,10 @@ class UIManager {
     };
     for (let sr = 0; sr < samples; sr++) {
       for (let sc = 0; sc < samples; sc++) {
-        const tile_r = Math.floor((sr + 0.5) / samples * MAP_ROWS);
-        const tile_c = Math.floor((sc + 0.5) / samples * MAP_COLS);
+        const wx = left + ((sc + 0.5) / samples) * viewW;
+        const wy = top + ((sr + 0.5) / samples) * viewH;
+        const tile_r = Math.floor(wy / TILE_SIZE);
+        const tile_c = Math.floor(wx / TILE_SIZE);
         const z = getZone(tile_r, tile_c);
         g.fillStyle(zoneColor[z] || 0x555555, 0.55);
         g.fillRect(this.miniX + sc * cellW, this.miniY + sr * cellH, cellW + 1, cellH + 1);
@@ -4004,18 +4049,20 @@ class UIManager {
       for (let c = 0; c < MAP_COLS; c++) {
         const t = getCellType(r, c);
         if (t === 'grass') continue;
-        const x = this.miniX + (c / MAP_COLS) * this.miniW;
-        const y = this.miniY + (r / MAP_ROWS) * this.miniH;
-        const w = Math.max(2, this.miniW / MAP_COLS);
-        const h = Math.max(2, this.miniH / MAP_ROWS);
+        const p = toMini(c * TILE_SIZE, r * TILE_SIZE);
+        const q = toMini((c + 1) * TILE_SIZE, (r + 1) * TILE_SIZE);
+        if (q.x < this.miniX || p.x > this.miniX + this.miniW || q.y < this.miniY || p.y > this.miniY + this.miniH) continue;
+        const x = Math.max(this.miniX, p.x);
+        const y = Math.max(this.miniY, p.y);
+        const w = Math.max(2, Math.min(this.miniX + this.miniW, q.x) - x);
+        const h = Math.max(2, Math.min(this.miniY + this.miniH, q.y) - y);
         g.fillRect(x, y, w + 0.5, h + 0.5);
       }
     }
     g.lineStyle(1, 0xffe0a0, 0.75);
     for (const p of landmarkTiles()) {
-      const x = this.miniX + ((p.c + 0.5) / MAP_COLS) * this.miniW;
-      const y = this.miniY + ((p.r + 0.5) / MAP_ROWS) * this.miniH;
-      g.strokeCircle(x, y, 4);
+      const pos = toMini((p.c + 0.5) * TILE_SIZE, (p.r + 0.5) * TILE_SIZE);
+      if (inMini(pos, 5)) g.strokeCircle(pos.x, pos.y, 4);
     }
     // Monsters.
     for (const m of bloblings) {
@@ -4030,22 +4077,26 @@ class UIManager {
       else if (m.typeId === 'bigfoot') { color = 0xff2222; r = 5; outline = 0x000000; }
       else if (m.typeId === 'rare_moowaan') { color = 0x7cffb0; r = 4; outline = 0xffffff; }
       else if (isBossCfg(m.cfg)) { color = m.cfg.tint || 0xffff44; r = 4; outline = 0x000000; }
+      const pos = toMini(m.sprite.x, m.sprite.y);
+      if (!inMini(pos, r + 3)) continue;
       g.fillStyle(color, 1);
-      g.fillCircle(this.miniX + m.sprite.x * sx, this.miniY + m.sprite.y * sy, r);
+      g.fillCircle(pos.x, pos.y, r);
       if (outline !== null) {
         g.lineStyle(2, outline, 1);
-        g.strokeCircle(this.miniX + m.sprite.x * sx, this.miniY + m.sprite.y * sy, r + 2);
+        g.strokeCircle(pos.x, pos.y, r + 2);
       }
     }
     // Loot.
     g.fillStyle(0xffd24a, 1);
     for (const l of loots) {
-      g.fillCircle(this.miniX + l.x * sx, this.miniY + l.y * sy, 2);
+      const pos = toMini(l.x, l.y);
+      if (inMini(pos, 2)) g.fillCircle(pos.x, pos.y, 2);
     }
     // Player on top.
+    const playerPos = toMini(player.sprite.x, player.sprite.y);
     g.lineStyle(2, 0x000000, 1);
     g.fillStyle(0xffffff, 1);
-    g.fillCircle(this.miniX + player.sprite.x * sx, this.miniY + player.sprite.y * sy, 4);
-    g.strokeCircle(this.miniX + player.sprite.x * sx, this.miniY + player.sprite.y * sy, 4);
+    g.fillCircle(playerPos.x, playerPos.y, 4);
+    g.strokeCircle(playerPos.x, playerPos.y, 4);
   }
 }

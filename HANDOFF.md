@@ -1,8 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 5:35pm CDT (post session 19,
-> HUD compact-mode toggle).
+> coding sessions. Last refresh: 2026-05-17 6:05pm CDT (post session 20,
+> mini-map zoom toggle).
 
 ---
 
@@ -186,7 +186,27 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 19 (latest, in order)
+## 3. What we did in session 20 (latest, in order)
+
+Continued from §4 quick polish. Cache now at **`?v=92`**.
+
+1. **Mini-map zoom toggle** — new `Map 1x` button under the mini HP bar
+   cycles `1x / 2x / 3x` and persists via
+   `grasslands_minimap_zoom_v1`.
+2. **Player-centered local map view** — `drawMinimap()` now uses a
+   world-window transform. `1x` shows the full world like before; `2x` and
+   `3x` zoom into a player-centered region, clamped at world edges.
+3. **Zoom-aware minimap drawing** — zone backdrop, roads, landmarks,
+   monsters, loot, and the player all render through the same transform.
+   Off-window markers are skipped so the zoomed map stays readable.
+4. **Cache bump** — `project-grasslands/index.html` now loads
+   `game.js?v=92`.
+5. **Verification**:
+   - `node -c project-grasslands/game.js` exited 0.
+   - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
+   - Served `index.html` references `game.js?v=92`.
+
+### (legacy) session 19
 
 Continued from §4 quick polish. Cache now at **`?v=91`**.
 
@@ -366,13 +386,11 @@ Big QoL + content batch on top of Codex's session 15. Cache now at
 The user is paused while context recharges. Pick freely.
 
 **Quick polish (5–15 min):**
-1. **Mini-map zoom toggle** — cycle 1×/2×/3× zoom of the mini-map
-   for players who want more detail.
-2. **Pickup popups for ambience** — when a road sparkle gets
+1. **Pickup popups for ambience** — when a road sparkle gets
    magneted, the `+Nz` float text we already show is fine, but the
    sparkle birth flash should follow the coin briefly so it reads
    as one event.
-3. **Auto-save indicator pulse** — tiny `💾` glyph in a HUD corner
+2. **Auto-save indicator pulse** — tiny `💾` glyph in a HUD corner
    that pulses each time `saveGame()` runs.
 
 **Gameplay (15–30 min):**
@@ -990,7 +1008,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=91`**. Next change should use `?v=92`.
+  change. Current: **`?v=92`**. Next change should use `?v=93`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1113,7 +1131,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=91`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=92`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.
