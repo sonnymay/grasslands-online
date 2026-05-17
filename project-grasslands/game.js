@@ -261,6 +261,7 @@ let autopilotOn = false;
 let autopilotLastScan = 0;
 let classSelectOpen = false;
 let shopOpen = false;
+let travelOpen = false;
 let activeQuests = []; // [{ monsterTypeId, monsterName, target, count, reward }]
 let questChain = 0;
 let bossRespawns = {};
@@ -770,7 +771,7 @@ function create() {
   // Pointer: click a Blobling to fight it; click ground to walk there.
   scene.input.on('pointerdown', (pointer) => {
     // Block world clicks while any modal overlay is up.
-    if (classSelectOpen || shopOpen) return;
+    if (classSelectOpen || shopOpen || travelOpen) return;
     // Ignore clicks that landed on a UI button (mute / autopilot / return /
     // class cards). Phaser's scene-level pointerdown fires regardless of
     // which interactive object was hit, so we check the hit list ourselves.
@@ -2654,6 +2655,119 @@ function shopItemPrice(item, bought) {
   return Math.round(item.base * Math.pow(1.5, bought));
 }
 
+// Map landmark plaza coords to friendly biome names based on offset from
+// center. The 5 plazas are: spawn (0,0), N forest, S desert, W ruins, E riverside.
+function landmarkLabel(lm) {
+  const { midRow, midCol } = mapCenter();
+  if (lm.r === midRow && lm.c === midCol) return 'Spawn Plaza';
+  if (lm.r < midRow) return 'Forest Heart';
+  if (lm.r > midRow) return 'Desert Heart';
+  if (lm.c < midCol) return 'Ruins Plaza';
+  if (lm.c > midCol) return 'Riverside Plaza';
+  return 'Plaza';
+}
+
+function showTravel(scene) {
+  if (travelOpen) return;
+  travelOpen = true;
+  const cont = scene.add.container(0, 0).setScrollFactor(0).setDepth(20000);
+
+  const bg = scene.add.rectangle(0, 0, GAME_W, GAME_H, 0x000000, 0.78)
+    .setOrigin(0, 0).setScrollFactor(0).setInteractive();
+  bg.on('pointerdown', (p, lx, ly, ev) => { ev && ev.stopPropagation && ev.stopPropagation(); });
+  cont.add(bg);
+
+  const title = scene.add.text(GAME_W / 2, 60, '🧭 FAST TRAVEL', {
+    fontSize: '34px', fontStyle: 'bold', color: '#aaddff',
+    stroke: '#001a33', strokeThickness: 5,
+  }).setOrigin(0.5).setScrollFactor(0);
+  cont.add(title);
+
+  const subtitle = scene.add.text(GAME_W / 2, 100, 'Visit a landmark plaza once to unlock fast travel to it.', {
+    fontSize: '14px', color: '#cccccc', stroke: '#000', strokeThickness: 2,
+  }).setOrigin(0.5).setScrollFactor(0);
+  cont.add(subtitle);
+
+  // Close X.
+  const closeBtn = scene.add.text(GAME_W - 40, 30, '✕', {
+    fontSize: '32px', fontStyle: 'bold', color: '#ffffff',
+    stroke: '#000', strokeThickness: 4,
+  }).setOrigin(0.5).setScrollFactor(0);
+  closeBtn.setInteractive(
+    new Phaser.Geom.Rectangle(-22, -22, 44, 44),
+    Phaser.Geom.Rectangle.Contains
+  );
+  closeBtn.input.cursor = 'pointer';
+  closeBtn.on('pointerover', () => closeBtn.setColor('#ffe066'));
+  closeBtn.on('pointerout',  () => closeBtn.setColor('#ffffff'));
+  closeBtn.on('pointerdown', () => { cont.destroy(); travelOpen = false; });
+  cont.add(closeBtn);
+
+  // Spawn plaza is auto-unlocked because the player starts there.
+  const { midRow, midCol } = mapCenter();
+  const spawnKey = `${midRow},${midCol}`;
+  if (player) {
+    player.visitedLandmarks = player.visitedLandmarks || {};
+    player.visitedLandmarks[spawnKey] = true;
+  }
+
+  const rowW = 460, rowH = 56;
+  const startY = 150;
+  const tiles = landmarkTiles();
+  tiles.forEach((lm, i) => {
+    const ry = startY + i * (rowH + 10);
+    const rx = (GAME_W - rowW) / 2;
+    const key = `${lm.r},${lm.c}`;
+    const visited = !!(player && player.visitedLandmarks && player.visitedLandmarks[key]);
+    const fill = visited ? 0x1c3a5e : 0x222222;
+    const card = scene.add.rectangle(rx + rowW/2, ry + rowH/2, rowW, rowH, fill, 0.94)
+      .setStrokeStyle(2, visited ? 0x88ddff : 0x555555, 0.9).setScrollFactor(0);
+    if (visited) {
+      card.setInteractive(
+        new Phaser.Geom.Rectangle(-rowW/2, -rowH/2, rowW, rowH),
+        Phaser.Geom.Rectangle.Contains
+      );
+      card.input.cursor = 'pointer';
+    }
+    const name = scene.add.text(rx + 20, ry + rowH/2,
+      visited ? `${landmarkLabel(lm)}` : `??? (undiscovered)`, {
+      fontSize: '18px', fontStyle: 'bold',
+      color: visited ? '#ffffff' : '#666666',
+      stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0, 0.5).setScrollFactor(0);
+    const hint = scene.add.text(rx + rowW - 20, ry + rowH/2,
+      visited ? 'Travel →' : 'Locked', {
+      fontSize: '14px',
+      color: visited ? '#aaddff' : '#999999',
+      stroke: '#000', strokeThickness: 2,
+    }).setOrigin(1, 0.5).setScrollFactor(0);
+    cont.add([card, name, hint]);
+    if (visited) {
+      card.on('pointerover', () => card.setStrokeStyle(3, 0xffffff, 1));
+      card.on('pointerout',  () => card.setStrokeStyle(2, 0x88ddff, 0.9));
+      card.on('pointerdown', () => {
+        // Convert tile coords to cell + warp.
+        const tileToCell = Math.floor(TILE_SIZE / CELL_SIZE);
+        const cx = lm.c * tileToCell + Math.floor(tileToCell / 2);
+        const cy = lm.r * tileToCell + Math.floor(tileToCell / 2);
+        player.attackTarget = null;
+        player.path = [];
+        player.cellCol = cx;
+        player.cellRow = cy;
+        const wx = cellCenterX(cx), wy = cellCenterY(cy);
+        player.sprite.setPosition(wx, wy);
+        player.groundY = wy;
+        player.stepFromX = player.stepToX = wx;
+        player.stepFromY = player.stepToY = wy;
+        ui.message(`🧭 Warped to ${landmarkLabel(lm)}.`);
+        sfxPickup();
+        cont.destroy();
+        travelOpen = false;
+      });
+    }
+  });
+}
+
 function showShop(scene) {
   if (shopOpen) return;
   shopOpen = true;
@@ -3226,10 +3340,25 @@ class UIManager {
     });
     addTip(this.rsBg, 'Warp back to spawn', btnX, rsY + btnH / 2);
 
+    // Fast Travel button — opens overlay listing discovered plazas.
+    const tvY = rsY + btnH + 6;
+    this.tvBg = scene.add.rectangle(btnX, tvY, btnW, btnH, 0x224466, 0.9)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
+      .setStrokeStyle(2, 0x88ddff, 0.95)
+      .setInteractive({ useHandCursor: true });
+    this.tvText = scene.add.text(btnX + btnW / 2, tvY + btnH / 2, '🧭 Travel', {
+      fontSize: '13px', color: '#aaddff', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    this.tvBg.on('pointerdown', () => {
+      if (!player || player.dead) return;
+      showTravel(scene);
+    });
+    addTip(this.tvBg, 'Fast travel to discovered plazas', btnX, tvY + btnH / 2);
+
     // Change Class button — always visible. Below Lv 10 it just tells the
     // player to keep leveling. At Lv 10+ it opens the class chooser
-    // (re-pickable at any time).
-    const clY = rsY + btnH + 6;
+    // (re-pickable at any time). Shifted down to make room for Travel.
+    const clY = tvY + btnH + 6;
     this.clBg = scene.add.rectangle(btnX, clY, btnW, btnH, 0x664422, 0.9)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
       .setStrokeStyle(2, 0xffe066, 1)
