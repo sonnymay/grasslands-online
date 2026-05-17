@@ -984,7 +984,7 @@ class PlayerController {
 
   update(time, delta) {
     if (this.dead) {
-      this.sprite.setTexture('rookie_dead');
+      applyRookieTexture(this.sprite, this.dir, 'dead');
       this.sprite.setFlipX(false);
       this.sprite.setOrigin(0.5, 0.5);
       this.sprite.scaleY = this.basePScale;
@@ -1058,7 +1058,8 @@ class PlayerController {
     if (!moving) this.frame = 'idle';
 
     if (showingAttack) {
-      this.sprite.setTexture('rookie_attack');
+      applyRookieTexture(this.sprite, this.dir, 'attack');
+      // Attack pose has no per-direction frame, so re-apply the flip for west.
       this.sprite.setFlipX(this.dir === 'west');
     } else {
       applyRookieTexture(this.sprite, this.dir, this.frame);
@@ -1463,28 +1464,48 @@ const DIR_TEXTURE = {
   northwest: { base: 'northeast', flip: true  },
 };
 
-function applyRookieTexture(sprite, dir, frame) {
+// Resolve any frame name ('idle' | 'walk' | 'walk2..4' | 'attack' | 'dead')
+// + direction to the best texture key. Prefers class-specific sprites and
+// falls back to rookie_* when the class hasn't shipped that frame yet.
+function pickPlayerTextureKey(sprite, dir, frame) {
   const info = DIR_TEXTURE[dir] || DIR_TEXTURE.south;
-  const frameSeg = (frame === 'walk')  ? 'walk_'
-                : (frame === 'walk2') ? 'walk2_'
-                : (frame === 'walk3') ? 'walk3_'
-                : (frame === 'walk4') ? 'walk4_'
-                : 'idle_';
+  // attack + dead are direction-less in the rookie set; everything else is
+  // per-direction.
+  const directional = !(frame === 'attack' || frame === 'dead');
+  const frameSeg =
+      (frame === 'walk')  ? 'walk_'
+    : (frame === 'walk2') ? 'walk2_'
+    : (frame === 'walk3') ? 'walk3_'
+    : (frame === 'walk4') ? 'walk4_'
+    : (frame === 'attack')? 'attack'
+    : (frame === 'dead')  ? 'dead'
+    : 'idle_';
+  const suffix = directional ? info.base : '';
   const classDef = (player && player.classId) ? CLASS_DEFS[player.classId] : null;
   let key = null;
-  // Try the class-specific texture first; fall back to rookie if missing.
+  let isClassKey = false;
   if (classDef) {
-    const candidate = classDef.spritePrefix + frameSeg + info.base;
-    if (sprite.scene.textures.exists(candidate)) key = candidate;
+    const candidate = classDef.spritePrefix + frameSeg + suffix;
+    if (sprite.scene.textures.exists(candidate)) {
+      key = candidate;
+      isClassKey = true;
+    }
   }
-  if (!key) key = 'rookie_' + frameSeg + info.base;
+  if (!key) key = 'rookie_' + frameSeg + suffix;
+  return { key, info, classDef, isClassKey };
+}
+
+function applyRookieTexture(sprite, dir, frame) {
+  const { key, info, classDef, isClassKey } = pickPlayerTextureKey(sprite, dir, frame);
   sprite.setTexture(key);
   sprite.setFlipX(info.flip);
   // Clear tint when drawing real class art (palette already correct);
   // keep the class tint on rookie fallbacks so they still read as the class.
   if (classDef) {
-    if (key.indexOf(classDef.spritePrefix) === 0) sprite.clearTint();
+    if (isClassKey) sprite.clearTint();
     else sprite.setTint(classDef.tint);
+  } else {
+    sprite.clearTint();
   }
 }
 
@@ -1909,7 +1930,12 @@ function selectClass(scene, id, container) {
     if (player.level >= t.level) tier = Math.max(tier, t.tier);
   }
   player.classTier = tier;
+  // Apply tint as a fallback color for directions without class art, then
+  // immediately re-resolve the texture so south swaps to the real class
+  // sprite right now (applyRookieTexture clears the tint when it lands on
+  // a real class key).
   player.sprite.setTint(cdef.tint);
+  applyRookieTexture(player.sprite, player.dir || 'south', player.frame || 'idle');
   player._refreshNameTag();
 
   // Dramatic full-screen flash.
