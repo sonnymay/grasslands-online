@@ -4,7 +4,7 @@
 > just opened a fresh Claude Code session, read top-to-bottom and follow §9
 > ("How to continue") at the bottom.
 >
-> Last updated: 2026-05-16 (session 7)
+> Last updated: 2026-05-16 (session 8)
 
 ---
 
@@ -50,6 +50,7 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 - Player position lerps cell-to-cell at `MS_PER_CELL = 170` ms. The slower cadence makes each footfall readable instead of sliding.
 - Walk animation uses direction-specific timer-driven cycles. South/north avoid the wrong-facing `walk` frames and use `walk2 → idle → walk3 → idle`; east/west/diagonals use `walk → idle → walk2 → idle`. `walk4` assets remain loaded but unused because some have dark/spotlight backgrounds.
 - Step-phase bob is subtle (3 px) with tiny squash (4%) so the character stays grounded.
+- Rookie and monsters have soft ground shadows that stay pinned to the feet/body base, making movement read less floaty.
 - 8-direction sprite art (`north/south/east/southeast/northeast`, plus mirrored `west/southwest/northwest`). No more head-spin on diagonals.
 - Hit stun (200 ms freeze) when damaged.
 - Camera follows with smoothing; `setZoom(0.85)` for wider RO-like FOV.
@@ -101,6 +102,23 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 ---
 
 ## 3. What we just did this session (latest first)
+
+### Session 8 — Ground shadow visual grounding pass
+1. **Added a soft ellipse shadow under Rookie** using Phaser graphics primitives, not a new image asset.
+2. **Tracked `player.groundY` separately from `sprite.y`** so the shadow stays on the grass while the body uses subtle bob/squash during walking.
+3. **Synced the Rookie shadow during all important player states**:
+   - normal idle/walk update,
+   - walk step interpolation,
+   - snap-to-target when entering attack range,
+   - death pose,
+   - respawn,
+   - saved-position restore from `localStorage`.
+4. **Added soft ellipse shadows under every monster** through `MonsterController`, including Blobling, MooHam, MooWaan, and Boss MooHam.
+5. **Scaled monster shadows from each sprite's display size**, so Boss MooHam gets a naturally larger footprint and MooWaan stays lighter/smaller.
+6. **Kept dead monster shadows visible during the 1.5 s dead-pose window**, then destroyed the shadow together with the sprite/name/HP bar cleanup.
+7. **Updated Y-sort depth** so shadows render just behind their owning sprite based on ground/body Y.
+8. **Updated cache bust**: `index.html` changed from `game.js?v=39` → `game.js?v=40`.
+9. **Implementation note**: shadows are deliberately subtle (`alpha` about 0.22–0.24) to improve RO-like grounding without making characters look pasted onto dark blobs.
 
 ### Session 7 — MooWaan baby monkey monster
 1. **User generated three MooWaan sprites** and placed them in `project-grasslands/assets/sprites/`.
@@ -210,15 +228,14 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 ## 4. Next steps — pick any
 
 1. **Regenerate clean 4-frame Rookie walk art** if user wants smoother RO-like walking. Prompt must require: same character, same direction, same scale, same feet baseline, transparent background PNG with alpha channel, no lighting/background changes. Replace `walk3`/`walk4`, then re-enable a 4-frame loop only after browser verification.
-2. **Add subtle ground shadow under Rookie** so foot contact reads better while walking.
-3. **Map variety pass.** Add biome patches/forest clusters using current tiles + decorations. Keep spawn/walkable protection intact.
-4. **Fantasy UI skin pass.** Replace debug black rectangles with warm brown/gold framed RO-inspired panels.
-5. **More monsters.** Add a third original monster via `MONSTER_TYPES`. Requires 3 new sprites.
-6. **Quest stub** — kill 5 Bloblings, get reward zeny. Tracker in chat box.
-7. **Inventory/equipment UI** only after user approves scope; keep game simple for now.
-8. **Multiplayer (Phase 2)** — big jump: FastAPI WebSocket server + Vercel/Railway. Confirm scope first.
+2. **Map variety pass.** Add biome patches/forest clusters using current tiles + decorations. Keep spawn/walkable protection intact.
+3. **Fantasy UI skin pass.** Replace debug black rectangles with warm brown/gold framed RO-inspired panels.
+4. **More monsters.** Add another original monster via `MONSTER_TYPES`. Requires 3 new sprites.
+5. **Quest stub** — kill 5 Bloblings, get reward zeny. Tracker in chat box.
+6. **Inventory/equipment UI** only after user approves scope; keep game simple for now.
+7. **Multiplayer (Phase 2)** — big jump: FastAPI WebSocket server + Vercel/Railway. Confirm scope first.
 
-**Recommendation:** #1 only if new art is generated. Otherwise do #2 ground shadow + #4 UI skin next because look matters most.
+**Recommendation:** #1 only if new art is generated. Otherwise do #2 map variety + #3 UI skin next because look matters most.
 
 ---
 
@@ -231,7 +248,7 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 - A* runs every repath; fine at 100×100 grid. Becomes expensive if grid grows. (max 8 000 iterations cap inside `findPath`).
 - Mini-map redraws every frame — cheap but allocates one graphics command list each tick.
 - Phaser banner spams the console on every reload. Cosmetic.
-- `?v=N` cache-bust in `index.html` — bump on every `game.js` change. Current: `?v=39`.
+- `?v=N` cache-bust in `index.html` — bump on every `game.js` change. Current: `?v=40`.
 
 ---
 
@@ -321,7 +338,7 @@ Stored in §9 of the older `~/Downloads/HANDOFF.md` and repeated for diagonals i
 5. Pick a task from §4 (or whatever the user asks for).
 6. **Every meaningful change:**
    - Edit code.
-   - Bump `?v=N` in `index.html` (next: `?v=40`).
+   - Bump `?v=N` in `index.html` (next: `?v=41`).
    - Reload preview, verify visually.
    - `git add` exact files, conventional-prefix commit, push.
 7. **End of session:**

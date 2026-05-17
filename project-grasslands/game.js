@@ -387,8 +387,10 @@ function update(time, delta) {
   ui.update();
 
   // Y-sort: depth follows y position
+  if (player.shadow) player.shadow.setDepth(player.groundY - 2);
   player.sprite.setDepth(player.sprite.y);
   for (const b of bloblings) {
+    if (b.shadow) b.shadow.setDepth(b.sprite.y - 2);
     if (b.sprite) b.sprite.setDepth(b.sprite.y);
   }
 }
@@ -565,6 +567,15 @@ class PlayerController {
     this.sprite = scene.add.sprite(x, y, 'rookie_idle_south');
     this.basePScale = PLAYER_DISPLAY_H / this.sprite.height;
     this.sprite.setScale(this.basePScale);
+    this.groundY = y;
+    this.shadow = scene.add.ellipse(
+      x,
+      y + this.sprite.displayHeight * 0.36,
+      this.sprite.displayWidth * 0.58,
+      Math.max(8, this.sprite.displayHeight * 0.12),
+      0x000000,
+      0.24
+    ).setOrigin(0.5);
 
     this.nameTag = scene.add.text(x, y, 'Rookie', {
       fontSize: '14px',
@@ -654,12 +665,18 @@ class PlayerController {
     return cycle[idx];
   }
 
+  _syncShadow() {
+    this.shadow.setPosition(this.sprite.x, this.groundY + this.sprite.displayHeight * 0.36);
+    this.shadow.setDisplaySize(this.sprite.displayWidth * 0.58, Math.max(8, this.sprite.displayHeight * 0.12));
+  }
+
   update(time, delta) {
     if (this.dead) {
       this.sprite.setTexture('rookie_dead');
       this.sprite.setFlipX(false);
       this.sprite.setOrigin(0.5, 0.5);
       this.sprite.scaleY = this.basePScale;
+      this._syncShadow();
       this.nameTag.setPosition(this.sprite.x, this.sprite.y - this.sprite.displayHeight / 2);
       return;
     }
@@ -680,6 +697,7 @@ class PlayerController {
       const baseX = this.stepFromX + (this.stepToX - this.stepFromX) * t;
       const baseY = this.stepFromY + (this.stepToY - this.stepFromY) * t;
       this.sprite.x = baseX;
+      this.groundY = baseY;
 
       // Full sine wave per step. Keep it subtle: RO-like walking should feel
       // grounded, not like a hopping tween.
@@ -696,6 +714,7 @@ class PlayerController {
       if (this.stepT >= 1) {
         this.sprite.x = this.stepToX;
         this.sprite.y = this.stepToY;
+        this.groundY = this.stepToY;
         this.sprite.scaleY = this.basePScale;
         // Start the next queued step if we have one.
         if (this.path.length > 0) this._beginNextStep();
@@ -729,6 +748,7 @@ class PlayerController {
             // Snap to current step's destination so we settle on a cell.
             this.sprite.x = this.stepToX;
             this.sprite.y = this.stepToY;
+            this.groundY = this.stepToY;
             this.stepT = 1;
             this.sprite.setOrigin(0.5, 0.5);
             this.sprite.scaleY = this.basePScale;
@@ -742,6 +762,7 @@ class PlayerController {
       }
     }
 
+    this._syncShadow();
     const topY = this.sprite.y - this.sprite.displayHeight / 2;
     this.nameTag.setPosition(this.sprite.x, topY);
     // HP bar above player, only when not full.
@@ -792,6 +813,7 @@ class PlayerController {
       this.cellCol = cx;
       this.cellRow = cy;
       this.sprite.setPosition(cellCenterX(cx), cellCenterY(cy));
+      this.groundY = this.sprite.y;
       this.stepFromX = this.stepToX = this.sprite.x;
       this.stepFromY = this.stepToY = this.sprite.y;
       this.hp = this.maxHP;
@@ -981,6 +1003,7 @@ function applySave() {
     player.cellCol = col;
     player.cellRow = row;
     player.sprite.setPosition(cellCenterX(col), cellCenterY(row));
+    player.groundY = player.sprite.y;
     player.stepFromX = player.stepToX = player.sprite.x;
     player.stepFromY = player.stepToY = player.sprite.y;
   }
@@ -1133,6 +1156,14 @@ class MonsterController {
     const bScale = (BLOBLING_DISPLAY_H / this.sprite.height) * (cfg.scaleMult || 1);
     this.sprite.setScale(bScale);
     this.sprite.setCollideWorldBounds(true);
+    this.shadow = scene.add.ellipse(
+      x,
+      y + this.sprite.displayHeight * 0.34,
+      this.sprite.displayWidth * 0.78,
+      Math.max(7, this.sprite.displayHeight * 0.14),
+      0x000000,
+      0.22
+    ).setOrigin(0.5);
 
     this.nameTag = scene.add.text(x, y, `${cfg.name} Lv.${this.level}`, {
       fontSize: '12px',
@@ -1143,6 +1174,11 @@ class MonsterController {
 
     this.hpBarBg = scene.add.rectangle(x, y, 40, 5, 0x000000).setOrigin(0.5);
     this.hpBar = scene.add.rectangle(x, y, 40, 5, 0xff3333).setOrigin(0, 0.5);
+  }
+
+  _syncShadow() {
+    this.shadow.setPosition(this.sprite.x, this.sprite.y + this.sprite.displayHeight * 0.34);
+    this.shadow.setDisplaySize(this.sprite.displayWidth * 0.78, Math.max(7, this.sprite.displayHeight * 0.14));
   }
 
   update(time, delta) {
@@ -1188,6 +1224,7 @@ class MonsterController {
       this.sprite.setVelocity(this.wanderVx, this.wanderVy);
     }
 
+    this._syncShadow();
     const topY = this.sprite.y - this.sprite.displayHeight / 2;
     this.nameTag.setPosition(this.sprite.x, topY - 6);
     this.hpBarBg.setPosition(this.sprite.x, topY + 2);
@@ -1214,6 +1251,7 @@ class MonsterController {
     this.alive = false;
     this.sprite.setVelocity(0, 0);
     this.sprite.setTexture(this.cfg.deadKey);
+    this._syncShadow();
     this.hpBar.setVisible(false);
     this.hpBarBg.setVisible(false);
     this.nameTag.setVisible(false);
@@ -1233,6 +1271,7 @@ class MonsterController {
 
     this.scene.time.delayedCall(1500, () => {
       this.sprite.destroy();
+      this.shadow.destroy();
       this.nameTag.destroy();
       this.hpBar.destroy();
       this.hpBarBg.destroy();
