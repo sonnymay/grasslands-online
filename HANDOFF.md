@@ -1,8 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 6:40pm CDT (post session 23,
-> Tier-2 Knight sprite wiring).
+> coding sessions. Last refresh: 2026-05-17 6:50pm CDT (post session 24,
+> Tier-2 Knight asset import).
 
 ---
 
@@ -186,7 +186,33 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 23 (latest, in order)
+## 3. What we did in session 24 (latest, in order)
+
+Follow-up to session 23. Cache now at **`?v=96`**.
+
+1. **Knight assets imported** — copied the available Knight PNGs from
+   `/Users/santipapmay/Downloads` into
+   `project-grasslands/assets/sprites/` and compressed them to 512×512
+   via `sips`.
+2. **All expected Knight keys now exist locally**:
+   `knight_{idle,walk}_{south,north,east,southeast,northeast}.png`.
+3. **Two source gaps filled with nearest available art** — Downloads did
+   not contain `knight_idle_east.png` or `knight_walk_northeast.png`, so
+   `knight_idle_east.png` was filled from `knight_walk_east.png`, and
+   `knight_walk_northeast.png` was filled from `knight_idle_northeast.png`.
+   Replace those later if exact art arrives.
+4. **Cache bump** — `project-grasslands/index.html` now loads
+   `game.js?v=96` so browsers re-run the preload after earlier 404s.
+5. **Verification**:
+   - `node -c project-grasslands/game.js` exited 0.
+   - `sips -g pixelWidth -g pixelHeight -g hasAlpha` confirmed sampled
+     Knight files are 512×512 and have no alpha, so existing `keyOutWhite()`
+     remains necessary.
+   - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
+   - Served `index.html` references `game.js?v=96`.
+   - `assets/sprites/knight_idle_south.png` now returns `HTTP/1.0 200 OK`.
+
+### (legacy) session 23
 
 User asked to wire Knight sprites for Swordsman Tier 2. Cache now at
 **`?v=95`**.
@@ -1063,7 +1089,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=95`**. Next change should use `?v=96`.
+  change. Current: **`?v=96`**. Next change should use `?v=97`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1186,7 +1212,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=95`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=96`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.
