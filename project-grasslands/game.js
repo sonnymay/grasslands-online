@@ -3073,21 +3073,29 @@ class UIManager {
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
       .setStrokeStyle(2, 0xffffff, 0.8)
       .setInteractive({ useHandCursor: true });
-    // Restore mute preference from localStorage.
-    const MUTE_KEY = 'grasslands_mute_v1';
-    let savedMute = false;
-    try { savedMute = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) { /* ignore */ }
-    if (savedMute && scene.bgm) scene.bgm.setMute(true);
-    this.muteText = scene.add.text(btnX + btnW / 2, btnY + btnH / 2,
-      savedMute ? '♪ Music: OFF' : '♪ Music: ON', {
+    // Cycle 5 volume steps instead of binary mute (0 / 0.25 / 0.5 / 0.75 / 1.0
+    // of the BGM's natural volume = 0.35). Persisted as an index.
+    const VOL_KEY = 'grasslands_volume_v2';
+    const VOL_LEVELS = [0, 0.25, 0.5, 0.75, 1.0];
+    let volIdx = 2; // default 50%
+    try { const s = localStorage.getItem(VOL_KEY); if (s !== null) volIdx = Math.max(0, Math.min(VOL_LEVELS.length - 1, parseInt(s, 10))); } catch (e) { /* ignore */ }
+    const applyVol = () => {
+      const bgm = scene.bgm; if (!bgm) return;
+      const mult = VOL_LEVELS[volIdx];
+      bgm.setVolume(0.35 * mult);
+      bgm.setMute(mult === 0);
+    };
+    applyVol();
+    const volLabel = () => `♪ Music ${Math.round(VOL_LEVELS[volIdx] * 100)}%`;
+    this.muteText = scene.add.text(btnX + btnW / 2, btnY + btnH / 2, volLabel(), {
       fontSize: '13px', color: '#ffffff', stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
     this.muteBg.on('pointerdown', () => {
-      const bgm = scene.bgm;
-      if (!bgm) return;
-      bgm.setMute(!bgm.mute);
-      // If unmuting and not yet started (autoplay block), kick it off here.
-      if (!bgm.mute && !bgm.isPlaying) {
+      const bgm = scene.bgm; if (!bgm) return;
+      volIdx = (volIdx + 1) % VOL_LEVELS.length;
+      applyVol();
+      // If we just unmuted and BGM never started (autoplay block), kick it off.
+      if (VOL_LEVELS[volIdx] > 0 && !bgm.isPlaying) {
         try {
           if (scene.sound.context && scene.sound.context.state === 'suspended') {
             scene.sound.context.resume();
@@ -3095,10 +3103,10 @@ class UIManager {
           bgm.play();
         } catch (e) { /* ignore */ }
       }
-      this.muteText.setText(bgm.mute ? '♪ Music: OFF' : '♪ Music: ON');
-      try { localStorage.setItem(MUTE_KEY, bgm.mute ? '1' : '0'); } catch (e) { /* ignore */ }
+      this.muteText.setText(volLabel());
+      try { localStorage.setItem(VOL_KEY, String(volIdx)); } catch (e) { /* ignore */ }
     });
-    addTip(this.muteBg, 'Toggle background music', btnX, btnY + btnH / 2);
+    addTip(this.muteBg, 'Cycle music volume (0/25/50/75/100%)', btnX, btnY + btnH / 2);
 
     // Autopilot toggle — auto-targets nearest safe monster, avoids bosses
     // and overleveled enemies. Sits right below the mute button.
@@ -3265,7 +3273,18 @@ class UIManager {
     this.questText.setVisible(false);
     this.gearBg = scene.add.rectangle(10, 70, 330, 38, 0x000000, 0.55)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
-      .setStrokeStyle(1, 0x88ddff, 0.7);
+      .setStrokeStyle(1, 0x88ddff, 0.7)
+      .setInteractive({ useHandCursor: true });
+    this.gearBg.on('pointerdown', () => {
+      const w = player.equipment.weapon;
+      const a = player.equipment.armor;
+      const wDesc = w ? `${w.name} (+${w.atk || 0} ATK)` : 'none';
+      const aDesc = a ? `${a.name} (+${a.def || 0} DEF)` : 'none';
+      const trophies = Object.entries(player.bossTrophies || {})
+        .map(([id, n]) => `${(MONSTER_TYPES[id] && MONSTER_TYPES[id].name) || id}×${n}`)
+        .join(', ') || 'none';
+      ui.message(`Weapon: ${wDesc}.  Armor: ${aDesc}.  Trophies: ${trophies}.`);
+    });
     this.gearText = scene.add.text(20, 78, '', {
       fontSize: '11px', color: '#d8f7ff', stroke: '#000', strokeThickness: 2,
       lineSpacing: 2,
