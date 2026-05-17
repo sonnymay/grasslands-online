@@ -71,6 +71,27 @@ const MONSTER_TYPES = {
     nameColor: '#bce86a', count: DUNE_BLOB_COUNT, scaleMult: 1.0,
     zones: ['desert'],
   },
+  // Rare "shiny" variants — same sprite, gold/emerald tint, +50% HP. Not
+  // spawned by the standard count loop (count: 0); the spawnMonster reroll
+  // below converts a regular mooham/moowaan spawn into one of these at 1%.
+  rare_mooham: {
+    name: 'Golden MooHam',
+    idleKey: 'mooham_idle', hitKey: 'mooham_hit', deadKey: 'mooham_dead',
+    maxHP: 120, atk: 10, expReward: 0, speed: 60,
+    nameColor: '#ffe066', tint: 0xffe066, scaleMult: 1.15,
+    zones: ['grasslands', 'ruins'], count: 0,
+    levelsAward: 5,
+    rare: true,
+  },
+  rare_moowaan: {
+    name: 'Emerald MooWaan',
+    idleKey: 'moowaan_idle', hitKey: 'moowaan_hit', deadKey: 'moowaan_dead',
+    maxHP: 90, atk: 8, expReward: 0, speed: 100,
+    nameColor: '#7cffb0', tint: 0x7cffb0, scaleMult: 1.05,
+    zones: ['forest', 'riverside'], count: 0,
+    levelsAward: 5,
+    rare: true,
+  },
   boss_mooham: {
     name: 'Boss MooHam',
     idleKey: 'mooham_idle', hitKey: 'mooham_hit', deadKey: 'mooham_dead',
@@ -1485,6 +1506,20 @@ class MonsterController {
       this.sprite.setScale(this.targetDisplayH / h);
     };
     if (cfg.tint) this.sprite.setTint(cfg.tint);
+    // Rare variants get a persistent pulsing aura ring under the sprite.
+    if (cfg.rare) {
+      this.auraRing = scene.add.circle(x, y + 8, 26)
+        .setStrokeStyle(3, cfg.tint || 0xffe066, 0.9).setFillStyle();
+      scene.tweens.add({
+        targets: this.auraRing,
+        scale: 1.4, alpha: 0.5,
+        duration: 700, yoyo: true, repeat: -1,
+      });
+      // Big chat callout the first time the player gets one in view.
+      if (typeof ui !== 'undefined' && ui) {
+        ui.message(`★ A ${cfg.name} appeared!`);
+      }
+    }
     this.sprite.setCollideWorldBounds(true);
     this.shadow = scene.add.ellipse(
       x,
@@ -1508,6 +1543,7 @@ class MonsterController {
 
   _syncShadow() {
     this.shadow.setPosition(this.sprite.x, this.sprite.y + this.sprite.displayHeight * 0.34);
+    if (this.auraRing) this.auraRing.setPosition(this.sprite.x, this.sprite.y + 8);
     this.shadow.setDisplaySize(this.sprite.displayWidth * 0.78, Math.max(7, this.sprite.displayHeight * 0.14));
   }
 
@@ -1597,10 +1633,29 @@ class MonsterController {
     this.hpBar.setVisible(false);
     this.hpBarBg.setVisible(false);
     this.nameTag.setVisible(false);
-    player.gainExp(this.expReward);
+    // Rare variant: grant N levels worth of EXP in one shot + huge fanfare.
+    if (this.cfg.levelsAward) {
+      const want = this.cfg.levelsAward;
+      let total = 0;
+      for (let i = 0; i < want; i++) total += (player.level + i) * 100;
+      player.gainExp(total);
+      ui.message(`★★ RARE KILL! +${want} LEVELS from ${this.cfg.name}! ★★`);
+      const banner = this.scene.add.text(GAME_W / 2, GAME_H / 2, `★ +${want} LEVELS! ★`, {
+        fontSize: '44px', fontStyle: 'bold', color: '#ffe066',
+        stroke: '#5a3a00', strokeThickness: 6,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(99999);
+      this.scene.tweens.add({
+        targets: banner, alpha: 0, scale: 1.3, duration: 1800,
+        onComplete: () => banner.destroy(),
+      });
+    } else {
+      player.gainExp(this.expReward);
+    }
+    if (this.auraRing) { this.scene.tweens.killTweensOf(this.auraRing); this.auraRing.destroy(); this.auraRing = null; }
     player.kills += 1;
-    // Heal on kill: 8% of maxHP, scaled up for bosses (expReward >= 90).
-    const healPct = this.expReward >= 90 ? 0.30 : 0.08;
+    // Heal on kill: 8% of maxHP, scaled up for bosses (expReward >= 90)
+    // and rare kills (always full heal).
+    const healPct = this.cfg.levelsAward ? 1.0 : (this.expReward >= 90 ? 0.30 : 0.08);
     const healAmt = Math.max(1, Math.round(player.maxHP * healPct));
     if (!player.dead && player.hp < player.maxHP) {
       player.hp = Math.min(player.maxHP, player.hp + healAmt);
@@ -1838,7 +1893,14 @@ function checkClassTierUpgrade(player) {
   }
 }
 
+// 1% reroll: a regular mooham/moowaan spawn becomes its rare variant.
+const RARE_VARIANTS = { mooham: 'rare_mooham', moowaan: 'rare_moowaan' };
+const RARE_SPAWN_CHANCE = 0.01;
+
 function spawnMonster(scene, typeId) {
+  if (RARE_VARIANTS[typeId] && Math.random() < RARE_SPAWN_CHANCE) {
+    typeId = RARE_VARIANTS[typeId];
+  }
   const cfg = MONSTER_TYPES[typeId];
   if (cfg.count === 1 && bloblings.some(m => m.typeId === typeId && m.alive)) return;
   const allowedZones = cfg && cfg.zones;
@@ -2235,6 +2297,8 @@ class UIManager {
       if (m.typeId === 'mooham') color = 0xffaa55;
       else if (m.typeId === 'moowaan') color = 0x55ff88;
       else if (m.typeId === 'cactling') color = 0xbce86a;
+      else if (m.typeId === 'rare_mooham') { color = 0xffe066; r = 4; outline = 0xffffff; }
+      else if (m.typeId === 'rare_moowaan') { color = 0x7cffb0; r = 4; outline = 0xffffff; }
       else if (m.typeId === 'boss_mooham') { color = 0xffff44; r = 4; }
       else if (m.typeId === 'bigfoot') { color = 0xff2222; r = 5; outline = 0x000000; }
       g.fillStyle(color, 1);
