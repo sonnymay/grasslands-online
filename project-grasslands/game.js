@@ -453,6 +453,15 @@ function gearSummary() {
   return `Gear: ${w} / ${a}\nTrophies: ${trophies}${next ? `  Next: ${next.total}` : '  Max bonus'}`;
 }
 
+// Auto-safety: when HP drops below PANIC_HP_PCT, spend PANIC_COST zeny on a
+// full heal. Cooldown prevents thrashing if the player keeps getting hit.
+const PANIC_HP_PCT     = 0.25;
+const PANIC_COST       = 50;
+const PANIC_COOLDOWN_MS = 6000;
+// First time the player stands on any landmark plaza they earn this bonus.
+const DISCOVERY_ZENY = 250;
+const DISCOVERY_EXP  = 75;
+
 // Shop items. price = base * 1.5^bought.
 const SHOP_ITEMS = [
   { id: 'hp',  label: '+20 Max HP',  base:  80, apply: (p) => { p.maxHP += 20; p.hp = p.maxHP; } },
@@ -1188,6 +1197,8 @@ class PlayerController {
     this.classId = null;   // 'swordsman' | 'mage' | 'archer'
     this.classTier = 0;    // 0 = unselected, 1..4 once chosen
     this.shopBought = { hp: 0, atk: 0, def: 0, pot: 0 };
+    this.visitedLandmarks = {}; // '<r>,<c>' -> true
+    this._lastPanicAt = 0;
     this.level = 1;
     this.dead = false;
     this.dir = 'south';
@@ -1372,6 +1383,50 @@ class PlayerController {
         this._specialGlow.setDepth(this.sprite.y - 8);
         this._specialGlow.setScale(1 + Math.sin(time / 160) * 0.12);
         this._specialGlow.setAlpha(0.12 + Math.sin(time / 180) * 0.04);
+      }
+    }
+
+    // Auto-safety panic-heal: very low HP + can afford pot + off cooldown.
+    if (this.hp > 0 && this.hp / this.maxHP < PANIC_HP_PCT &&
+        this.zeny >= PANIC_COST &&
+        time - this._lastPanicAt > PANIC_COOLDOWN_MS) {
+      this.zeny -= PANIC_COST;
+      const healed = this.maxHP - this.hp;
+      this.hp = this.maxHP;
+      this._lastPanicAt = time;
+      spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 32,
+        `💚 PANIC HEAL +${healed}`, 0x66ff88, { fontSize: '18px' });
+      if (typeof sfxHeal === 'function') sfxHeal();
+      if (typeof ui !== 'undefined' && ui) {
+        ui.message(`Panic heal used (−${fmt(PANIC_COST)}z, +${healed} HP).`);
+      }
+    }
+
+    // Landmark discovery — first time the player's cell sits on a plaza.
+    if (typeof landmarkTiles === 'function') {
+      const cr = this.cellRow, cc = this.cellCol;
+      for (const lm of landmarkTiles()) {
+        // Plazas are defined in tile coords; convert to cell.
+        const lmCellR = lm.r * Math.floor(TILE_SIZE / CELL_SIZE);
+        const lmCellC = lm.c * Math.floor(TILE_SIZE / CELL_SIZE);
+        const reach = (lm.radius + 1) * Math.floor(TILE_SIZE / CELL_SIZE);
+        if (Math.abs(cr - lmCellR) <= reach && Math.abs(cc - lmCellC) <= reach) {
+          const key = `${lm.r},${lm.c}`;
+          if (!this.visitedLandmarks[key]) {
+            this.visitedLandmarks[key] = true;
+            this.zeny += DISCOVERY_ZENY;
+            this.gainExp(DISCOVERY_EXP);
+            const banner = this.scene.add.text(GAME_W / 2, 180,
+              `★ Discovered new landmark! +${fmt(DISCOVERY_ZENY)}z, +${DISCOVERY_EXP} EXP`, {
+              fontSize: '22px', fontStyle: 'bold', color: '#ffe066',
+              stroke: '#000', strokeThickness: 4,
+            }).setOrigin(0.5).setScrollFactor(0).setDepth(15000).setAlpha(0);
+            this.scene.tweens.add({ targets: banner, alpha: 1, duration: 300,
+              yoyo: true, hold: 1400, onComplete: () => banner.destroy() });
+            if (typeof sfxLevelUp === 'function') sfxLevelUp();
+          }
+          break;
+        }
       }
     }
 
@@ -1698,6 +1753,7 @@ function saveGame() {
       kills: player.kills, hotStreak: player.hotStreak,
       classId: player.classId, classTier: player.classTier,
       shopBought: player.shopBought,
+      visitedLandmarks: player.visitedLandmarks,
       activeQuests: activeQuests, activeQuest: activeQuests[0] || null,
       questChain: questChain,
       equipment: player.equipment,
@@ -1734,6 +1790,7 @@ function applySave() {
   player.classId   = save.classId   ?? null;
   player.classTier = save.classTier ?? 0;
   player.shopBought = Object.assign({ hp:0, atk:0, def:0, pot:0 }, save.shopBought || {});
+  player.visitedLandmarks = save.visitedLandmarks || {};
   activeQuests = Array.isArray(save.activeQuests) ? save.activeQuests.slice(0, 2) : (save.activeQuest ? [save.activeQuest] : []);
   questChain = save.questChain ?? 0;
   // Reapply class tint on sprite + refresh name tag color/title.
