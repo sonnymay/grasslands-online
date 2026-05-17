@@ -1,8 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 6:05pm CDT (post session 20,
-> mini-map zoom toggle).
+> coding sessions. Last refresh: 2026-05-17 6:15pm CDT (post session 21,
+> auto-save indicator pulse).
 
 ---
 
@@ -186,7 +186,24 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 20 (latest, in order)
+## 3. What we did in session 21 (latest, in order)
+
+Continued from §4 quick polish. Cache now at **`?v=93`**.
+
+1. **Auto-save indicator pulse** — added a small dim `💾` glyph near the
+   top-left HUD. It pulses brighter/larger whenever `saveGame()` writes
+   successfully.
+2. **Low-risk save hook** — `saveGame()` now calls
+   `ui.pulseSaveIndicator()` only after `localStorage.setItem(...)`
+   succeeds. Save data shape is unchanged.
+3. **Cache bump** — `project-grasslands/index.html` now loads
+   `game.js?v=93`.
+4. **Verification**:
+   - `node -c project-grasslands/game.js` exited 0.
+   - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
+   - Served `index.html` references `game.js?v=93`.
+
+### (legacy) session 20
 
 Continued from §4 quick polish. Cache now at **`?v=92`**.
 
@@ -390,8 +407,6 @@ The user is paused while context recharges. Pick freely.
    magneted, the `+Nz` float text we already show is fine, but the
    sparkle birth flash should follow the coin briefly so it reads
    as one event.
-2. **Auto-save indicator pulse** — tiny `💾` glyph in a HUD corner
-   that pulses each time `saveGame()` runs.
 
 **Gameplay (15–30 min):**
 1. **Pet companion** — small sprite (reuse blobling tinted with
@@ -1008,7 +1023,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=92`**. Next change should use `?v=93`.
+  change. Current: **`?v=93`**. Next change should use `?v=94`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1131,7 +1146,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=92`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=93`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.

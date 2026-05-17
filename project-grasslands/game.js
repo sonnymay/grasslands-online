@@ -1829,6 +1829,7 @@ function saveGame() {
       cellCol: player.cellCol, cellRow: player.cellRow,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    if (ui && typeof ui.pulseSaveIndicator === 'function') ui.pulseSaveIndicator();
   } catch (e) { /* localStorage full or disabled — ignore */ }
 }
 
@@ -3408,6 +3409,12 @@ class UIManager {
       fontSize: '14px', color: '#ffd24a', stroke: '#000', strokeThickness: 3,
     }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10003);
 
+    // Auto-save indicator — dim idle glyph that pulses whenever saveGame()
+    // writes successfully.
+    this.saveGlyph = scene.add.text(354, 20, '💾', {
+      fontSize: '18px', color: '#d8f7ff', stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10008).setAlpha(0.32);
+
     // Mini-map top-right.
     this.miniW = 160;
     this.miniH = 160;
@@ -3836,6 +3843,19 @@ class UIManager {
 
   visibleMessages() {
     return this.messages.slice(hudCompact ? -6 : -10);
+  }
+
+  pulseSaveIndicator() {
+    if (!this.saveGlyph) return;
+    this.scene.tweens.killTweensOf(this.saveGlyph);
+    this.saveGlyph.setAlpha(1).setScale(1.22);
+    this.scene.tweens.add({
+      targets: this.saveGlyph,
+      alpha: 0.32,
+      scale: 1,
+      duration: 520,
+      ease: 'Quad.out',
+    });
   }
 
   applyCompactHud() {
