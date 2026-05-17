@@ -296,6 +296,7 @@ function scaledMonsterExp(monster) {
 function awardHotStreak(monster, earnedExp) {
   if (!player || player.dead) return;
   player.hotStreak = (player.hotStreak || 0) + 1;
+  if (player.hotStreak > (player.bestStreak || 0)) player.bestStreak = player.hotStreak;
   if (player.hotStreak % 5 !== 0) return;
   const tier = (player.hotStreak % 10 === 0) ? 10 : 5;
   const bonus = Math.max(25, Math.round(earnedExp * tier * 1.2));
@@ -565,9 +566,12 @@ function preload() {
     this.load.image(`swordsman_idle_${d}`, `assets/sprites/swordsman_idle_${d}.png`);
     this.load.image(`swordsman_walk_${d}`, `assets/sprites/swordsman_walk_${d}.png`);
   }
-  // Mage + Archer: south only for now; other dirs fall back to class south.
-  this.load.image('mage_idle_south',      'assets/sprites/mage_idle_south.png');
-  this.load.image('mage_walk_south',      'assets/sprites/mage_walk_south.png');
+  // Mage: all 5 base directions.
+  for (const d of ['south','north','east','southeast','northeast']) {
+    this.load.image(`mage_idle_${d}`, `assets/sprites/mage_idle_${d}.png`);
+    this.load.image(`mage_walk_${d}`, `assets/sprites/mage_walk_${d}.png`);
+  }
+  // Archer: south only for now; other dirs fall back to class south.
   this.load.image('archer_idle_south',    'assets/sprites/archer_idle_south.png');
   this.load.image('archer_walk_south',    'assets/sprites/archer_walk_south.png');
   // Desert biome — Cactling monster + sand tileset + cactus / dune deco.
@@ -646,6 +650,10 @@ function create() {
     'swordsman_idle_east','swordsman_walk_east',
     'swordsman_idle_southeast','swordsman_walk_southeast',
     'swordsman_idle_northeast','swordsman_walk_northeast',
+    'mage_idle_north','mage_walk_north',
+    'mage_idle_east','mage_walk_east',
+    'mage_idle_southeast','mage_walk_southeast',
+    'mage_idle_northeast','mage_walk_northeast',
     'mage_idle_south','mage_walk_south',
     'archer_idle_south','archer_walk_south',
     'deco_flower_cluster_01','deco_flower_cluster_02','deco_flower_cluster_03','deco_flower_cluster_04',
@@ -1775,7 +1783,7 @@ function saveGame() {
       level: player.level, exp: player.exp,
       hp: player.hp, maxHP: player.maxHP,
       atk: player.atk, def: player.def, zeny: player.zeny,
-      kills: player.kills, hotStreak: player.hotStreak,
+      kills: player.kills, hotStreak: player.hotStreak, bestStreak: player.bestStreak,
       classId: player.classId, classTier: player.classTier,
       shopBought: player.shopBought,
       visitedLandmarks: player.visitedLandmarks,
@@ -1809,6 +1817,7 @@ function applySave() {
   player.zeny   = save.zeny   ?? 0;
   player.kills  = save.kills  ?? 0;
   player.hotStreak = save.hotStreak ?? 0;
+  player.bestStreak = save.bestStreak ?? 0;
   player.equipment = Object.assign({ weapon: null, armor: null }, save.equipment || {});
   player.bossTrophies = Object.assign({}, save.bossTrophies || {});
   player.trophyMilestones = Object.assign({}, save.trophyMilestones || {});
@@ -3502,7 +3511,8 @@ class UIManager {
     const streak = player.hotStreak || 0;
     if (streak > 0) {
       const next = 5 - (streak % 5);
-      const label = `🔥 Streak ×${streak}   (next bonus in ${next === 5 ? 5 : next})`;
+      const best = player.bestStreak || streak;
+      const label = `🔥 ×${streak}   next +${next === 5 ? 5 : next}   best ×${best}`;
       if (this.streakText.text !== label) this.streakText.setText(label);
       this.streakBg.setVisible(true);
       this.streakText.setVisible(true);
