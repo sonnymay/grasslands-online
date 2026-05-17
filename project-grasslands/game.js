@@ -744,12 +744,13 @@ class PlayerController {
       0.24
     ).setOrigin(0.5);
 
-    this.nameTag = scene.add.text(x, y, 'Rookie', {
+    this.nameTag = scene.add.text(x, y, `Rookie Lv.${this.level}`, {
       fontSize: '14px',
       color: '#ffffff',
       stroke: '#000000',
       strokeThickness: 3,
     }).setOrigin(0.5, 1);
+    this._refreshNameTag = () => this.nameTag.setText(`Rookie Lv.${this.level}`);
 
     // HP bar above the player (matches monster bars; only shows when wounded).
     this.hpBarBg = scene.add.rectangle(x, y, 44, 5, 0x000000).setOrigin(0.5);
@@ -1004,6 +1005,7 @@ class PlayerController {
     this.def += 1;
     this.hp = this.maxHP;
     ui.message(`LEVEL UP! Now Lv.${this.level} (+ATK +DEF)`);
+    this._refreshNameTag();
     sfxLevelUp();
     saveGame();
     const txt = this.scene.add.text(this.sprite.x, this.sprite.y - 40, 'LEVEL UP!', {
@@ -1160,6 +1162,7 @@ function applySave() {
   player.def    = save.def    ?? player.def;
   player.zeny   = save.zeny   ?? 0;
   player.kills  = save.kills  ?? 0;
+  if (player._refreshNameTag) player._refreshNameTag();
   if (Number.isInteger(save.cellCol) && Number.isInteger(save.cellRow)) {
     let col = save.cellCol, row = save.cellRow;
     // If the saved cell got blocked by new decorations, fall back to spawn.
@@ -1250,6 +1253,7 @@ function sfxCrit() {
 function sfxMiss()     { _tone(180, 0.06, 'sawtooth', 0.04); }
 function sfxLevelUp()  { _tone(523, 0.12, 'triangle', 0.1); _tone(659, 0.12, 'triangle', 0.1, 0.12); _tone(784, 0.2, 'triangle', 0.1, 0.24); }
 function sfxPickup()   { _tone(880, 0.06, 'sine', 0.08); _tone(1320, 0.08, 'sine', 0.08, 0.06); }
+function sfxHeal()     { _tone(660, 0.08, 'sine', 0.07); _tone(990, 0.1, 'sine', 0.06, 0.05); _tone(1320, 0.14, 'triangle', 0.05, 0.1); }
 function sfxPlayerHit(){ _noise(0.08, 0.08, 0, 800); _tone(140, 0.12, 'sawtooth', 0.08); }
 function sfxDeath()    { _tone(196, 0.4, 'sawtooth', 0.1, 0, 60); _tone(98, 0.5, 'sawtooth', 0.08, 0.2); }
 // Subtle grass scuff per cell — adds groundedness.
@@ -1455,6 +1459,7 @@ class MonsterController {
     if (!player.dead && player.hp < player.maxHP) {
       player.hp = Math.min(player.maxHP, player.hp + healAmt);
       spawnFloatText(this.scene, player.sprite.x, player.sprite.y - 20, `+${healAmt}`, 0x66ff88);
+      sfxHeal();
     }
     ui.message(`Killed ${this.cfg.name} (+${this.expReward} EXP, +${healAmt} HP)`);
     spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 30, `+${this.expReward} EXP`, 0x66ff66, { fontSize: '14px' });
@@ -1673,7 +1678,13 @@ class UIManager {
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
       .setStrokeStyle(2, 0xffffff, 0.8)
       .setInteractive({ useHandCursor: true });
-    this.muteText = scene.add.text(btnX + btnW / 2, btnY + btnH / 2, '♪ Music: ON', {
+    // Restore mute preference from localStorage.
+    const MUTE_KEY = 'grasslands_mute_v1';
+    let savedMute = false;
+    try { savedMute = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) { /* ignore */ }
+    if (savedMute && scene.bgm) scene.bgm.setMute(true);
+    this.muteText = scene.add.text(btnX + btnW / 2, btnY + btnH / 2,
+      savedMute ? '♪ Music: OFF' : '♪ Music: ON', {
       fontSize: '13px', color: '#ffffff', stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
     this.muteBg.on('pointerdown', () => {
@@ -1690,6 +1701,7 @@ class UIManager {
         } catch (e) { /* ignore */ }
       }
       this.muteText.setText(bgm.mute ? '♪ Music: OFF' : '♪ Music: ON');
+      try { localStorage.setItem(MUTE_KEY, bgm.mute ? '1' : '0'); } catch (e) { /* ignore */ }
     });
 
     // Chat box
