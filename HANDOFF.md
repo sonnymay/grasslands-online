@@ -1,8 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 6:15pm CDT (post session 21,
-> auto-save indicator pulse).
+> coding sessions. Last refresh: 2026-05-17 6:25pm CDT (post session 22,
+> road sparkle pickup polish).
 
 ---
 
@@ -186,7 +186,24 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 21 (latest, in order)
+## 3. What we did in session 22 (latest, in order)
+
+Continued from §4 quick polish. Cache now at **`?v=94`**.
+
+1. **Road sparkle halo follows the coin** — road sparkle zeny now creates
+   a biome-tinted halo attached to the `LootDrop`, instead of a detached
+   one-shot birth ring.
+2. **Pickup cohesion** — the halo shares the coin bounce, follows magnet
+   movement during auto-pickup, and fades out with the coin on collection.
+   This makes the sparkle, magnet, and `+Nz` pickup float read as one event.
+3. **Cache bump** — `project-grasslands/index.html` now loads
+   `game.js?v=94`.
+4. **Verification**:
+   - `node -c project-grasslands/game.js` exited 0.
+   - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
+   - Served `index.html` references `game.js?v=94`.
+
+### (legacy) session 21
 
 Continued from §4 quick polish. Cache now at **`?v=93`**.
 
@@ -401,12 +418,6 @@ Big QoL + content batch on top of Codex's session 15. Cache now at
 ## 4. Next steps for Codex (suggested)
 
 The user is paused while context recharges. Pick freely.
-
-**Quick polish (5–15 min):**
-1. **Pickup popups for ambience** — when a road sparkle gets
-   magneted, the `+Nz` float text we already show is fine, but the
-   sparkle birth flash should follow the coin briefly so it reads
-   as one event.
 
 **Gameplay (15–30 min):**
 1. **Pet companion** — small sprite (reuse blobling tinted with
@@ -1023,7 +1034,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=93`**. Next change should use `?v=94`.
+  change. Current: **`?v=94`**. Next change should use `?v=95`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1146,7 +1157,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=93`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=94`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.

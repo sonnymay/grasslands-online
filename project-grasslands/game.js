@@ -2348,19 +2348,14 @@ function tickRoadSparkles(scene, time) {
     const wx = tc * TILE_SIZE + TILE_SIZE / 2;
     const wy = tr * TILE_SIZE + TILE_SIZE / 2;
     if (Math.hypot(wx - player.sprite.x, wy - player.sprite.y) > SPARKLE_NEAR_PX) continue;
-    loots.push(new LootDrop(scene, wx, wy, Phaser.Math.Between(5, 25), 'zeny'));
-    // Brief biome-tinted birth flash so the sparkle catches the eye.
     const zone = getZone(tr, tc);
     const tintByZone = {
       grasslands: 0xfff0a8, forest: 0x88ee88, desert: 0xffd28a,
       ruins: 0xcccccc, riverside: 0x99ddff,
     };
-    const ring = scene.add.circle(wx, wy, 6, tintByZone[zone] || 0xffd24a, 0.85)
-      .setDepth(wy + 50);
-    scene.tweens.add({
-      targets: ring, scale: 4, alpha: 0,
-      duration: 700, onComplete: () => ring.destroy(),
-    });
+    loots.push(new LootDrop(scene, wx, wy, Phaser.Math.Between(5, 25), 'zeny', {
+      sparkleColor: tintByZone[zone] || 0xffd24a,
+    }));
     return;
   }
 }
@@ -2501,7 +2496,7 @@ function tickAmbience(scene, time, delta) {
 }
 
 class LootDrop {
-  constructor(scene, x, y, amount, kind = 'zeny') {
+  constructor(scene, x, y, amount, kind = 'zeny', opts = {}) {
     this.scene = scene;
     this.x = x; this.y = y;
     this.amount = amount;
@@ -2512,9 +2507,24 @@ class LootDrop {
     const rim  = kind === 'heal' ? 0x1b6b1b : 0x7a5a00;
     this.coin = scene.add.circle(x, y - 10, 8, fill).setStrokeStyle(2, rim);
     this.coin.setDepth(y);
+    if (opts.sparkleColor) {
+      this.sparkleHalo = scene.add.circle(x, y - 10, 9, opts.sparkleColor, 0.5)
+        .setStrokeStyle(2, opts.sparkleColor, 0.85)
+        .setDepth(y - 1);
+      scene.tweens.add({
+        targets: this.sparkleHalo,
+        scale: 2.2,
+        alpha: 0.18,
+        duration: 700,
+        yoyo: true,
+        repeat: -1,
+      });
+    }
     // Drop bounce.
     scene.tweens.add({
-      targets: this.coin, y: y, duration: 250,
+      targets: this.sparkleHalo ? [this.coin, this.sparkleHalo] : this.coin,
+      y,
+      duration: 250,
       ease: 'Bounce.easeOut',
     });
     // Subtle pulse so it's visible in grass.
@@ -2538,6 +2548,11 @@ class LootDrop {
     this.coin.x = this.x;
     this.coin.y = this.y;
     this.coin.setDepth(this.y);
+    if (this.sparkleHalo) {
+      this.sparkleHalo.x = this.x;
+      this.sparkleHalo.y = this.y;
+      this.sparkleHalo.setDepth(this.y - 1);
+    }
   }
 
   tryPickup(px, py) {
@@ -2547,10 +2562,17 @@ class LootDrop {
     if (Math.hypot(this.x - px, this.y - py) <= LOOT_PICKUP_RADIUS) {
       this.alive = false;
       this.scene.tweens.killTweensOf(this.coin);
+      if (this.sparkleHalo) this.scene.tweens.killTweensOf(this.sparkleHalo);
       this.scene.tweens.add({
         targets: this.coin, alpha: 0, y: this.y - 20, duration: 200,
         onComplete: () => this.coin.destroy(),
       });
+      if (this.sparkleHalo) {
+        this.scene.tweens.add({
+          targets: this.sparkleHalo, alpha: 0, scale: 2.8, duration: 220,
+          onComplete: () => this.sparkleHalo.destroy(),
+        });
+      }
       return true;
     }
     return false;
