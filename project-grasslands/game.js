@@ -96,28 +96,28 @@ const MONSTER_TYPES = {
   boss_mooham: {
     name: 'Boss MooHam',
     idleKey: 'mooham_idle', hitKey: 'mooham_hit', deadKey: 'mooham_dead',
-    maxHP: 240, atk: 16, expReward: 90, speed: 55,
+    maxHP: 260, atk: 16, expReward: 110, speed: 55,
     nameColor: '#ff9933', count: 1, scaleMult: 1.9,
     zones: ['desert'], boss: true,
   },
   king_blobling: {
     name: 'King Blobling',
     idleKey: 'blobling_idle', hitKey: 'blobling_hit', deadKey: 'blobling_dead',
-    maxHP: 180, atk: 14, expReward: 80, speed: 62,
+    maxHP: 160, atk: 10, expReward: 90, speed: 62,
     nameColor: '#ff99dd', count: BIOME_BOSS_COUNT, scaleMult: 1.7,
-    tint: 0xff88cc, zones: ['grasslands'], minSpawnDistance: 700, boss: true,
+    tint: 0xff88cc, zones: ['grasslands'], minSpawnDistance: 1200, boss: true,
   },
   ruin_golem: {
     name: 'Ruin Golem',
     idleKey: 'mooham_idle', hitKey: 'mooham_hit', deadKey: 'mooham_dead',
-    maxHP: 360, atk: 28, expReward: 150, speed: 42,
+    maxHP: 340, atk: 26, expReward: 170, speed: 42,
     nameColor: '#c8c0aa', count: BIOME_BOSS_COUNT, scaleMult: 2.0,
     tint: 0xaaa088, zones: ['ruins'], minSpawnDistance: 1600, boss: true,
   },
   river_warden: {
     name: 'River Warden',
     idleKey: 'moowaan_idle', hitKey: 'moowaan_hit', deadKey: 'moowaan_dead',
-    maxHP: 300, atk: 24, expReward: 135, speed: 58,
+    maxHP: 300, atk: 22, expReward: 155, speed: 58,
     nameColor: '#88ddff', count: BIOME_BOSS_COUNT, scaleMult: 1.8,
     tint: 0x77ccff, zones: ['riverside'], minSpawnDistance: 1400, boss: true,
   },
@@ -265,6 +265,12 @@ let bossRespawns = {};
 
 const QUEST_MONSTER_POOL = ['blobling', 'mooham', 'moowaan', 'cactling'];
 const QUEST_BOSS_POOL = ['king_blobling', 'boss_mooham', 'ruin_golem', 'river_warden'];
+const QUEST_ZONE_POOL = ['grasslands', 'riverside', 'desert', 'ruins'];
+const TROPHY_MILESTONES = [
+  { total: 3,  label: 'Boss Hunter',  atk: 2 },
+  { total: 10, label: 'Boss Breaker', def: 2 },
+  { total: 25, label: 'MVP Soul',     maxHP: 30 },
+];
 
 // Compact thousands-separator. Used wherever zeny is printed.
 function fmt(n) { return Math.floor(n).toLocaleString('en-US'); }
@@ -314,7 +320,17 @@ function awardHotStreak(monster, earnedExp) {
 
 function rollNewQuest() {
   const canBossQuest = player && player.level >= 10 && !activeQuests.some(q => q.kind === 'boss');
-  const bossQuest = canBossQuest && Math.random() < 0.25;
+  const zoneQuest = player && player.level >= 4 && !activeQuests.some(q => q.kind === 'zone') && Math.random() < 0.25;
+  const bossQuest = !zoneQuest && canBossQuest && Math.random() < 0.25;
+  if (zoneQuest) {
+    const zoneKey = QUEST_ZONE_POOL[Math.floor(Math.random() * QUEST_ZONE_POOL.length)];
+    const target = 8;
+    const reward = zoneKey === 'grasslands' ? 120 : 180;
+    activeQuests.push({ kind: 'zone', zoneKey, zoneName: ZONE_LABELS[zoneKey] || zoneKey, target, count: 0, reward });
+    if (typeof ui !== 'undefined' && ui) ui.message(`New quest: clear ${target} in ${ZONE_LABELS[zoneKey] || zoneKey} (${fmt(reward)} zeny).`);
+    saveGame();
+    return;
+  }
   const pool = bossQuest ? QUEST_BOSS_POOL : QUEST_MONSTER_POOL;
   const id = pool[Math.floor(Math.random() * pool.length)];
   const cfg = MONSTER_TYPES[id];
@@ -327,18 +343,28 @@ function rollNewQuest() {
   saveGame();
 }
 
-function onMonsterKilledForQuest(typeId) {
+function onMonsterKilledForQuest(monsterOrTypeId) {
   if (!activeQuests.length) return;
+  const monster = typeof monsterOrTypeId === 'object' ? monsterOrTypeId : null;
+  const typeId = monster ? monster.typeId : monsterOrTypeId;
+  let killedZone = null;
+  if (monster && monster.sprite) {
+    killedZone = getZone(Math.floor(monster.sprite.y / TILE_SIZE), Math.floor(monster.sprite.x / TILE_SIZE));
+  }
   let completed = false;
   for (const q of activeQuests) {
-    if (q.monsterTypeId !== typeId) continue;
+    if (q.kind === 'zone') {
+      if (q.zoneKey !== killedZone) continue;
+    } else if (q.monsterTypeId !== typeId) {
+      continue;
+    }
     q.count += 1;
     if (q.count < q.target) continue;
     const reward = q.reward;
-    const name = q.monsterName;
+    const name = q.kind === 'zone' ? q.zoneName : q.monsterName;
     player.zeny += reward;
     questChain += 1;
-    ui.message(`✓ Quest complete! Slayed ${q.target} ${name} (+${fmt(reward)} zeny)`);
+    ui.message(`✓ Quest complete! ${q.kind === 'zone' ? 'Cleared' : 'Slayed'} ${q.target} ${name} (+${fmt(reward)} zeny)`);
     spawnFloatText(player.scene, player.sprite.x, player.sprite.y - 42, `+${fmt(reward)}z`, 0xffd24a, { fontSize: '18px' });
     if (questChain % 3 === 0) {
       const chainBonus = Math.max(75, Math.round(reward * 0.75));
@@ -391,14 +417,40 @@ function recordBossTrophy(monster) {
   player.bossTrophies[monster.typeId] = (player.bossTrophies[monster.typeId] || 0) + 1;
   const total = Object.values(player.bossTrophies).reduce((sum, n) => sum + n, 0);
   spawnFloatText(monster.scene, player.sprite.x, player.sprite.y - 110, `Trophy +1 (${total})`, 0xffe066, { fontSize: '16px' });
+  player.trophyMilestones = player.trophyMilestones || {};
+  for (const m of TROPHY_MILESTONES) {
+    if (total < m.total || player.trophyMilestones[m.total]) continue;
+    player.trophyMilestones[m.total] = true;
+    if (m.atk) player.atk += m.atk;
+    if (m.def) player.def += m.def;
+    if (m.maxHP) {
+      player.maxHP += m.maxHP;
+      player.hp = Math.min(player.maxHP, player.hp + m.maxHP);
+    }
+    const gains = [];
+    if (m.atk) gains.push(`+${m.atk} ATK`);
+    if (m.def) gains.push(`+${m.def} DEF`);
+    if (m.maxHP) gains.push(`+${m.maxHP} HP`);
+    const label = `${m.label}! ${gains.join(' ')}`;
+    spawnFloatText(monster.scene, player.sprite.x, player.sprite.y - 138, label, 0xffe066, { fontSize: '18px' });
+    ui.message(`Trophy milestone: ${label}`);
+    sfxLevelUp();
+  }
 }
 
 function gearSummary() {
-  const short = (name) => name.length > 13 ? `${name.slice(0, 12)}…` : name;
-  const w = player.equipment.weapon ? short(player.equipment.weapon.name) : 'No weapon';
-  const a = player.equipment.armor ? short(player.equipment.armor.name) : 'No armor';
+  const short = (name) => name.length > 11 ? `${name.slice(0, 10)}…` : name;
+  const item = (slot, empty) => {
+    const it = player.equipment[slot];
+    if (!it) return empty;
+    const stat = it.atk ? `+${it.atk} ATK` : `+${it.def || 0} DEF`;
+    return `${short(it.name)} ${stat}`;
+  };
+  const w = item('weapon', 'No weapon');
+  const a = item('armor', 'No armor');
   const trophies = Object.values(player.bossTrophies || {}).reduce((sum, n) => sum + n, 0);
-  return `W: ${w}  A: ${a}  Trophies: ${trophies}`;
+  const next = TROPHY_MILESTONES.find(m => trophies < m.total);
+  return `Gear: ${w} / ${a}\nTrophies: ${trophies}${next ? `  Next: ${next.total}` : '  Max bonus'}`;
 }
 
 // Shop items. price = base * 1.5^bought.
@@ -747,6 +799,7 @@ function update(time, delta) {
     if (z !== currentZone) {
       currentZone = z;
       showZoneBanner(player.scene, ZONE_LABELS[z] || z, z);
+      showBossZoneHint(player.scene, z);
     }
   }
 
@@ -773,7 +826,8 @@ function update(time, delta) {
       if (!safe(m)) continue;
       const d = Math.hypot(m.sprite.x - player.sprite.x, m.sprite.y - player.sprite.y);
       // Prefer the active quest target — gives autopilot a real goal.
-      const isQuestTarget = activeQuests.some(q => q.monsterTypeId === m.typeId);
+      const mz = getZone(Math.floor(m.sprite.y / TILE_SIZE), Math.floor(m.sprite.x / TILE_SIZE));
+      const isQuestTarget = activeQuests.some(q => q.kind === 'zone' ? q.zoneKey === mz : q.monsterTypeId === m.typeId);
       let neighbors = 0;
       for (const n of bloblings) {
         if (n === m || !safe(n)) continue;
@@ -1055,6 +1109,7 @@ class PlayerController {
     this.hotStreak = 0;
     this.equipment = { weapon: null, armor: null };
     this.bossTrophies = {};
+    this.trophyMilestones = {};
     this.classId = null;   // 'swordsman' | 'mage' | 'archer'
     this.classTier = 0;    // 0 = unselected, 1..4 once chosen
     this.shopBought = { hp: 0, atk: 0, def: 0, pot: 0 };
@@ -1572,6 +1627,7 @@ function saveGame() {
       questChain: questChain,
       equipment: player.equipment,
       bossTrophies: player.bossTrophies,
+      trophyMilestones: player.trophyMilestones,
       cellCol: player.cellCol, cellRow: player.cellRow,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -1599,6 +1655,7 @@ function applySave() {
   player.hotStreak = save.hotStreak ?? 0;
   player.equipment = Object.assign({ weapon: null, armor: null }, save.equipment || {});
   player.bossTrophies = Object.assign({}, save.bossTrophies || {});
+  player.trophyMilestones = Object.assign({}, save.trophyMilestones || {});
   player.classId   = save.classId   ?? null;
   player.classTier = save.classTier ?? 0;
   player.shopBought = Object.assign({ hp:0, atk:0, def:0, pot:0 }, save.shopBought || {});
@@ -2000,7 +2057,7 @@ class MonsterController {
     awardHotStreak(this, earnedExp);
     recordBossTrophy(this);
     tryEquipDrop(this);
-    onMonsterKilledForQuest(this.typeId);
+    onMonsterKilledForQuest(this);
     // Center-screen banner when a boss-tier monster (or aggressive) dies.
     const cfg = this.cfg || {};
     if (isBossCfg(cfg)) {
@@ -2138,6 +2195,38 @@ function showZoneBanner(scene, label, zoneKey) {
     targets, alpha: 1, duration: 350,
     yoyo: true, hold: 1400,
     onComplete: () => targets.forEach(t => t.destroy()),
+  });
+}
+
+function showBossZoneHint(scene, zoneKey) {
+  if (!scene || !zoneKey) return;
+  const typeId = Object.keys(MONSTER_TYPES).find(id => {
+    const cfg = MONSTER_TYPES[id];
+    return isBossCfg(cfg) && cfg.zones && cfg.zones.includes(zoneKey);
+  });
+  if (!typeId) return;
+  const cfg = MONSTER_TYPES[typeId];
+  const alive = bloblings.some(m => m.alive && m.typeId === typeId);
+  const respawnAt = bossRespawns[typeId];
+  let label = null;
+  if (alive) {
+    label = `${cfg.name} is roaming`;
+  } else if (respawnAt) {
+    const secs = Math.max(0, Math.ceil((respawnAt - scene.time.now) / 1000));
+    label = `${cfg.name} returns in ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+  }
+  if (!label) return;
+  const txt = scene.add.text(GAME_W / 2, 192, label, {
+    fontSize: '17px', fontStyle: 'bold', color: '#ffdddd',
+    stroke: '#3a0000', strokeThickness: 4,
+  }).setOrigin(0.5).setScrollFactor(0).setDepth(10500).setAlpha(0);
+  scene.tweens.add({
+    targets: txt,
+    alpha: 1,
+    duration: 280,
+    yoyo: true,
+    hold: 1300,
+    onComplete: () => txt.destroy(),
   });
 }
 
@@ -2825,6 +2914,12 @@ class UIManager {
     });
     addTip(this.clBg, 'Choose or change class', btnX, clY + btnH / 2);
 
+    let debugUi = false;
+    try {
+      debugUi = new URLSearchParams(window.location.search).get('debug') === '1' ||
+        localStorage.getItem('grasslands_debug_v1') === '1';
+    } catch (e) { debugUi = false; }
+
     // Cheat button — manually bump level by 1. Triggers normal levelUp() so
     // tier upgrades + class select prompt fire as if earned organically.
     const lvY = clY + btnH + 6;
@@ -2879,9 +2974,15 @@ class UIManager {
       saveGame();
     });
     addTip(this.lvMBg, 'Debug: lower level by 1', btnX, lvMY + btnH / 2);
+    if (!debugUi) {
+      for (const obj of [this.lvBg, this.lvText, this.lv10Bg, this.lv10Text, this.lvMBg, this.lvMText]) {
+        obj.setVisible(false);
+      }
+      for (const obj of [this.lvBg, this.lv10Bg, this.lvMBg]) obj.disableInteractive();
+    }
 
     // Shop button — spend zeny on permanent upgrades + full-heal potion.
-    const shY = lvMY + btnH + 6;
+    const shY = (debugUi ? lvMY : clY) + btnH + 6;
     this.shBg = scene.add.rectangle(btnX, shY, btnW, btnH, 0x553300, 0.9)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
       .setStrokeStyle(2, 0xffe066, 1)
@@ -2905,12 +3006,13 @@ class UIManager {
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
     this.questBg.setVisible(false);
     this.questText.setVisible(false);
-    this.gearBg = scene.add.rectangle(10, 70, 330, 26, 0x000000, 0.55)
+    this.gearBg = scene.add.rectangle(10, 70, 330, 38, 0x000000, 0.55)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
       .setStrokeStyle(1, 0x88ddff, 0.7);
-    this.gearText = scene.add.text(20, 83, '', {
+    this.gearText = scene.add.text(20, 78, '', {
       fontSize: '11px', color: '#d8f7ff', stroke: '#000', strokeThickness: 2,
-    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(10006);
+      lineSpacing: 2,
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
 
     // Boss HP bar (top of screen, hidden until a boss is engaged).
     const bbW = 520, bbH = 22;
@@ -2967,7 +3069,11 @@ class UIManager {
 
     // Quest tracker badge.
     if (activeQuests.length) {
-      const txt = activeQuests.map((q, i) => `${q.kind === 'boss' ? 'Boss' : `Quest ${i + 1}`}: ${q.count}/${q.target} ${q.monsterName}`).join('\n');
+      const txt = activeQuests.map((q, i) => {
+        const label = q.kind === 'boss' ? 'Boss' : `Quest ${i + 1}`;
+        const target = q.kind === 'zone' ? q.zoneName : q.monsterName;
+        return `${label}: ${q.count}/${q.target} ${target}`;
+      }).join('\n');
       if (this.questText.text !== txt) this.questText.setText(txt);
       this.questBg.setVisible(true);
       this.questText.setVisible(true);

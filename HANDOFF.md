@@ -1,8 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 1:25pm CDT (post session 13,
-> progression visibility and chase-loop polish).
+> coding sessions. Last refresh: 2026-05-17 1:31pm CDT (post session 14,
+> satisfaction/friction polish and automatic chase rewards).
 
 ---
 
@@ -186,7 +186,61 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 13 (latest, in order)
+## 3. What we did in session 14 (latest, in order)
+
+Goal: make the game more satisfying, simpler to read, less annoying, and more
+automatic without adding NPCs or extra controls. Cache now at **`?v=75`**.
+
+1. **Normal-player UI decluttered.** The visible +1/+10/-1 level debug
+   buttons are now hidden unless `?debug=1` or
+   `localStorage.grasslands_debug_v1 = "1"` is set. The shop moves up into
+   that space, so the right-side UI is shorter and less noisy.
+2. **Zone-clear quests added.** At Lv 4+, one quest slot can roll
+   `clear 8 in [zone]` for grasslands/riverside/desert/ruins. Autopilot now
+   understands zone quests and prefers safe monsters inside the active quest
+   zone.
+3. **Automatic boss trophy milestones added.** Total boss trophies at 3/10/25
+   grant permanent bonuses automatically:
+   - 3 trophies: `Boss Hunter` (+2 ATK)
+   - 10 trophies: `Boss Breaker` (+2 DEF)
+   - 25 trophies: `MVP Soul` (+30 Max HP)
+   Milestone claims persist in save data.
+4. **Equipment visibility upgraded.** The gear HUD now shows weapon/armor
+   stat bonuses and the next trophy milestone target, not just item names.
+5. **Boss zone stingers added.** On zone entry, the game tells the player
+   whether that zone's boss is roaming or when it will return.
+6. **Boss balance pass.** New biome bosses are a bit less cheap and more
+   rewarding:
+   - King Blobling spawns farther from the player, hits softer, and pays more.
+   - Boss MooHam, Ruin Golem, and River Warden pay more EXP.
+   - Ruin Golem / River Warden ATK reduced slightly.
+   - Bigfoot's high-danger identity was left intact.
+7. **Cache bust bumped** in `project-grasslands/index.html` from `?v=74`
+   to `?v=75`.
+8. **Verification so far**:
+   - `node -c project-grasslands/game.js` exited 0.
+   - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
+   - Served `index.html` references `game.js?v=75`.
+
+## 4. Suggestions / next best ROI
+
+NPC merchant remains skipped per user request.
+
+Recommended next batch:
+
+1. **Auto-safety polish** — add a simple panic-heal behavior when HP is very
+   low and the player has enough zeny, with a cooldown so it feels helpful
+   rather than invincible.
+2. **Reward chest moments** — every 10th normal kill drops a small bonus coin
+   burst so streaks feel tactile even before the banner.
+3. **Quest UI clarity pass** — add tiny color accents for Slay / Clear / Boss
+   objectives so players understand goals at a glance.
+4. **Boss trophy collection panel** — compact list of each boss trophy count,
+   opened from the existing gear HUD or shop, no NPC needed.
+5. **Biome identity polish** — more unique boss stinger colors and minimap
+   boss markers per zone.
+
+## 5. (legacy) What we did in session 13 (in order)
 
 Goal: make players feel visible progress and have one-more-run goals without
 adding NPCs or broad new systems. Cache now at **`?v=74`**.
@@ -212,7 +266,7 @@ adding NPCs or broad new systems. Cache now at **`?v=74`**.
    - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
    - Served `index.html` references `game.js?v=74`.
 
-## 4. Suggestions / next best ROI
+## 6. Previous suggestions
 
 NPC merchant remains skipped per user request.
 
@@ -229,7 +283,7 @@ Recommended next batch:
 5. **Long-term collection goals** — trophy milestones at 3/10/25 boss kills
    grant titles or small stat bonuses.
 
-## 5. (legacy) What we did in session 12 (in order)
+## 7. (legacy) What we did in session 12 (in order)
 
 User said to do all non-NPC suggestions. Cache now at **`?v=73`**.
 
@@ -269,7 +323,7 @@ User said to do all non-NPC suggestions. Cache now at **`?v=73`**.
    - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
    - Served `index.html` references `game.js?v=73`.
 
-## 6. Previous suggestions
+## 8. Previous suggestions
 
 NPC merchant is intentionally skipped per user request.
 
@@ -286,7 +340,7 @@ Recommended next batch:
 5. **Boss respawn longer cadence** — if 5 seconds feels too arcade, move
    bosses to 60-180 seconds and keep normal mobs at 5 seconds.
 
-## 7. (legacy) What we did in session 11 (in order)
+## 9. (legacy) What we did in session 11 (in order)
 
 Followed the suggested next ROI order. Cache now at **`?v=72`**.
 
@@ -307,7 +361,7 @@ Followed the suggested next ROI order. Cache now at **`?v=72`**.
    - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
    - Served `index.html` references `game.js?v=72`.
 
-## 8. Previous suggestions
+## 10. Previous suggestions
 
 Recommended next batch:
 
@@ -323,7 +377,7 @@ Recommended next batch:
 5. **Mini-boss per biome** — strong content expansion, but needs either
    new art or careful recolor/reuse choices to avoid feeling cheap.
 
-## 9. (legacy) What we did in session 10 (in order)
+## 11. (legacy) What we did in session 10 (in order)
 
 Follow-up from the user's ranked ROI list. Cache now at **`?v=71`**.
 
@@ -349,7 +403,7 @@ Follow-up from the user's ranked ROI list. Cache now at **`?v=71`**.
    - Escalated local server on `127.0.0.1:8000` answered `HTTP/1.0 200 OK`.
    - Served `index.html` references `game.js?v=71`.
 
-## 10. Previous suggestions
+## 12. Previous suggestions
 
 Recommended next batch:
 
