@@ -573,9 +573,11 @@ function preload() {
     this.load.image(`mage_idle_${d}`, `assets/sprites/mage_idle_${d}.png`);
     this.load.image(`mage_walk_${d}`, `assets/sprites/mage_walk_${d}.png`);
   }
-  // Archer: south only for now; other dirs fall back to class south.
-  this.load.image('archer_idle_south',    'assets/sprites/archer_idle_south.png');
-  this.load.image('archer_walk_south',    'assets/sprites/archer_walk_south.png');
+  // Archer: all 5 base directions.
+  for (const d of ['south','north','east','southeast','northeast']) {
+    this.load.image(`archer_idle_${d}`, `assets/sprites/archer_idle_${d}.png`);
+    this.load.image(`archer_walk_${d}`, `assets/sprites/archer_walk_${d}.png`);
+  }
   // Desert biome — Cactling monster + sand tileset + cactus / dune deco.
   this.load.image('cactling_idle', 'assets/sprites/cactling_idle.png');
   this.load.image('cactling_hit', 'assets/sprites/cactling_hit.png');
@@ -656,6 +658,10 @@ function create() {
     'mage_idle_east','mage_walk_east',
     'mage_idle_southeast','mage_walk_southeast',
     'mage_idle_northeast','mage_walk_northeast',
+    'archer_idle_north','archer_walk_north',
+    'archer_idle_east','archer_walk_east',
+    'archer_idle_southeast','archer_walk_southeast',
+    'archer_idle_northeast','archer_walk_northeast',
     'mage_idle_south','mage_walk_south',
     'archer_idle_south','archer_walk_south',
     'deco_flower_cluster_01','deco_flower_cluster_02','deco_flower_cluster_03','deco_flower_cluster_04',
@@ -811,6 +817,18 @@ function create() {
     ui.message('Click monsters to attack. Click ground to walk.');
     ui.message('Click monsters to auto-fight. Tab targets nearest. Shift+R resets save.');
   }
+  // Daily login bonus — once per calendar day. Persists in localStorage.
+  try {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const last = localStorage.getItem('grasslands_last_login_v1');
+    if (last !== today) {
+      localStorage.setItem('grasslands_last_login_v1', today);
+      const bonus = 500;
+      player.zeny += bonus;
+      ui.message(`🌟 Daily login bonus: +${fmt(bonus)} zeny!`);
+      if (typeof sfxLevelUp === 'function') sfxLevelUp();
+    }
+  } catch (e) { /* ignore */ }
   ensureQuestSlots();
 }
 
