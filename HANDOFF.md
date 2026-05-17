@@ -1,7 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 2:35am CDT (post session 7).
+> coding sessions. Last refresh: 2026-05-17 3:15am CDT (post session 7,
+> RO-feel pass).
 
 ---
 
@@ -213,26 +214,46 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
    prefix lookup (the `spritePrefix` field is already there).
 7. **Loot auto-collect magnet + autopilot toggle** shipped earlier in
    the session — see commits `f6e595b` and the mute/heal commits.
-8. Cache bumped to **`?v=50`**.
+8. **Class card art wired** — `swordsman_card.png` / `mage_card.png` /
+   `archer_card.png` preloaded; `showClassSelect` was already gated on
+   `scene.textures.exists` so cards rendered the moment they shipped.
+9. **Class-flavored attack visuals** (`spawnClassAttackFx`): swordsman
+   white slash arc, mage blue fireball + burst, archer yellow arrow
+   streak. Procs every player hit; falls back to a generic impact when
+   no class is chosen yet.
+10. **Auto-skill every 10s** (`SPECIAL_COOLDOWN_MS`). While charged a
+    pulsing gold ring sits under the player. Next attack consumes it:
+    2x damage + upgraded visual ("BASH!" / "METEOR!" / "TRIPLE SHOT!").
+    No hotkey — fully automatic per the simple+automatic direction.
+11. **Boss HP bar** at top of screen — shows whenever any aggressive or
+    boss-tier monster (`expReward >= 90`) is within 1200 px. Tracks the
+    nearest. Hides automatically when out of range or dead.
+12. **Zone-entry banner** — fades in/out when crossing a biome
+    boundary ("Entering Sun-bleached Desert" etc).
+13. **Return Home button** under the autopilot toggle — instant warp
+    back to spawn, clears path/target.
+14. Cache bumped to **`?v=52`**.
 
 ## 4. Next steps (pick any)
 
-1. **Real class card art.** Generate `swordsman_card.png`,
-   `mage_card.png`, `archer_card.png` at ~512×768 each. Wire in
-   `preload()`; `showClassSelect` already checks
-   `scene.textures.exists(cdef.cardImage)` and renders the image if
-   present.
-2. **Real per-class player sprites.** Generate `swordsman_idle_<dir>`,
+1. **Real per-class player sprites.** Generate `swordsman_idle_<dir>`,
    `swordsman_walk{,2,3,4}_<dir>` (same 8-dir × 5-frame layout as
    rookie), then mage and archer. Update `applyRookieTexture` to
    prefix from `CLASS_DEFS[player.classId].spritePrefix` (fall back to
-   `rookie_` if the texture doesn't exist).
-3. **Slice `desert_props.png` by hand** — still pending from session 6.
-4. **Forest tileset.** Same pattern as desert. Ruins, riverside next.
-5. **Class-specific skills / attack flavor.** With classes wired,
-   distinct ranged/magic feel for archer/mage is the obvious next
-   gameplay beat — but the user removed skills earlier so confirm
-   before reintroducing.
+   `rookie_` if the texture doesn't exist). Currently still tinted
+   rookie.
+2. **Slice `desert_props.png` by hand** — non-uniform 512×512 sheet
+   with skull/bones/skeleton/rocks/signpost. Add manual `{x,y,w,h}`
+   per frame in `preload()`, then drop into the desert scatter pass.
+3. **Forest tileset.** Same pattern as desert (real tiles + skip
+   tint). Ruins and riverside next.
+4. **Boss kill announcement** — big center-screen text + chime when a
+   boss-tier monster dies. Reuses `expReward >= 90` test.
+5. **Death respawn countdown** — currently silent 3s; add
+   "Respawning in 3..." text and dim overlay.
+6. **Item drops beyond zeny** — potions and accessories with simple
+   inventory + auto-equip when ATK higher. Bigger feature.
+7. **Skill / item shop NPC** at spawn — buy temporary buffs with zeny.
 
 ## 5. (legacy) What we did in session 6 (in order)
 
