@@ -200,6 +200,7 @@ const BOB_AMPLITUDE = 3;     // subtle lift; too much reads as bounce, not walki
 const STEP_SQUASH = 0.04;    // tiny squash so feet stay visually planted
 const ATTACK_RANGE = 100; // melee click-attack range
 const RESPAWN_MS = 5000;
+const BOSS_RESPAWN_MS = 60000;
 const PLAYER_RESPAWN_MS = 3000;
 
 // Tile indices in a 4x4 tileset (0..15), left→right, top→bottom
@@ -263,6 +264,7 @@ let questChain = 0;
 let bossRespawns = {};
 
 const QUEST_MONSTER_POOL = ['blobling', 'mooham', 'moowaan', 'cactling'];
+const QUEST_BOSS_POOL = ['king_blobling', 'boss_mooham', 'ruin_golem', 'river_warden'];
 
 // Compact thousands-separator. Used wherever zeny is printed.
 function fmt(n) { return Math.floor(n).toLocaleString('en-US'); }
@@ -311,13 +313,16 @@ function awardHotStreak(monster, earnedExp) {
 }
 
 function rollNewQuest() {
-  const id = QUEST_MONSTER_POOL[Math.floor(Math.random() * QUEST_MONSTER_POOL.length)];
+  const canBossQuest = player && player.level >= 10 && !activeQuests.some(q => q.kind === 'boss');
+  const bossQuest = canBossQuest && Math.random() < 0.25;
+  const pool = bossQuest ? QUEST_BOSS_POOL : QUEST_MONSTER_POOL;
+  const id = pool[Math.floor(Math.random() * pool.length)];
   const cfg = MONSTER_TYPES[id];
-  const target = 10;
-  const reward = Math.round((cfg.expReward || 10) * target * 1.5);
-  activeQuests.push({ monsterTypeId: id, monsterName: cfg.name, target, count: 0, reward });
+  const target = bossQuest ? 1 : 10;
+  const reward = bossQuest ? Math.round((cfg.expReward || 80) * 5) : Math.round((cfg.expReward || 10) * target * 1.5);
+  activeQuests.push({ kind: bossQuest ? 'boss' : 'slay', monsterTypeId: id, monsterName: cfg.name, target, count: 0, reward });
   if (typeof ui !== 'undefined' && ui) {
-    ui.message(`New quest: slay ${target} ${cfg.name} (${fmt(reward)} zeny).`);
+    ui.message(`New quest: ${bossQuest ? 'hunt' : 'slay'} ${target} ${cfg.name} (${fmt(reward)} zeny).`);
   }
   saveGame();
 }
@@ -379,6 +384,21 @@ function tryEquipDrop(monster) {
   ui.message(`Equipped ${item.name} (+${value} ${stat.toUpperCase()}).`);
   sfxLevelUp();
   saveGame();
+}
+
+function recordBossTrophy(monster) {
+  if (!isBossCfg(monster.cfg) || !player || player.dead) return;
+  player.bossTrophies[monster.typeId] = (player.bossTrophies[monster.typeId] || 0) + 1;
+  const total = Object.values(player.bossTrophies).reduce((sum, n) => sum + n, 0);
+  spawnFloatText(monster.scene, player.sprite.x, player.sprite.y - 110, `Trophy +1 (${total})`, 0xffe066, { fontSize: '16px' });
+}
+
+function gearSummary() {
+  const short = (name) => name.length > 13 ? `${name.slice(0, 12)}…` : name;
+  const w = player.equipment.weapon ? short(player.equipment.weapon.name) : 'No weapon';
+  const a = player.equipment.armor ? short(player.equipment.armor.name) : 'No armor';
+  const trophies = Object.values(player.bossTrophies || {}).reduce((sum, n) => sum + n, 0);
+  return `W: ${w}  A: ${a}  Trophies: ${trophies}`;
 }
 
 // Shop items. price = base * 1.5^bought.
@@ -1034,6 +1054,7 @@ class PlayerController {
     this.kills = 0;
     this.hotStreak = 0;
     this.equipment = { weapon: null, armor: null };
+    this.bossTrophies = {};
     this.classId = null;   // 'swordsman' | 'mage' | 'archer'
     this.classTier = 0;    // 0 = unselected, 1..4 once chosen
     this.shopBought = { hp: 0, atk: 0, def: 0, pot: 0 };
@@ -1550,6 +1571,7 @@ function saveGame() {
       activeQuests: activeQuests, activeQuest: activeQuests[0] || null,
       questChain: questChain,
       equipment: player.equipment,
+      bossTrophies: player.bossTrophies,
       cellCol: player.cellCol, cellRow: player.cellRow,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -1576,6 +1598,7 @@ function applySave() {
   player.kills  = save.kills  ?? 0;
   player.hotStreak = save.hotStreak ?? 0;
   player.equipment = Object.assign({ weapon: null, armor: null }, save.equipment || {});
+  player.bossTrophies = Object.assign({}, save.bossTrophies || {});
   player.classId   = save.classId   ?? null;
   player.classTier = save.classTier ?? 0;
   player.shopBought = Object.assign({ hp:0, atk:0, def:0, pot:0 }, save.shopBought || {});
@@ -1975,6 +1998,7 @@ class MonsterController {
     if (this.auraRing) { this.scene.tweens.killTweensOf(this.auraRing); this.auraRing.destroy(); this.auraRing = null; }
     player.kills += 1;
     awardHotStreak(this, earnedExp);
+    recordBossTrophy(this);
     tryEquipDrop(this);
     onMonsterKilledForQuest(this.typeId);
     // Center-screen banner when a boss-tier monster (or aggressive) dies.
@@ -2019,8 +2043,9 @@ class MonsterController {
       if (idx >= 0) bloblings.splice(idx, 1);
     });
 
-    if (isBossCfg(this.cfg)) bossRespawns[this.typeId] = this.scene.time.now + RESPAWN_MS;
-    this.scene.time.delayedCall(RESPAWN_MS, () => spawnMonster(this.scene, this.typeId));
+    const respawnDelay = isBossCfg(this.cfg) ? BOSS_RESPAWN_MS : RESPAWN_MS;
+    if (isBossCfg(this.cfg)) bossRespawns[this.typeId] = this.scene.time.now + respawnDelay;
+    this.scene.time.delayedCall(respawnDelay, () => spawnMonster(this.scene, this.typeId));
   }
 
   _swingAtPlayer() {
@@ -2880,6 +2905,12 @@ class UIManager {
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
     this.questBg.setVisible(false);
     this.questText.setVisible(false);
+    this.gearBg = scene.add.rectangle(10, 70, 330, 26, 0x000000, 0.55)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
+      .setStrokeStyle(1, 0x88ddff, 0.7);
+    this.gearText = scene.add.text(20, 83, '', {
+      fontSize: '11px', color: '#d8f7ff', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(10006);
 
     // Boss HP bar (top of screen, hidden until a boss is engaged).
     const bbW = 520, bbH = 22;
@@ -2936,7 +2967,7 @@ class UIManager {
 
     // Quest tracker badge.
     if (activeQuests.length) {
-      const txt = activeQuests.map((q, i) => `Quest ${i + 1}: ${q.count}/${q.target} ${q.monsterName}`).join('\n');
+      const txt = activeQuests.map((q, i) => `${q.kind === 'boss' ? 'Boss' : `Quest ${i + 1}`}: ${q.count}/${q.target} ${q.monsterName}`).join('\n');
       if (this.questText.text !== txt) this.questText.setText(txt);
       this.questBg.setVisible(true);
       this.questText.setVisible(true);
@@ -2944,6 +2975,8 @@ class UIManager {
       this.questBg.setVisible(false);
       this.questText.setVisible(false);
     }
+    const gearTxt = gearSummary();
+    if (this.gearText.text !== gearTxt) this.gearText.setText(gearTxt);
 
     // Boss bar — show whenever any aggressive / boss-tier monster is alive
     // anywhere in the world. Picks the closest one when several are around.
