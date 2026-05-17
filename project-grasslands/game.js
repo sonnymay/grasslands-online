@@ -231,6 +231,9 @@ let activeQuest = null; // { monsterTypeId, monsterName, target, count, reward }
 
 const QUEST_MONSTER_POOL = ['blobling', 'mooham', 'moowaan', 'cactling'];
 
+// Compact thousands-separator. Used wherever zeny is printed.
+function fmt(n) { return Math.floor(n).toLocaleString('en-US'); }
+
 function rollNewQuest() {
   const id = QUEST_MONSTER_POOL[Math.floor(Math.random() * QUEST_MONSTER_POOL.length)];
   const cfg = MONSTER_TYPES[id];
@@ -238,7 +241,7 @@ function rollNewQuest() {
   const reward = Math.round((cfg.expReward || 10) * target * 1.5);
   activeQuest = { monsterTypeId: id, monsterName: cfg.name, target, count: 0, reward };
   if (typeof ui !== 'undefined' && ui) {
-    ui.message(`New quest: slay ${target} ${cfg.name} (${reward} zeny).`);
+    ui.message(`New quest: slay ${target} ${cfg.name} (${fmt(reward)} zeny).`);
   }
   saveGame();
 }
@@ -251,7 +254,7 @@ function onMonsterKilledForQuest(typeId) {
     const reward = activeQuest.reward;
     const name = activeQuest.monsterName;
     player.zeny += reward;
-    ui.message(`✓ Quest complete! Slayed ${activeQuest.target} ${name} (+${reward} zeny)`);
+    ui.message(`✓ Quest complete! Slayed ${activeQuest.target} ${name} (+${fmt(reward)} zeny)`);
     sfxLevelUp();
     activeQuest = null;
     rollNewQuest();
@@ -580,7 +583,7 @@ function create() {
   // Apply saved progress (level / exp / zeny / position) if present.
   const loaded = applySave();
   if (loaded) {
-    ui.message(`Welcome back — Lv.${player.level}, ${player.zeny} zeny.`);
+    ui.message(`Welcome back — Lv.${player.level}, ${fmt(player.zeny)} zeny.`);
   } else {
     // First-session tutorial only. Returning players don't need the hints.
     ui.message('Welcome to Grasslands Online!');
@@ -649,10 +652,10 @@ function update(time, delta) {
       if (l.tryPickup(player.sprite.x, player.sprite.y)) {
         if (l.kind === 'heal') {
           player.hp = Math.min(player.maxHP, player.hp + l.amount);
-          ui.message(`Healed +${l.amount} HP.`);
+          spawnFloatText(player.scene, player.sprite.x, player.sprite.y - 14, `+${l.amount} HP`, 0x66ff88);
         } else {
           player.zeny += l.amount;
-          ui.message(`Picked up ${l.amount} zeny.`);
+          spawnFloatText(player.scene, player.sprite.x, player.sprite.y - 14, `+${fmt(l.amount)}z`, 0xffd24a);
         }
         sfxPickup();
       }
@@ -1823,6 +1826,17 @@ class MonsterController {
     if (this.auraRing) { this.scene.tweens.killTweensOf(this.auraRing); this.auraRing.destroy(); this.auraRing = null; }
     player.kills += 1;
     onMonsterKilledForQuest(this.typeId);
+    // Center-screen banner when a boss-tier monster (or aggressive) dies.
+    const cfg = this.cfg || {};
+    if (cfg.aggressive || cfg.expReward >= 90) {
+      const banner = this.scene.add.text(GAME_W / 2, 200, `${cfg.name} slain!`, {
+        fontSize: '40px', fontStyle: 'bold', color: '#ffe066',
+        stroke: '#5a3a00', strokeThickness: 6,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(19000).setAlpha(0);
+      this.scene.tweens.add({ targets: banner, alpha: 1, duration: 300, yoyo: true,
+        hold: 1500, onComplete: () => banner.destroy() });
+      sfxLevelUp();
+    }
     // Heal on kill: 8% of maxHP, scaled up for bosses (expReward >= 90)
     // and rare kills (always full heal).
     const healPct = this.cfg.levelsAward ? 1.0 : (this.expReward >= 90 ? 0.30 : 0.08);
@@ -2110,7 +2124,7 @@ function showShop(scene) {
   cont.add(title);
 
   // Live zeny display.
-  const zenyTxt = scene.add.text(GAME_W / 2, 110, `Zeny: ${player.zeny}`, {
+  const zenyTxt = scene.add.text(GAME_W / 2, 110, `Zeny: ${fmt(player.zeny)}`, {
     fontSize: '20px', color: '#ffd24a', stroke: '#000', strokeThickness: 4,
   }).setOrigin(0.5).setScrollFactor(0);
   cont.add(zenyTxt);
@@ -2152,7 +2166,7 @@ function showShop(scene) {
       stroke: '#000', strokeThickness: 3,
     }).setOrigin(0, 0.5).setScrollFactor(0);
     const priceText = scene.add.text(rx + rowW - 20, ry + rowH/2,
-      `${price} zeny${item.flat ? '' : `   (bought ${bought})`}`, {
+      `${fmt(price)} zeny${item.flat ? '' : `   (bought ${bought})`}`, {
       fontSize: '16px', color: '#ffd24a',
       stroke: '#000', strokeThickness: 3,
     }).setOrigin(1, 0.5).setScrollFactor(0);
@@ -2166,7 +2180,7 @@ function showShop(scene) {
       const cur = player.shopBought[item.id] || 0;
       const cost = shopItemPrice(item, cur);
       if (player.zeny < cost) {
-        ui.message(`Not enough zeny (need ${cost}, have ${player.zeny}).`);
+        ui.message(`Not enough zeny (need ${fmt(cost)}, have ${fmt(player.zeny)}).`);
         sfxMiss();
         return;
       }
@@ -2174,12 +2188,12 @@ function showShop(scene) {
       item.apply(player);
       player.shopBought[item.id] = cur + 1;
       sfxLevelUp();
-      ui.message(`Bought ${item.label} for ${cost} zeny.`);
+      ui.message(`Bought ${item.label} for ${fmt(cost)} zeny.`);
       // Refresh prices + zeny on the open panel.
-      zenyTxt.setText(`Zeny: ${player.zeny}`);
+      zenyTxt.setText(`Zeny: ${fmt(player.zeny)}`);
       const nb = player.shopBought[item.id];
       const np = shopItemPrice(item, nb);
-      priceText.setText(`${np} zeny${item.flat ? '' : `   (bought ${nb})`}`);
+      priceText.setText(`${fmt(np)} zeny${item.flat ? '' : `   (bought ${nb})`}`);
       saveGame();
     });
   });
@@ -2647,7 +2661,7 @@ class UIManager {
     this.expText.setText(`EXP ${player.exp}/${player.expNeeded()}`);
 
     this.lvlText.setText(`Lv.${player.level}`);
-    this.zenyText.setText(`Zeny: ${player.zeny}`);
+    this.zenyText.setText(`Zeny: ${fmt(player.zeny)}`);
 
     // Label flips between Choose / Change based on whether a class is set.
     // Always visible; the click handler gates by level.
