@@ -197,6 +197,14 @@ let ui;
 let autopilotOn = false;
 let autopilotLastScan = 0;
 let classSelectOpen = false;
+let currentZone = null;
+const ZONE_LABELS = {
+  grasslands: 'Grasslands',
+  forest:     'Dark Forest',
+  desert:     'Sun-bleached Desert',
+  ruins:      'Ancient Ruins',
+  riverside:  'Riverside',
+};
 let lastPlayerAttack = 0;
 let tileSliceW = 0;
 let tileSliceH = 0;
@@ -265,6 +273,10 @@ function preload() {
   this.load.image('bigfoot_attack', 'assets/sprites/bigfoot_attack.png');
   this.load.image('bigfoot_hit', 'assets/sprites/bigfoot_hit.png');
   this.load.image('bigfoot_dead', 'assets/sprites/bigfoot_dead.png');
+  // Class selection card art.
+  this.load.image('swordsman_card', 'assets/sprites/swordsman_card.png');
+  this.load.image('mage_card',      'assets/sprites/mage_card.png');
+  this.load.image('archer_card',    'assets/sprites/archer_card.png');
   // Desert biome — Cactling monster + sand tileset + cactus / dune deco.
   this.load.image('cactling_idle', 'assets/sprites/cactling_idle.png');
   this.load.image('cactling_hit', 'assets/sprites/cactling_hit.png');
@@ -488,6 +500,17 @@ function update(time, delta) {
   if (!player) return;
   player.update(time, delta);
   for (const b of bloblings) b.update(time, delta);
+
+  // Zone change banner — fades in/out when crossing a biome boundary.
+  if (player && !player.dead) {
+    const tile_c = Math.floor(player.sprite.x / TILE_SIZE);
+    const tile_r = Math.floor(player.sprite.y / TILE_SIZE);
+    const z = getZone(tile_r, tile_c);
+    if (z !== currentZone) {
+      currentZone = z;
+      showZoneBanner(player.scene, ZONE_LABELS[z] || z);
+    }
+  }
 
   // Autopilot: when on, pick the nearest safe live monster as attack target.
   // "Safe" = not aggressive, not boss-tier reward, maxHP not >1.5x player.
@@ -1638,6 +1661,19 @@ class LootDrop {
   }
 }
 
+function showZoneBanner(scene, label) {
+  if (!scene || !label) return;
+  const txt = scene.add.text(GAME_W / 2, 120, `Entering ${label}`, {
+    fontSize: '32px', fontStyle: 'bold', color: '#ffe066',
+    stroke: '#000', strokeThickness: 5,
+  }).setOrigin(0.5).setScrollFactor(0).setDepth(10500).setAlpha(0);
+  scene.tweens.add({
+    targets: txt, alpha: 1, duration: 350,
+    yoyo: true, hold: 1200,
+    onComplete: () => txt.destroy(),
+  });
+}
+
 // ---------- Class selection overlay ----------
 // Renders 3 cards centered on screen at GAME_W x GAME_H. Cards use cardImage
 // keys if loaded, otherwise a tinted colored panel placeholder.
@@ -1825,8 +1861,59 @@ function attemptPlayerAttack(scene, target) {
   const crit = Math.random() < PLAYER_CRIT_CHANCE;
   const variance = 1 + (Math.random() * 2 - 1) * DAMAGE_VARIANCE;
   let dmg = Math.max(1, Math.round(player.atk * variance * (crit ? CRIT_MULTIPLIER : 1)));
+  spawnClassAttackFx(scene, player, target);
   target.takeDamage(dmg, { crit });
   if (crit) sfxCrit(); else sfxHit();
+}
+
+// Class-flavored attack visual. Cheap shapes, no art assets needed. Falls
+// back to a small white impact when no class is chosen yet.
+function spawnClassAttackFx(scene, pl, target) {
+  const px = pl.sprite.x, py = pl.sprite.y - 12;
+  const tx = target.sprite.x, ty = target.sprite.y - 10;
+  const id = pl.classId;
+
+  if (id === 'swordsman') {
+    // Curved white slash at the target.
+    const arc = scene.add.graphics().setDepth(ty + 50);
+    arc.lineStyle(6, 0xffffff, 1);
+    const rad = 36;
+    arc.beginPath();
+    arc.arc(tx, ty, rad, Math.PI * 0.85, Math.PI * 1.55, false);
+    arc.strokePath();
+    scene.tweens.add({
+      targets: arc, alpha: 0, scale: 1.25, duration: 220,
+      onComplete: () => arc.destroy(),
+    });
+  } else if (id === 'mage') {
+    // Blue fireball projectile flies player → target.
+    const orb = scene.add.circle(px, py, 9, 0x66aaff, 0.95)
+      .setStrokeStyle(2, 0xaaddff, 1).setDepth(ty + 50);
+    scene.tweens.add({
+      targets: orb, x: tx, y: ty, duration: 140,
+      onComplete: () => {
+        const burst = scene.add.circle(tx, ty, 12, 0x66aaff, 0.7).setDepth(ty + 50);
+        scene.tweens.add({ targets: burst, radius: 30, alpha: 0, duration: 200,
+          onComplete: () => burst.destroy() });
+        orb.destroy();
+      },
+    });
+  } else if (id === 'archer') {
+    // Yellow arrow streak.
+    const line = scene.add.graphics().setDepth(ty + 50);
+    line.lineStyle(3, 0xffee66, 1);
+    line.lineBetween(px, py, tx, ty);
+    const tip = scene.add.circle(tx, ty, 5, 0xffee66, 1).setDepth(ty + 50);
+    scene.tweens.add({
+      targets: [line, tip], alpha: 0, duration: 200,
+      onComplete: () => { line.destroy(); tip.destroy(); },
+    });
+  } else {
+    // No class yet → small generic impact.
+    const dot = scene.add.circle(tx, ty, 8, 0xffffff, 0.7).setDepth(ty + 50);
+    scene.tweens.add({ targets: dot, scale: 2, alpha: 0, duration: 200,
+      onComplete: () => dot.destroy() });
+  }
 }
 
 // Roll monster damage on the player. No crits for monsters, only variance + miss.
@@ -1968,6 +2055,23 @@ class UIManager {
       ui.message(autopilotOn ? 'Autopilot ON — avoiding bosses + strong monsters.' : 'Autopilot OFF.');
     });
 
+    // Boss HP bar (top of screen, hidden until a boss is engaged).
+    const bbW = 520, bbH = 22;
+    const bbX = (GAME_W - bbW) / 2;
+    const bbY = 14;
+    this.bossBg = scene.add.rectangle(bbX, bbY, bbW, bbH, 0x110000, 0.85)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
+      .setStrokeStyle(2, 0xff5555, 1);
+    this.bossFill = scene.add.rectangle(bbX, bbY, bbW, bbH, 0xff2222)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
+    this.bossText = scene.add.text(bbX + bbW / 2, bbY + bbH / 2, '', {
+      fontSize: '14px', fontStyle: 'bold', color: '#ffffff',
+      stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10007);
+    this.bossBg.setVisible(false);
+    this.bossFill.setVisible(false);
+    this.bossText.setVisible(false);
+
     // Chat box
     this.chatBg = scene.add.rectangle(10, GAME_H - 220, 320, 150, 0x000000, 0.5)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10000);
@@ -1993,6 +2097,30 @@ class UIManager {
 
     this.lvlText.setText(`Lv.${player.level}`);
     this.zenyText.setText(`Zeny: ${player.zeny}`);
+
+    // Boss bar — show whenever any aggressive / boss-tier monster is alive
+    // anywhere in the world. Picks the closest one when several are around.
+    let boss = null, bossD = Infinity;
+    for (const m of bloblings) {
+      if (!m.alive) continue;
+      const cfg = m.cfg || {};
+      if (!cfg.aggressive && cfg.expReward < 90) continue;
+      const d = Math.hypot(m.sprite.x - player.sprite.x, m.sprite.y - player.sprite.y);
+      if (d < bossD) { bossD = d; boss = m; }
+    }
+    if (boss && bossD < 1200) {
+      const bbW = 520;
+      const pct = Math.max(0, boss.hp / boss.maxHP);
+      this.bossFill.width = bbW * pct;
+      this.bossText.setText(`${boss.cfg.name} Lv.${boss.level}   ${boss.hp} / ${boss.maxHP}`);
+      this.bossBg.setVisible(true);
+      this.bossFill.setVisible(true);
+      this.bossText.setVisible(true);
+    } else {
+      this.bossBg.setVisible(false);
+      this.bossFill.setVisible(false);
+      this.bossText.setVisible(false);
+    }
 
     this.drawMinimap();
   }
