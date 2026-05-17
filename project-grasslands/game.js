@@ -92,6 +92,45 @@ const MONSTER_TYPES = {
 // Zones partition the world into themed regions. Each zone gets its own tile
 // tint, decoration mix, and monster pool. Center stays grasslands so the spawn
 // area is unchanged for returning players.
+// Class progression. Tier 1 unlocked by picking at Lv 10. Subsequent tiers
+// auto-upgrade at 30/60/100. `tint` is a placeholder until real class sprites
+// arrive — applyRookieTexture still draws rookie keys and sets this tint.
+// `sprite` prefix is the future per-class sprite key prefix; if those textures
+// don't exist yet we fall back to `rookie_`.
+const CLASS_DEFS = {
+  swordsman: {
+    flavor: 'The blade never lies',
+    cardImage: 'swordsman_card',
+    spritePrefix: 'swordsman_',
+    tint: 0xff8866,
+    nameColor: '#ff9966',
+    tierNames: ['Swordsman', 'Knight', 'Lord Knight', 'Dragon Sovereign'],
+  },
+  mage: {
+    flavor: 'The arcane calls you',
+    cardImage: 'mage_card',
+    spritePrefix: 'mage_',
+    tint: 0x99aaff,
+    nameColor: '#aabbff',
+    tierNames: ['Mage', 'Wizard', 'Archmage', 'Void Sorcerer'],
+  },
+  archer: {
+    flavor: 'Swift and true',
+    cardImage: 'archer_card',
+    spritePrefix: 'archer_',
+    tint: 0x88ee88,
+    nameColor: '#99ee99',
+    tierNames: ['Archer', 'Hunter', 'Ranger', 'Phantom Striker'],
+  },
+};
+// Stat bonuses applied once when crossing each tier threshold.
+const CLASS_TIER_THRESHOLDS = [
+  { level: 10,  tier: 1, dHP:   0, dAtk:  0 }, // tier 1 just unlocks selection
+  { level: 30,  tier: 2, dHP:  50, dAtk: 15 },
+  { level: 60,  tier: 3, dHP: 100, dAtk: 30 },
+  { level: 100, tier: 4, dHP: 200, dAtk: 60 },
+];
+
 const ZONE_TINTS = {
   grasslands: 0xffffff,
   forest:     0x6b8a5a,
@@ -157,6 +196,7 @@ const SAVE_INTERVAL_MS = 3000;
 let ui;
 let autopilotOn = false;
 let autopilotLastScan = 0;
+let classSelectOpen = false;
 let lastPlayerAttack = 0;
 let tileSliceW = 0;
 let tileSliceH = 0;
@@ -736,6 +776,8 @@ class PlayerController {
     this.exp = 0;
     this.zeny = 0;
     this.kills = 0;
+    this.classId = null;   // 'swordsman' | 'mage' | 'archer'
+    this.classTier = 0;    // 0 = unselected, 1..4 once chosen
     this.level = 1;
     this.dead = false;
     this.dir = 'south';
@@ -775,7 +817,18 @@ class PlayerController {
       stroke: '#000000',
       strokeThickness: 3,
     }).setOrigin(0.5, 1);
-    this._refreshNameTag = () => this.nameTag.setText(`Rookie Lv.${this.level}`);
+    this._refreshNameTag = () => {
+      let title = 'Rookie';
+      let color = '#ffffff';
+      if (this.classId && CLASS_DEFS[this.classId]) {
+        const cdef = CLASS_DEFS[this.classId];
+        const tierIdx = Math.max(0, Math.min(cdef.tierNames.length - 1, this.classTier - 1));
+        title = cdef.tierNames[tierIdx];
+        color = cdef.nameColor;
+      }
+      this.nameTag.setText(`${title} Lv.${this.level}`);
+      this.nameTag.setColor(color);
+    };
 
     // HP bar above the player (matches monster bars; only shows when wounded).
     this.hpBarBg = scene.add.rectangle(x, y, 44, 5, 0x000000).setOrigin(0.5);
@@ -1032,6 +1085,12 @@ class PlayerController {
     ui.message(`LEVEL UP! Now Lv.${this.level} (+ATK +DEF)`);
     this._refreshNameTag();
     sfxLevelUp();
+    // Class system: open chooser at Lv 10 the first time, otherwise check tier.
+    if (this.level >= 10 && !this.classId && !classSelectOpen) {
+      showClassSelect(this.scene);
+    } else if (this.classId) {
+      checkClassTierUpgrade(this);
+    }
     saveGame();
     const txt = this.scene.add.text(this.sprite.x, this.sprite.y - 40, 'LEVEL UP!', {
       fontSize: '20px',
@@ -1163,6 +1222,7 @@ function saveGame() {
       hp: player.hp, maxHP: player.maxHP,
       atk: player.atk, def: player.def, zeny: player.zeny,
       kills: player.kills,
+      classId: player.classId, classTier: player.classTier,
       cellCol: player.cellCol, cellRow: player.cellRow,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -1187,6 +1247,14 @@ function applySave() {
   player.def    = save.def    ?? player.def;
   player.zeny   = save.zeny   ?? 0;
   player.kills  = save.kills  ?? 0;
+  player.classId   = save.classId   ?? null;
+  player.classTier = save.classTier ?? 0;
+  // Reapply class tint on sprite + refresh name tag color/title.
+  if (player.classId && CLASS_DEFS[player.classId]) {
+    player.sprite.setTint(CLASS_DEFS[player.classId].tint);
+  } else {
+    player.sprite.clearTint();
+  }
   if (player._refreshNameTag) player._refreshNameTag();
   if (Number.isInteger(save.cellCol) && Number.isInteger(save.cellRow)) {
     let col = save.cellCol, row = save.cellRow;
@@ -1567,6 +1635,140 @@ class LootDrop {
       return true;
     }
     return false;
+  }
+}
+
+// ---------- Class selection overlay ----------
+// Renders 3 cards centered on screen at GAME_W x GAME_H. Cards use cardImage
+// keys if loaded, otherwise a tinted colored panel placeholder.
+function showClassSelect(scene) {
+  if (classSelectOpen) return;
+  classSelectOpen = true;
+  const cont = scene.add.container(0, 0).setScrollFactor(0).setDepth(20000);
+  // Dark overlay catches input below the cards so the world freezes.
+  const bg = scene.add.rectangle(0, 0, GAME_W, GAME_H, 0x000000, 0.78)
+    .setOrigin(0, 0).setScrollFactor(0).setInteractive();
+  bg.on('pointerdown', (p, lx, ly, ev) => { ev && ev.stopPropagation && ev.stopPropagation(); });
+  cont.add(bg);
+
+  // Title — gold with a soft glow via stacked text strokes.
+  const titleShadow = scene.add.text(GAME_W / 2, 80, 'CHOOSE YOUR PATH', {
+    fontSize: '40px', fontStyle: 'bold', color: '#ffcc33',
+    stroke: '#3b2400', strokeThickness: 8,
+  }).setOrigin(0.5).setAlpha(0.45);
+  const title = scene.add.text(GAME_W / 2, 80, 'CHOOSE YOUR PATH', {
+    fontSize: '40px', fontStyle: 'bold', color: '#ffe066',
+    stroke: '#5a3a00', strokeThickness: 4,
+  }).setOrigin(0.5);
+  scene.tweens.add({ targets: titleShadow, scale: 1.06, alpha: 0.7, duration: 900, yoyo: true, repeat: -1 });
+  cont.add([titleShadow, title]);
+
+  const ids = ['swordsman', 'mage', 'archer'];
+  const cardW = 220, cardH = 320;
+  const gap = 40;
+  const totalW = ids.length * cardW + (ids.length - 1) * gap;
+  const startX = (GAME_W - totalW) / 2;
+  const baseY = 150;
+
+  ids.forEach((id, i) => {
+    const cdef = CLASS_DEFS[id];
+    const cx = startX + i * (cardW + gap);
+    const cy = baseY;
+
+    // Card body — placeholder colored panel until real card images ship.
+    const card = scene.add.rectangle(cx + cardW / 2, cy + cardH / 2, cardW, cardH, cdef.tint, 0.85)
+      .setStrokeStyle(3, 0xffffff, 0.9)
+      .setInteractive({ useHandCursor: true });
+
+    // Optional real card image if it was preloaded.
+    let img = null;
+    if (scene.textures.exists(cdef.cardImage)) {
+      img = scene.add.image(cx + cardW / 2, cy + cardH / 2 - 30, cdef.cardImage);
+      const scale = Math.min((cardW - 30) / img.width, (cardH - 120) / img.height);
+      img.setScale(scale);
+    }
+
+    const nameText = scene.add.text(cx + cardW / 2, cy + cardH - 60, cdef.tierNames[0], {
+      fontSize: '24px', fontStyle: 'bold', color: '#ffffff',
+      stroke: '#000', strokeThickness: 4,
+    }).setOrigin(0.5);
+    const flavor = scene.add.text(cx + cardW / 2, cy + cardH - 28, `"${cdef.flavor}"`, {
+      fontSize: '13px', color: '#f4f4f4', fontStyle: 'italic',
+      stroke: '#000', strokeThickness: 3, align: 'center', wordWrap: { width: cardW - 20 },
+    }).setOrigin(0.5);
+
+    cont.add(card);
+    if (img) cont.add(img);
+    cont.add([nameText, flavor]);
+
+    // Hover lift + glow.
+    const lift = () => {
+      scene.tweens.add({ targets: [card, nameText, flavor, img].filter(Boolean),
+        y: '-=10', duration: 120 });
+      card.setStrokeStyle(4, 0xffe066, 1);
+    };
+    const drop = () => {
+      scene.tweens.add({ targets: [card, nameText, flavor, img].filter(Boolean),
+        y: '+=10', duration: 120 });
+      card.setStrokeStyle(3, 0xffffff, 0.9);
+    };
+    card.on('pointerover', lift);
+    card.on('pointerout', drop);
+    card.on('pointerdown', () => {
+      selectClass(scene, id, cont);
+    });
+  });
+}
+
+function selectClass(scene, id, container) {
+  const cdef = CLASS_DEFS[id];
+  if (!cdef) return;
+  player.classId = id;
+  player.classTier = 1;
+  player.sprite.setTint(cdef.tint);
+  player._refreshNameTag();
+
+  // Dramatic full-screen flash.
+  const flash = scene.add.rectangle(0, 0, GAME_W, GAME_H, 0xffffff, 1)
+    .setOrigin(0, 0).setScrollFactor(0).setDepth(20100);
+  scene.tweens.add({
+    targets: flash, alpha: 0, duration: 450,
+    onComplete: () => flash.destroy(),
+  });
+
+  container.destroy();
+  classSelectOpen = false;
+  ui.message(`You became a ${cdef.tierNames[0]}!`);
+  sfxLevelUp();
+  saveGame();
+}
+
+function checkClassTierUpgrade(player) {
+  if (!player.classId) return;
+  const cdef = CLASS_DEFS[player.classId];
+  if (!cdef) return;
+  // Walk thresholds in order; apply any whose level <= player and tier > current.
+  for (const t of CLASS_TIER_THRESHOLDS) {
+    if (t.tier <= player.classTier) continue;
+    if (player.level < t.level) break;
+    player.classTier = t.tier;
+    player.maxHP += t.dHP;
+    player.atk   += t.dAtk;
+    player.hp = player.maxHP;
+    const newTitle = cdef.tierNames[t.tier - 1];
+    ui.message(`You ascend to ${newTitle}! (+${t.dHP} HP, +${t.dAtk} ATK)`);
+    if (t.tier === 4) {
+      const txt = player.scene.add.text(player.sprite.x, player.sprite.y - 60, 'LEGENDARY CLASS!', {
+        fontSize: '22px', fontStyle: 'bold', color: '#ffe066',
+        stroke: '#5a3a00', strokeThickness: 5,
+      }).setOrigin(0.5).setDepth(99999);
+      player.scene.tweens.add({
+        targets: txt, y: '-=40', alpha: 0, duration: 1800,
+        onComplete: () => txt.destroy(),
+      });
+    }
+    player._refreshNameTag();
+    sfxLevelUp();
   }
 }
 

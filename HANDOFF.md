@@ -1,7 +1,7 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 1:05am CDT (post session 6).
+> coding sessions. Last refresh: 2026-05-17 2:35am CDT (post session 7).
 
 ---
 
@@ -185,7 +185,56 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 6 (latest, in order)
+## 3. What we did in session 7 (latest, in order)
+
+1. **Class selection system added.** New `CLASS_DEFS` table for
+   `swordsman` / `mage` / `archer`, each with a 4-tier name ladder, tint
+   color, name color, and future per-class sprite prefix. Tier
+   thresholds (`CLASS_TIER_THRESHOLDS`): tier 1 at Lv 10 (choose),
+   tier 2 at Lv 30 (+50 HP / +15 ATK), tier 3 at Lv 60 (+100 HP /
+   +30 ATK), tier 4 at Lv 100 (+200 HP / +60 ATK + "LEGENDARY CLASS!"
+   on-screen text).
+2. `showClassSelect(scene)` opens a depth-20000 overlay at Lv 10 with
+   a gold glowing "CHOOSE YOUR PATH" title and three centered cards
+   (220×320 each, hover lift, flavor text). Cards use a colored
+   placeholder until real `*_card.png` images ship. Click → flash,
+   tint, save, `ui.message('You became a [class]!')`. Cannot close
+   without picking.
+3. `checkClassTierUpgrade(player)` runs after every level-up and
+   applies any tier whose threshold the player just crossed.
+4. **Save format additions:** `classId` (string|null), `classTier`
+   (0..4). `applySave()` reapplies tint + refreshes name tag color.
+5. **`_refreshNameTag` now uses class tier title** instead of "Rookie"
+   once a class is chosen, and tints the floating name with the
+   class's `nameColor`.
+6. **Sprite art:** real per-class sprites not yet generated. We still
+   draw rookie textures and apply the class tint via `sprite.setTint`.
+   When real art arrives, `applyRookieTexture` will need a class-aware
+   prefix lookup (the `spritePrefix` field is already there).
+7. **Loot auto-collect magnet + autopilot toggle** shipped earlier in
+   the session — see commits `f6e595b` and the mute/heal commits.
+8. Cache bumped to **`?v=50`**.
+
+## 4. Next steps (pick any)
+
+1. **Real class card art.** Generate `swordsman_card.png`,
+   `mage_card.png`, `archer_card.png` at ~512×768 each. Wire in
+   `preload()`; `showClassSelect` already checks
+   `scene.textures.exists(cdef.cardImage)` and renders the image if
+   present.
+2. **Real per-class player sprites.** Generate `swordsman_idle_<dir>`,
+   `swordsman_walk{,2,3,4}_<dir>` (same 8-dir × 5-frame layout as
+   rookie), then mage and archer. Update `applyRookieTexture` to
+   prefix from `CLASS_DEFS[player.classId].spritePrefix` (fall back to
+   `rookie_` if the texture doesn't exist).
+3. **Slice `desert_props.png` by hand** — still pending from session 6.
+4. **Forest tileset.** Same pattern as desert. Ruins, riverside next.
+5. **Class-specific skills / attack flavor.** With classes wired,
+   distinct ranged/magic feel for archer/mage is the obvious next
+   gameplay beat — but the user removed skills earlier so confirm
+   before reintroducing.
+
+## 5. (legacy) What we did in session 6 (in order)
 
 1. **Wired real desert art** — `sand_tileset.png` loaded + sliced
    identically to grass tileset; `buildMap` picks `sand_tileset` for
@@ -207,22 +256,7 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
    512×512 sheet) is **still untracked-wired** — layout is irregular,
    needs hand-tuned per-prop frame coords. Noted in §4.
 
-## 4. Next steps (pick any)
-
-1. **Slice `desert_props.png` by hand.** The sheet has 7 props in a
-   non-uniform layout. Open it in Preview, read pixel coords for each
-   prop, then add named frames in `preload()` similar to the tileset
-   slicer but with manual `{x, y, w, h}` per frame. Place them in the
-   desert scatter pass.
-2. **Forest tileset.** Same workflow as desert: generate a 4×4 forest
-   tileset (dark grass + moss + dirt path variants), load it, branch
-   `buildMap` for `zone === 'forest'` to draw from it, drop the
-   forest tint. Ruins and riverside next.
-3. **Boss feedback when Bigfoot aggros.** Currently he just walks at
-   you — add a chat message ("A Bigfoot has noticed you!") + screen
-   pulse + bass hit so low-level players have a chance to retreat.
-
-## 5. What we did in session 5 (in order)
+## 6. (legacy) What we did in session 5 (in order)
 
 1. **World doubled** to 6400×6400 (200×200 cells, 50×50 tiles). A* iter
    cap 8 000 → 32 000.
@@ -262,7 +296,7 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 6. Known issues / quirks
+## 7. Known issues / quirks
 
 - **Asset weight** — now **~34 MB** of PNGs (down from 96 MB after
   sips downscale in session 5). Acceptable on broadband; mobile / slow
@@ -295,7 +329,7 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 7. File structure
+## 8. File structure
 
 ```
 Grasslands Online/                                  ← git repo root
@@ -354,7 +388,7 @@ Grasslands Online/                                  ← git repo root
 
 ---
 
-## 8. Assets
+## 9. Assets
 
 ### Sprites — `project-grasslands/assets/sprites/`
 
@@ -406,7 +440,7 @@ Always include `transparent background PNG with alpha channel`. The
 
 ---
 
-## 9. GitHub + Vercel workflow (enforced)
+## 10. GitHub + Vercel workflow (enforced)
 
 - Commit **after every meaningful change**.
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
@@ -420,7 +454,7 @@ Always include `transparent background PNG with alpha channel`. The
 
 ---
 
-## 10. How to continue (do this first in a new session)
+## 11. How to continue (do this first in a new session)
 
 1. **Read this file in full.** No skimming.
 2. From repo root run `git status` and `git log --oneline -10` to confirm
@@ -440,7 +474,7 @@ Always include `transparent background PNG with alpha channel`. The
 
 ---
 
-## 11. Constraints (do NOT re-add)
+## 12. Constraints (do NOT re-add)
 
 The user has explicitly cut these features. Re-adding them is regressive:
 
