@@ -127,6 +127,23 @@ let clickMarker = null;
 
 // ---------- Preload ----------
 function preload() {
+  // Loader UI driven from the HTML overlay so the user sees progress instead of
+  // a blank green canvas while the heavy PNG batch downloads on first visit.
+  const fill = document.getElementById('loader-fill');
+  const pct  = document.getElementById('loader-pct');
+  this.load.on('progress', (p) => {
+    const v = Math.round(p * 100);
+    if (fill) fill.style.width = v + '%';
+    if (pct)  pct.textContent = 'Loading ' + v + '%';
+  });
+  this.load.on('complete', () => {
+    const overlay = document.getElementById('loader');
+    if (overlay) {
+      overlay.classList.add('hidden');
+      setTimeout(() => overlay.remove(), 400);
+    }
+  });
+
   this.load.image('rookie_idle_south', 'assets/sprites/rookie_idle_south.png');
   this.load.image('rookie_walk_south', 'assets/sprites/rookie_walk_south.png');
   this.load.image('rookie_idle_north', 'assets/sprites/rookie_idle_north.png');
@@ -178,11 +195,35 @@ function preload() {
   this.load.image('mushroom_brown_02', 'assets/decorations/mushroom_brown_02.png');
   this.load.image('pond_01', 'assets/decorations/pond_01.png');
   this.load.image('grass_tileset', 'assets/tiles/grass_tileset.png');
+
+  // Background music — optional. Loader tolerates missing file (silent if absent).
+  // Try mp3 first; ogg fallback for Firefox-only setups.
+  this.load.audio('bgm', ['assets/audio/bgm.mp3', 'assets/audio/bgm.ogg']);
 }
 
 // ---------- Create ----------
 function create() {
   const scene = this;
+
+  // Background music: loop quietly. Browsers require a user gesture before
+  // playing audio, so attach a one-shot pointer/key listener that resumes the
+  // audio context and starts the track. After that it just loops.
+  if (scene.cache.audio.exists('bgm')) {
+    const bgm = scene.sound.add('bgm', { loop: true, volume: 0.35 });
+    const start = () => {
+      try {
+        if (scene.sound.context && scene.sound.context.state === 'suspended') {
+          scene.sound.context.resume();
+        }
+        if (!bgm.isPlaying) bgm.play();
+      } catch (e) { /* ignore */ }
+    };
+    // Try immediately (works if user already interacted on the page).
+    start();
+    // And on the very first input afterward as a fallback.
+    scene.input.once('pointerdown', start);
+    scene.input.keyboard.once('keydown', start);
+  }
 
   // Source PNGs lack alpha; key out near-white pixels to fake transparency.
   const spriteKeys = [

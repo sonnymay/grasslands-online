@@ -4,7 +4,7 @@
 > just opened a fresh Claude Code session, read top-to-bottom and follow §9
 > ("How to continue") at the bottom.
 >
-> Last updated: 2026-05-16 (session 8)
+> Last updated: 2026-05-16 (session 9)
 
 ---
 
@@ -17,6 +17,7 @@ Everything is original (name, art, code), copyright-safe by design.
 - **Repo:** https://github.com/sonnymay/grasslands-online (public)
 - **Local root:** `/Users/santipapmay/Documents/Grasslands Online`
 - **Playable subfolder:** `project-grasslands/`
+- **Production URL:** https://grasslands-online.vercel.app
 - **Engine:** Phaser 3.70 (loaded from CDN, no build tools)
 - **Language:** plain JavaScript + HTML
 - **Art:** ChatGPT image-gen, anime 2D, no pixel art
@@ -102,6 +103,39 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 ---
 
 ## 3. What we just did this session (latest first)
+
+### Session 9 — Vercel deployment + GitHub Actions setup
+1. **Added `vercel.json` at repo root** for static deployment:
+   - `framework: null`
+   - no build command
+   - no install command
+   - `outputDirectory: project-grasslands`
+2. **Added Vercel cache headers**:
+   - `index.html` and `game.js` use `max-age=0, must-revalidate`.
+   - `/assets/*` uses long immutable caching because asset filenames are stable and game code cache-busts with `?v=N`.
+3. **Added `.vercel/` to `.gitignore`** so local Vercel project-link metadata stays off GitHub.
+4. **Added `.github/workflows/ci.yml`**:
+   - runs on push, pull request, and manual dispatch;
+   - parses `project-grasslands/game.js` with `node -c`;
+   - verifies required HTML/JS/tile/sprite files exist;
+   - starts a local Python static server and fetches key files with `curl`.
+5. **Added `.github/workflows/vercel-deploy.yml`** as an optional manual deploy workflow. It requires GitHub repo secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`. Recommended default remains Vercel Git integration.
+6. **Added `DEPLOY.md`** with production URL, recommended Vercel Git setup, GitHub Actions notes, and local deploy commands.
+7. **Verified local config**:
+   - `node -c project-grasslands/game.js`
+   - `python3 -m json.tool vercel.json`
+   - Ruby YAML parse for both workflow files
+   - `git diff --check`
+8. **Authenticated Vercel CLI as `sonnymay`** with `vercel whoami`.
+9. **Linked local repo to Vercel project `grasslands-online`**, connecting GitHub repo `sonnymay/grasslands-online`.
+10. **Deployed production to Vercel**. First normal upload hit a network `EPIPE`; retry with `vercel deploy --prod --yes --archive=tgz` succeeded.
+11. **Production deployment is live**:
+   - Canonical alias: https://grasslands-online.vercel.app
+   - Deployment URL: https://grasslands-online-flf8e4ogu-sonnys-projects-f5a1e40b.vercel.app
+   - Inspector: https://vercel.com/sonnys-projects-f5a1e40b/grasslands-online/Cxed7H7X5QyPnDSosjXNNwxqN9g9
+12. **Verified deployed production**:
+   - `curl -I https://grasslands-online.vercel.app` returned `HTTP/2 200`.
+   - `curl -I 'https://grasslands-online.vercel.app/game.js?v=40'` returned `HTTP/2 200`.
 
 ### Session 8 — Ground shadow visual grounding pass
 1. **Added a soft ellipse shadow under Rookie** using Phaser graphics primitives, not a new image asset.
@@ -257,7 +291,10 @@ Or use Claude Code preview: `mcp__Claude_Preview__preview_start` name `grassland
 ```
 Grasslands Online/                    ← git repo root
 ├── .gitignore                        ← ignores .DS_Store, .claude/, node_modules, *.log
+├── .github/workflows/                ← CI + optional manual Vercel deploy
+├── DEPLOY.md                         ← Vercel/GitHub deployment notes
 ├── HANDOFF.md                        ← this file
+├── vercel.json                       ← static Vercel config
 └── project-grasslands/               ← the playable web app
     ├── CLAUDE.md                     ← per-project coding rules
     ├── index.html                    ← Phaser CDN + game.js?v=N

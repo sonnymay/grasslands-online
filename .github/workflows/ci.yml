@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  static-check:
+    name: Static game check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Parse game JavaScript
+        run: node -c project-grasslands/game.js
+
+      - name: Verify required files
+        run: |
+          set -euo pipefail
+          test -f project-grasslands/index.html
+          test -f project-grasslands/game.js
+          test -f project-grasslands/assets/tiles/grass_tileset.png
+          test -f project-grasslands/assets/sprites/rookie_idle_south.png
+          test -f project-grasslands/assets/sprites/blobling_idle.png
+          test -f project-grasslands/assets/sprites/mooham_idle.png
+          test -f project-grasslands/assets/sprites/moowaan_idle.png
+
+      - name: Smoke test static server
+        run: |
+          set -euo pipefail
+          cd project-grasslands
+          python3 -m http.server 8000 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+
+          for attempt in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8000/ > /tmp/grasslands-index.html; then
+              break
+            fi
+            sleep 0.5
+          done
+
+          grep -q 'game.js?v=' /tmp/grasslands-index.html
+          curl -fsS http://127.0.0.1:8000/game.js > /dev/null
+          curl -fsS http://127.0.0.1:8000/assets/tiles/grass_tileset.png > /dev/null
+          curl -fsS http://127.0.0.1:8000/assets/sprites/moowaan_idle.png > /dev/null

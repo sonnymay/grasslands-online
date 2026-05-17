@@ -18,11 +18,62 @@
       align-items: center;
       height: 100vh;
     }
+    /* Loading overlay shown until Phaser preload finishes. */
+    #loader {
+      position: fixed;
+      inset: 0;
+      background: #0d1a0d;
+      color: #d8f3c8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      z-index: 9999;
+      transition: opacity 350ms ease;
+    }
+    #loader.hidden { opacity: 0; pointer-events: none; }
+    #loader h1 {
+      font-size: 22px;
+      margin: 0;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 0 #000;
+    }
+    #loader .bar {
+      width: 320px;
+      height: 14px;
+      background: #14361a;
+      border: 1px solid #3a6b35;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    #loader .fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #5fbf4a, #aef299);
+      transition: width 120ms linear;
+    }
+    #loader .pct {
+      font-size: 13px;
+      opacity: 0.85;
+    }
+    #loader .hint {
+      font-size: 11px;
+      opacity: 0.5;
+      max-width: 320px;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
+  <div id="loader">
+    <h1>Grasslands Online</h1>
+    <div class="bar"><div class="fill" id="loader-fill"></div></div>
+    <div class="pct" id="loader-pct">Loading 0%</div>
+    <div class="hint">Click anywhere once the game starts to enable sound.</div>
+  </div>
   <div id="game"></div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
-  <script src="game.js?v=40"></script>
+  <script src="game.js?v=41"></script>
 </body>
 </html>
