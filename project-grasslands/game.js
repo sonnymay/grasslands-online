@@ -299,6 +299,14 @@ function preload() {
   this.load.image('swordsman_card', 'assets/sprites/swordsman_card.png');
   this.load.image('mage_card',      'assets/sprites/mage_card.png');
   this.load.image('archer_card',    'assets/sprites/archer_card.png');
+  // Class tier-1 player sprites (south-only for now; other directions fall
+  // back to rookie + class tint via applyRookieTexture).
+  this.load.image('swordsman_idle_south', 'assets/sprites/swordsman_idle_south.png');
+  this.load.image('swordsman_walk_south', 'assets/sprites/swordsman_walk_south.png');
+  this.load.image('mage_idle_south',      'assets/sprites/mage_idle_south.png');
+  this.load.image('mage_walk_south',      'assets/sprites/mage_walk_south.png');
+  this.load.image('archer_idle_south',    'assets/sprites/archer_idle_south.png');
+  this.load.image('archer_walk_south',    'assets/sprites/archer_walk_south.png');
   // Desert biome — Cactling monster + sand tileset + cactus / dune deco.
   this.load.image('cactling_idle', 'assets/sprites/cactling_idle.png');
   this.load.image('cactling_hit', 'assets/sprites/cactling_hit.png');
@@ -370,6 +378,9 @@ function create() {
     'bigfoot_idle','bigfoot_aggro','bigfoot_chase','bigfoot_attack','bigfoot_hit','bigfoot_dead',
     'cactling_idle','cactling_hit','cactling_dead',
     'cactus_set','deco_sand_dune',
+    'swordsman_idle_south','swordsman_walk_south',
+    'mage_idle_south','mage_walk_south',
+    'archer_idle_south','archer_walk_south',
     'deco_flower_cluster_01','deco_flower_cluster_02','deco_flower_cluster_03','deco_flower_cluster_04',
     'deco_rock_01','deco_rock_02','deco_rock_03',
     'deco_tallgrass_01','deco_tallgrass_02','deco_tallgrass_03',
@@ -1454,13 +1465,27 @@ const DIR_TEXTURE = {
 
 function applyRookieTexture(sprite, dir, frame) {
   const info = DIR_TEXTURE[dir] || DIR_TEXTURE.south;
-  const prefix = (frame === 'walk')  ? 'rookie_walk_'
-              : (frame === 'walk2') ? 'rookie_walk2_'
-              : (frame === 'walk3') ? 'rookie_walk3_'
-              : (frame === 'walk4') ? 'rookie_walk4_'
-              : 'rookie_idle_';
-  sprite.setTexture(prefix + info.base);
+  const frameSeg = (frame === 'walk')  ? 'walk_'
+                : (frame === 'walk2') ? 'walk2_'
+                : (frame === 'walk3') ? 'walk3_'
+                : (frame === 'walk4') ? 'walk4_'
+                : 'idle_';
+  const classDef = (player && player.classId) ? CLASS_DEFS[player.classId] : null;
+  let key = null;
+  // Try the class-specific texture first; fall back to rookie if missing.
+  if (classDef) {
+    const candidate = classDef.spritePrefix + frameSeg + info.base;
+    if (sprite.scene.textures.exists(candidate)) key = candidate;
+  }
+  if (!key) key = 'rookie_' + frameSeg + info.base;
+  sprite.setTexture(key);
   sprite.setFlipX(info.flip);
+  // Clear tint when drawing real class art (palette already correct);
+  // keep the class tint on rookie fallbacks so they still read as the class.
+  if (classDef) {
+    if (key.indexOf(classDef.spritePrefix) === 0) sprite.clearTint();
+    else sprite.setTint(classDef.tint);
+  }
 }
 
 // ---------- MonsterController ----------
