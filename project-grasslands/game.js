@@ -4,11 +4,13 @@
 const GAME_W = Math.max(1, Math.floor(window.innerWidth || 1280));
 const GAME_H = Math.max(1, Math.floor(window.innerHeight || 720));
 const UI_TEXT_RESOLUTION = Math.max(2, Math.min(3, window.devicePixelRatio || 2));
-// World dimensions. Doubled from 6400 → 12800 (4× area) so the map feels
-// effectively endless during normal play. The tile system is still bounded;
-// true infinite scrolling would need a chunked terrain refactor.
-const WORLD_W = 12800;
-const WORLD_H = 12800;
+// World dimensions. Bumped from 6400 → 19200 (3× linear, 9× area). The
+// tile renderer pre-builds one image per tile (MAP_COLS × MAP_ROWS), so
+// going beyond this risks first-load lag and GPU memory pressure on
+// low-end devices. True infinite scrolling would need chunk streaming
+// (build/destroy tiles around the camera as the player moves).
+const WORLD_W = 19200;
+const WORLD_H = 19200;
 const TILE_SIZE = 128;
 const MAP_COLS = Math.ceil(WORLD_W / TILE_SIZE); // 25
 const MAP_ROWS = Math.ceil(WORLD_H / TILE_SIZE);
