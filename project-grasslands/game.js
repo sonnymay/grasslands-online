@@ -299,6 +299,23 @@ function scaledMonsterExp(monster) {
   return Math.max(1, Math.round(monster.expReward * mult));
 }
 
+// Cosmetic milestone title shown above the class/level nameTag. Pure
+// derived state from existing player counters — no save schema bump.
+// Highest-priority match wins (single title at a time).
+function pickPlayerTitle(p) {
+  if (!p) return null;
+  const trophyN = p.bossTrophies ? Object.keys(p.bossTrophies).length : 0;
+  const landmarkN = p.visitedLandmarks ? Object.keys(p.visitedLandmarks).length : 0;
+  const totalLandmarks = (typeof landmarkTiles === 'function') ? landmarkTiles().length : 5;
+  if (p.level >= 40) return { label: 'Veteran', color: '#ffd1ff' };
+  if (trophyN >= 5)  return { label: 'Boss Hunter', color: '#ff8866' };
+  if ((p.bestStreak || 0) >= 25) return { label: 'Streak Master', color: '#ffd24a' };
+  if ((p.zeny || 0) >= 100000) return { label: 'Tycoon', color: '#ffe066' };
+  if (landmarkN >= totalLandmarks) return { label: 'Plaza Wanderer', color: '#88c8ff' };
+  if (p.classSwitches >= 3) return { label: 'Wayfarer', color: '#a0e8c8' };
+  return null;
+}
+
 function awardHotStreak(monster, earnedExp) {
   if (!player || player.dead) return;
   player.hotStreak = (player.hotStreak || 0) + 1;
@@ -1273,6 +1290,7 @@ class PlayerController {
     this.classId = null;   // 'swordsman' | 'mage' | 'archer'
     this.classTier = 0;    // 0 = unselected, 1..4 once chosen
     this.classSwitches = 0; // count of paid swaps; first class pick is free
+    this._titleCheckAt = 0; // ms; throttled cosmetic title re-evaluation
     this.shopBought = { hp: 0, atk: 0, def: 0, pot: 0 };
     this.visitedLandmarks = {}; // '<r>,<c>' -> true
     this._lastPanicAt = 0;
@@ -1319,6 +1337,14 @@ class PlayerController {
       stroke: '#000000',
       strokeThickness: 3,
     }).setOrigin(0.5, 1);
+    // Cosmetic milestone title (e.g. "« Boss Hunter »"). Sits above the
+    // class/level tag. Hidden until the player earns at least one title.
+    this.titleTag = scene.add.text(x, y, '', {
+      fontSize: '11px',
+      color: '#ffe066',
+      stroke: '#000',
+      strokeThickness: 3,
+    }).setOrigin(0.5, 1).setVisible(false);
     this._refreshNameTag = () => {
       let title = 'Rookie';
       let color = '#ffffff';
@@ -1330,6 +1356,14 @@ class PlayerController {
       }
       this.nameTag.setText(`${title} Lv.${this.level}`);
       this.nameTag.setColor(color);
+      const cosmetic = pickPlayerTitle(this);
+      if (cosmetic) {
+        this.titleTag.setText(`« ${cosmetic.label} »`);
+        this.titleTag.setColor(cosmetic.color);
+        this.titleTag.setVisible(true);
+      } else {
+        this.titleTag.setVisible(false);
+      }
     };
 
     // HP bar above the player (matches monster bars; only shows when wounded).
@@ -1426,7 +1460,9 @@ class PlayerController {
       this.sprite.setOrigin(0.5, 0.5);
       this.sprite.scaleY = this.basePScale;
       this._syncShadow();
-      this.nameTag.setPosition(this.sprite.x, this.sprite.y - this.sprite.displayHeight / 2);
+      const deadTop = this.sprite.y - this.sprite.displayHeight / 2;
+      this.nameTag.setPosition(this.sprite.x, deadTop);
+      if (this.titleTag.visible) this.titleTag.setPosition(this.sprite.x, deadTop - 14);
       return;
     }
 
@@ -1592,6 +1628,13 @@ class PlayerController {
     this._syncShadow();
     const topY = this.sprite.y - this.sprite.displayHeight / 2;
     this.nameTag.setPosition(this.sprite.x, topY);
+    // Re-evaluate cosmetic title once per second so milestone unlocks (boss
+    // kills, landmark discovery, zeny crossings) surface without callsites.
+    if (time >= this._titleCheckAt) {
+      this._refreshNameTag();
+      this._titleCheckAt = time + 1000;
+    }
+    if (this.titleTag.visible) this.titleTag.setPosition(this.sprite.x, topY - 14);
     // HP bar above player, only when not full.
     const wounded = this.hp < this.maxHP;
     this.hpBarBg.setVisible(wounded);
