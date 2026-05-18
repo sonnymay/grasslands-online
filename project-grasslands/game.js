@@ -1384,91 +1384,103 @@ function nearZoneBoundary(r, c) {
   });
 }
 
+function tileNoise(r, c, salt = 0) {
+  let n = (r * 374761393 + c * 668265263 + salt * 2147483647) | 0;
+  n = (n ^ (n >>> 13)) | 0;
+  n = Math.imul(n, 1274126177);
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+}
+
+function smoothTileNoise(r, c, salt = 0) {
+  let total = 0;
+  let weight = 0;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const w = dx === 0 && dy === 0 ? 4 : (dx === 0 || dy === 0 ? 2 : 1);
+      total += tileNoise(Math.floor((r + dy) / 2), Math.floor((c + dx) / 2), salt) * w;
+      weight += w;
+    }
+  }
+  return total / weight;
+}
+
+function neighborZones(r, c) {
+  const zones = new Set();
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const nr = Phaser.Math.Clamp(r + dy, 0, MAP_ROWS - 1);
+      const nc = Phaser.Math.Clamp(c + dx, 0, MAP_COLS - 1);
+      zones.add(getZone(nr, nc));
+    }
+  }
+  return zones;
+}
+
+function pickNaturalGroundTile(zone, r, c, type) {
+  if (type === 'path_cross' || type === 'path_open') return TILE.DIRT_OPEN;
+  if (type === 'path_h') return tileNoise(r, c, 101) < 0.55 ? TILE.DIRT_H : TILE.DIRT_H2;
+  if (type === 'path_v') return tileNoise(r, c, 102) < 0.55 ? TILE.DIRT_V : TILE.DIRT_V2;
+  if (type === 'path_loop') return tileNoise(r, c, 103) < 0.5 ? TILE.DIRT_WIDE : TILE.DIRT_PATCH;
+  if (type === 'path_diag') return tileNoise(r, c, 104) < 0.5 ? TILE.DIRT_CORNER : TILE.DIRT_HEAVY;
+
+  const boundaryZones = neighborZones(r, c);
+  const boundary = boundaryZones.size > 1;
+  const detail = tileNoise(r, c, 17);
+  const stonePatch = smoothTileNoise(r, c, 31);
+  const dryPatch = smoothTileNoise(r, c, 47);
+  const lushPatch = smoothTileNoise(r, c, 59);
+
+  if (boundary) {
+    if (boundaryZones.has('desert') && zone !== 'desert' && dryPatch > 0.45) {
+      return detail < 0.52 ? TILE.DIRT_PATCH : (detail < 0.80 ? TILE.DIRT_HEAVY : TILE.ROCKS_SPARSE);
+    }
+    if (boundaryZones.has('ruins') && zone !== 'ruins' && stonePatch > 0.43) {
+      return detail < 0.48 ? TILE.DIRT_PATCH : (detail < 0.76 ? TILE.ROCKS_SPARSE : TILE.ROCKS_DENSE);
+    }
+    if ((zone === 'desert' || zone === 'ruins') && lushPatch > 0.52) {
+      return detail < 0.42 ? TILE.THICK_GRASS : (detail < 0.72 ? TILE.TALL_GRASS : TILE.DIRT_PATCH);
+    }
+  }
+
+  if (zone === 'desert') {
+    if (stonePatch > 0.64) return detail < 0.62 ? TILE.ROCKS_SPARSE : TILE.ROCKS_DENSE;
+    if (dryPatch > 0.58) return detail < 0.70 ? TILE.DIRT_HEAVY : TILE.DIRT_PATCH;
+    if (lushPatch > 0.70) return detail < 0.72 ? TILE.DIRT_PATCH : TILE.TALL_GRASS;
+    return detail < 0.72 ? TILE.DIRT_PATCH : (detail < 0.92 ? TILE.DIRT_HEAVY : TILE.ROCKS_SPARSE);
+  }
+
+  if (zone === 'ruins') {
+    if (stonePatch > 0.56) return detail < 0.55 ? TILE.ROCKS_DENSE : TILE.ROCKS_SPARSE;
+    if (dryPatch > 0.52) return detail < 0.58 ? TILE.DIRT_HEAVY : TILE.DIRT_PATCH;
+    if (lushPatch > 0.66) return detail < 0.66 ? TILE.TALL_GRASS : TILE.THICK_GRASS;
+    return detail < 0.46 ? TILE.DIRT_PATCH : (detail < 0.74 ? TILE.ROCKS_SPARSE : TILE.DIRT_HEAVY);
+  }
+
+  if (zone === 'forest') {
+    if (stonePatch > 0.70) return detail < 0.64 ? TILE.DIRT_PATCH : TILE.ROCKS_SPARSE;
+    if (lushPatch > 0.54) return detail < 0.48 ? TILE.THICK_GRASS : (detail < 0.82 ? TILE.TALL_GRASS : TILE.FLOWER);
+    return detail < 0.40 ? TILE.THICK_GRASS : (detail < 0.68 ? TILE.GRASS : (detail < 0.88 ? TILE.TALL_GRASS : TILE.FLOWER));
+  }
+
+  if (zone === 'riverside') {
+    if (dryPatch > 0.72) return detail < 0.70 ? TILE.DIRT_PATCH : TILE.ROCKS_SPARSE;
+    if (lushPatch > 0.48) return detail < 0.36 ? TILE.THICK_GRASS : (detail < 0.72 ? TILE.TALL_GRASS : TILE.FLOWERS_COLOR);
+    return detail < 0.36 ? TILE.GRASS : (detail < 0.62 ? TILE.THICK_GRASS : (detail < 0.82 ? TILE.FLOWER : TILE.DIRT_PATCH));
+  }
+
+  if (stonePatch > 0.73) return detail < 0.65 ? TILE.DIRT_PATCH : TILE.ROCKS_SPARSE;
+  if (dryPatch > 0.76) return detail < 0.70 ? TILE.DIRT_PATCH : TILE.DIRT_HEAVY;
+  if (lushPatch > 0.58) return detail < 0.42 ? TILE.THICK_GRASS : (detail < 0.78 ? TILE.TALL_GRASS : TILE.FLOWER);
+  return detail < 0.42 ? TILE.GRASS : (detail < 0.66 ? TILE.THICK_GRASS : (detail < 0.82 ? TILE.TALL_GRASS : TILE.FLOWER));
+}
+
 function buildMap(scene) {
   for (let r = 0; r < MAP_ROWS; r++) {
     for (let c = 0; c < MAP_COLS; c++) {
       const type = getCellType(r, c);
       const zone = getZone(r, c);
-      let idx;
-      // Path tiles: alternate horizontal/vertical variants so the
-      // road doesn't read as a perfectly straight monoline.
-      if (type === 'path_cross' || type === 'path_open') idx = TILE.DIRT_OPEN;
-      else if (type === 'path_h') idx = Math.random() < 0.55 ? TILE.DIRT_H : TILE.DIRT_H2;
-      else if (type === 'path_v') idx = Math.random() < 0.55 ? TILE.DIRT_V : TILE.DIRT_V2;
-      else if (type === 'path_loop') idx = Math.random() < 0.5 ? TILE.DIRT_WIDE : TILE.DIRT_PATCH;
-      else if (type === 'path_diag') idx = Math.random() < 0.5 ? TILE.DIRT_CORNER : TILE.DIRT_HEAVY;
-      else {
-        // Biome-weighted ground rolls give each zone its own texture rhythm
-        // while reusing the same sheet: forest lush, desert rocky, ruins
-        // broken, riverside flowery.
-        const boundary = nearZoneBoundary(r, c) && Math.random() < 0.42;
-        const roll = Math.random();
-        if (boundary) {
-          if (zone === 'desert') {
-            if      (roll < 0.34) idx = TILE.DIRT_PATCH;
-            else if (roll < 0.60) idx = TILE.ROCKS_SPARSE;
-            else if (roll < 0.82) idx = TILE.DIRT_HEAVY;
-            else                  idx = TILE.ROCKS_DENSE;
-          } else if (zone === 'ruins') {
-            if      (roll < 0.38) idx = TILE.DIRT_PATCH;
-            else if (roll < 0.64) idx = TILE.ROCKS_DENSE;
-            else if (roll < 0.84) idx = TILE.ROCKS_SPARSE;
-            else                  idx = TILE.TALL_GRASS;
-          } else if (zone === 'riverside') {
-            if      (roll < 0.34) idx = TILE.FLOWER;
-            else if (roll < 0.62) idx = TILE.FLOWERS_COLOR;
-            else if (roll < 0.84) idx = TILE.TALL_GRASS;
-            else                  idx = TILE.THICK_GRASS;
-          } else if (zone === 'forest') {
-            if      (roll < 0.36) idx = TILE.THICK_GRASS;
-            else if (roll < 0.62) idx = TILE.TALL_GRASS;
-            else if (roll < 0.82) idx = TILE.FLOWER;
-            else                  idx = TILE.DIRT_PATCH;
-          } else {
-            if      (roll < 0.34) idx = TILE.FLOWER;
-            else if (roll < 0.58) idx = TILE.FLOWERS_COLOR;
-            else if (roll < 0.78) idx = TILE.DIRT_PATCH;
-            else                  idx = TILE.TALL_GRASS;
-          }
-        } else if (zone === 'desert') {
-          if      (roll < 0.38) idx = TILE.ROCKS_SPARSE;
-          else if (roll < 0.62) idx = TILE.DIRT_PATCH;
-          else if (roll < 0.76) idx = TILE.DIRT_HEAVY;
-          else if (roll < 0.88) idx = TILE.ROCKS_DENSE;
-          else if (roll < 0.96) idx = TILE.GRASS;
-          else                  idx = TILE.THICK_GRASS;
-        } else if (zone === 'ruins') {
-          if      (roll < 0.30) idx = TILE.DIRT_PATCH;
-          else if (roll < 0.52) idx = TILE.ROCKS_DENSE;
-          else if (roll < 0.70) idx = TILE.ROCKS_SPARSE;
-          else if (roll < 0.84) idx = TILE.DIRT_HEAVY;
-          else if (roll < 0.94) idx = TILE.TALL_GRASS;
-          else                  idx = TILE.THICK_GRASS;
-        } else if (zone === 'forest') {
-          if      (roll < 0.34) idx = TILE.THICK_GRASS;
-          else if (roll < 0.58) idx = TILE.TALL_GRASS;
-          else if (roll < 0.74) idx = TILE.GRASS;
-          else if (roll < 0.86) idx = TILE.FLOWER;
-          else if (roll < 0.94) idx = TILE.FLOWERS_COLOR;
-          else                  idx = TILE.DIRT_PATCH;
-        } else if (zone === 'riverside') {
-          if      (roll < 0.28) idx = TILE.GRASS;
-          else if (roll < 0.50) idx = TILE.THICK_GRASS;
-          else if (roll < 0.68) idx = TILE.TALL_GRASS;
-          else if (roll < 0.82) idx = TILE.FLOWER;
-          else if (roll < 0.94) idx = TILE.FLOWERS_COLOR;
-          else                  idx = TILE.DIRT_PATCH;
-        } else {
-          if      (roll < 0.32) idx = TILE.GRASS;
-          else if (roll < 0.58) idx = TILE.THICK_GRASS;
-          else if (roll < 0.72) idx = TILE.TALL_GRASS;
-          else if (roll < 0.82) idx = TILE.FLOWER;
-          else if (roll < 0.88) idx = TILE.FLOWERS_COLOR;
-          else if (roll < 0.94) idx = TILE.ROCKS_SPARSE;
-          else if (roll < 0.97) idx = TILE.ROCKS_DENSE;
-          else                  idx = TILE.DIRT_PATCH;
-        }
-      }
+      const idx = pickNaturalGroundTile(zone, r, c, type);
 
       const zoneTileset = {
         desert: 'sand_tileset',
@@ -2009,56 +2021,118 @@ function buildDecorations(scene) {
     }
   }
 
-  // Soft-blob overlay pass — breaks the 128 px tile grid visually by
-  // scattering large translucent decoration sprites at sub-tile offsets.
-  // Depth -800 sits between map tiles (-1000) and props (-500/-620) so
-  // these blur the grid but don't obscure objects on the ground plane.
-  // Skip dry biomes (desert/ruins) — those should read crisp and barren.
+  const firstExisting = (keys) => keys.find((key) => scene.textures.exists(key));
+  const groundOverlayKey = (zone, large = false) => {
+    if (zone === 'desert') {
+      return firstExisting([
+        'deco_sand_scuff_soft_01',
+        large ? 'deco_sand_dune' : 'deco_dry_grass_tuft_01',
+        'deco_sand_dune',
+        Phaser.Utils.Array.GetRandom(grassKeys),
+      ]);
+    }
+    if (zone === 'ruins') {
+      return firstExisting([
+        'deco_stone_dust_soft_01',
+        large ? 'deco_pebble_cluster_01' : 'deco_cracked_earth_01',
+        Phaser.Utils.Array.GetRandom(rockKeys),
+        Phaser.Utils.Array.GetRandom(grassKeys),
+      ]);
+    }
+    if (zone === 'forest') return firstExisting([Phaser.Utils.Array.GetRandom(forestFernKeys), Phaser.Utils.Array.GetRandom(grassKeys)]);
+    if (zone === 'riverside') return firstExisting([Phaser.Utils.Array.GetRandom(riversideCattailKeys), Phaser.Utils.Array.GetRandom(grassKeys)]);
+    return firstExisting([...flowerKeys, ...grassKeys]);
+  };
+  const groundOverlayTint = (zone, large = false) => ({
+    desert: large ? 0xd8bd78 : 0xd6c178,
+    ruins: large ? 0xbdb49f : 0xc8c0b0,
+    forest: large ? 0xa8c898 : 0xb8d8a0,
+    riverside: large ? 0xb8d8c8 : 0xc8e8d8,
+    grasslands: large ? 0xc8d8a8 : 0xd8e8c0,
+  }[zone] || 0xffffff);
+
+  // Soft ground overlay pass — breaks the 128 px tile grid visually by
+  // scattering translucent sprites at sub-tile offsets. Depth -800 sits
+  // between map tiles (-1000) and props (-500/-620), so these blend terrain
+  // without hiding monsters, labels, roads, or interactable props.
   const softKeys = [...flowerKeys, ...grassKeys];
   // Mid-size overlay layer — sparse and low-alpha so it adds organic
   // variation without drawing attention as another large patch pattern.
-  const softCount = 520;
+  const softCount = 760;
   for (let i = 0; i < softCount; i++) {
     const x = Phaser.Math.Between(0, WORLD_W);
     const y = Phaser.Math.Between(0, WORLD_H);
     const tile_r = Math.floor(y / TILE_SIZE), tile_c = Math.floor(x / TILE_SIZE);
     const z = getZone(tile_r, tile_c);
-    if (z === 'desert' || z === 'ruins') continue;
     if (getCellType(tile_r, tile_c) !== 'grass') continue;
-    const key = Phaser.Utils.Array.GetRandom(softKeys);
+    const key = groundOverlayKey(z, false) || Phaser.Utils.Array.GetRandom(softKeys);
     if (!scene.textures.exists(key)) continue;
     const img = scene.add.image(x, y, key);
-    const baseH = Phaser.Math.Between(170, 260);
+    const dry = z === 'desert' || z === 'ruins';
+    const baseH = dry ? Phaser.Math.Between(120, 220) : Phaser.Math.Between(170, 260);
     img.setScale(baseH / img.height);
-    img.setAlpha(Phaser.Math.FloatBetween(0.07, 0.12));
+    img.setAlpha(dry ? Phaser.Math.FloatBetween(0.045, 0.085) : Phaser.Math.FloatBetween(0.07, 0.12));
     img.setAngle(Phaser.Math.Between(0, 359));
     img.setDepth(-800);
-    if (z === 'forest') img.setTint(0xb8d8a0);
-    else if (z === 'riverside') img.setTint(0xc8e8d8);
-    else img.setTint(0xd8e8c0);
+    img.setTint(groundOverlayTint(z, false));
   }
 
   // Macro-blob layer — larger, fainter sprites that span multiple tiles,
   // adding broad value variance and breaking long axis-aligned tile rows.
-  const macroCount = 110;
+  const macroCount = 180;
   for (let i = 0; i < macroCount; i++) {
     const x = Phaser.Math.Between(0, WORLD_W);
     const y = Phaser.Math.Between(0, WORLD_H);
     const tile_r = Math.floor(y / TILE_SIZE), tile_c = Math.floor(x / TILE_SIZE);
     const z = getZone(tile_r, tile_c);
-    if (z === 'desert' || z === 'ruins') continue;
     if (getCellType(tile_r, tile_c) !== 'grass') continue;
-    const key = Phaser.Utils.Array.GetRandom(softKeys);
+    const key = groundOverlayKey(z, true) || Phaser.Utils.Array.GetRandom(softKeys);
     if (!scene.textures.exists(key)) continue;
     const img = scene.add.image(x, y, key);
-    const baseH = Phaser.Math.Between(320, 460);
+    const dry = z === 'desert' || z === 'ruins';
+    const baseH = dry ? Phaser.Math.Between(220, 360) : Phaser.Math.Between(320, 460);
     img.setScale(baseH / img.height);
-    img.setAlpha(Phaser.Math.FloatBetween(0.04, 0.08));
+    img.setAlpha(dry ? Phaser.Math.FloatBetween(0.025, 0.055) : Phaser.Math.FloatBetween(0.04, 0.08));
     img.setAngle(Phaser.Math.Between(0, 359));
     img.setDepth(-820);
-    if (z === 'forest') img.setTint(0xa8c898);
-    else if (z === 'riverside') img.setTint(0xb8d8c8);
-    else img.setTint(0xc8d8a8);
+    img.setTint(groundOverlayTint(z, true));
+  }
+
+  // Small ground accents — low-contrast pebble/crack/tuft details below
+  // props. These make dry and rocky regions feel authored without adding
+  // blockers or visual noise around combat readability.
+  const accentCount = 520;
+  for (let i = 0; i < accentCount; i++) {
+    const x = Phaser.Math.Between(0, WORLD_W);
+    const y = Phaser.Math.Between(0, WORLD_H);
+    const tile_r = Math.floor(y / TILE_SIZE), tile_c = Math.floor(x / TILE_SIZE);
+    const z = getZone(tile_r, tile_c);
+    if (getCellType(tile_r, tile_c) !== 'grass') continue;
+    let key;
+    let h;
+    let alpha;
+    if (z === 'desert') {
+      key = firstExisting(['deco_cracked_earth_01', 'deco_dry_grass_tuft_01', 'deco_sand_dune', Phaser.Utils.Array.GetRandom(grassKeys)]);
+      h = Phaser.Math.Between(34, 82);
+      alpha = Phaser.Math.FloatBetween(0.10, 0.18);
+    } else if (z === 'ruins') {
+      key = firstExisting(['deco_pebble_cluster_01', 'deco_cracked_earth_01', Phaser.Utils.Array.GetRandom(rockKeys)]);
+      h = Phaser.Math.Between(30, 68);
+      alpha = Phaser.Math.FloatBetween(0.09, 0.16);
+    } else if (nearZoneBoundary(tile_r, tile_c) && tileNoise(tile_r, tile_c, 211) > 0.44) {
+      key = firstExisting(['deco_pebble_cluster_01', Phaser.Utils.Array.GetRandom(grassKeys), Phaser.Utils.Array.GetRandom(flowerKeys)]);
+      h = Phaser.Math.Between(34, 72);
+      alpha = Phaser.Math.FloatBetween(0.10, 0.18);
+    } else {
+      continue;
+    }
+    if (!key || !scene.textures.exists(key)) continue;
+    const img = scene.add.image(x, y, key);
+    img.setScale(h / img.height);
+    img.setAlpha(alpha);
+    img.setAngle(Phaser.Math.Between(0, 359));
+    img.setDepth(-780);
+    img.setTint(groundOverlayTint(z, false));
   }
 }
 

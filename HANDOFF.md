@@ -4,19 +4,35 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 6:03 PM CDT — post grass checkerboard fix.**
+**State as of 2026-05-18 6:54 PM CDT — post full-world terrain cohesion pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 50 fixes harsh grass checkerboarding by
-  making the base grass tiles cohesive and pushing variation into subtle
-  overlays/details.
-- **Cache version live in `project-grasslands/index.html`:** `?v=141`.
-- **Next change must use:** `?v=142`.
+- **Latest completed work:** session 51 improves full-world terrain visuals
+  beyond grass: clustered desert/ruins/stone ground selection, blended biome
+  transitions, and low-alpha dry/rock overlay accents.
+- **Cache version live in `project-grasslands/index.html`:** `?v=142`.
+- **Next change must use:** `?v=143`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
 
-**Where we left off (session 50):**
+**Where we left off (session 51):**
+- Root cause: desert/ruins/rock ground still looked like pasted squares
+  because `buildMap()` used independent per-tile random rolls for terrain
+  categories. That produced noise, not natural clustered terrain.
+- Fix: terrain selection now uses coordinate-stable noise helpers
+  (`tileNoise`, `smoothTileNoise`, `pickNaturalGroundTile`) so dry, rocky,
+  lush, and transition patches form larger coherent areas.
+- Desert and ruins no longer skip ground-softening entirely. The soft overlay,
+  macro overlay, and new small ground-accent passes now include low-alpha
+  dry/stone tinting, while staying below props/monsters/labels.
+- Current art is still a ceiling: the pass uses existing rocks, dunes, grass,
+  and flowers as temporary scuffs/accents. The real next asset win is soft
+  sand/stone/crack/pebble/dry-grass detail PNGs.
+- No gameplay, enemy logic, combat, UI, controls, map dimensions, saves, or
+  progression changed.
+
+**Previous state (session 50):**
 - Root cause: `grass_tileset_v2.png` has a huge brightness spread across its
   3×3 cells (source means ~69.7–143.2), and the renderer was randomly mixing
   those cells with 90° rotations, alpha 0.85–1.00, and ±8 RGB jitter. That
@@ -85,12 +101,26 @@ player halo / cloud shadows / dim overlays.
 `project-grasslands/CLAUDE.md` (think before code, simplicity first,
 surgical changes, goal-driven execution).
 
+**Prompt rewrite rule:** Before answering any user prompt, first rewrite it
+into a clearer, more specific version and output:
+
+```text
+Improved prompt:
+<rewritten prompt — preserve intent, resolve ambiguous pronouns, add
+inferable context, list acceptance criteria if it's an implementation task,
+stay concise>
+```
+
+Then immediately answer the improved prompt. Do not ask the user to confirm
+the rewrite. Skip the rewrite only when the prompt is 4 words or fewer with
+obvious meaning, is a yes/no/ok acknowledgement, or starts with `/`.
+
 ---
 
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 50, grass
-> checkerboard / harsh square patchwork fix. Cache `?v=141`).
+> coding sessions. Last refresh: 2026-05-18 (post session 51, full-world
+> terrain cohesion pass. Cache `?v=142`).
 >
 > (Pre-session-47 header line:) Last refresh: 2026-05-18 (post session 46,
 > `grass_tileset_v2.png` wired as the base grass tileset. Cache `?v=137`).
@@ -298,7 +328,52 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 50 (latest)
+## 3. What we did in session 51 (latest)
+
+Cache now at **`?v=142`**. Sonny said grass was better but the whole world
+still felt like a pasted-square grid, especially rock and desert terrain.
+This session stayed terrain-visuals-only.
+
+1. **Diagnosis.** `buildMap()` was still choosing desert, ruins, rocky, and
+   transition ground with independent `Math.random()` rolls per 128 px tile.
+   That creates shuffled square noise instead of natural terrain regions.
+   Grass got special softening in session 50, but desert/ruins were still
+   excluded from the soft overlay layers.
+2. **Clustered terrain selection.** Added coordinate-stable helpers
+   `tileNoise()`, `smoothTileNoise()`, `neighborZones()`, and
+   `pickNaturalGroundTile()`. Ground tiles now form coherent sandy, dry,
+   stone, lush, and transition patches instead of every square choosing a
+   category independently.
+3. **Better biome transitions.** Boundary-adjacent terrain now borrows dry,
+   rocky, or lush tile choices based on neighboring zones and noise fields,
+   so grass/desert/ruins blends are less abrupt.
+4. **Dry + stone overlays.** The soft-overlay and macro-overlay passes now
+   include desert and ruins at lower alpha with zone-specific tints. This
+   adds broad sand/stone variation across multiple tiles without hiding
+   players, monsters, nameplates, HP bars, roads, or props.
+5. **Small ground accents.** Added a non-blocking accent pass for desert,
+   ruins, and transition edges. It uses existing assets as temporary pebbles,
+   cracks, dry tufts, and scuffs until purpose-built generated PNGs arrive.
+6. **Future asset hooks.** Overlay selection already checks for the desired
+   filenames (`deco_sand_scuff_soft_01`, `deco_stone_dust_soft_01`,
+   `deco_cracked_earth_01`, `deco_pebble_cluster_01`,
+   `deco_dry_grass_tuft_01`) once those assets are preloaded/wired.
+7. **Scope preserved.** No gameplay, combat, progression, controls, UI
+   layout, monster logic, map dimensions, saves, or lighting changed.
+8. **Verification.** `node -c project-grasslands/game.js` exited 0.
+9. **Cache bump.** `?v=141` → `?v=142`.
+
+### Honest art assessment
+
+This should make the world feel less random and more naturally clustered,
+especially in desert and ruins. But the current art is still not enough for
+the final RO-inspired target. The biggest missing pieces are true
+transparent ground-detail overlays: soft sand scuffs, stone dust, cracked
+earth, pebble clusters, and dry grass tufts. Existing rock/dune/grass assets
+can mask the grid, but they cannot fully replace purpose-built low-contrast
+terrain detail sprites.
+
+## 3.1. What we did in session 50
 
 Cache now at **`?v=141`**. Sonny reported the grass field looked like a
 harsh checkerboard / patchwork of big square bright and dark tiles. This
