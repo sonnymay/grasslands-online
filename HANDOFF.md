@@ -1,9 +1,9 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 43,
-> O(N) autopilot + off-screen sway cull + resting heal float. Cache
-> `?v=134`).
+> coding sessions. Last refresh: 2026-05-18 (post session 44,
+> 8 new named secondary plazas — world feels bigger without growing.
+> Cache `?v=135`).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -208,7 +208,37 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 43 (latest)
+## 3. What we did in session 44 (latest)
+
+Cache now at **`?v=135`**. Make the world feel beautiful and bigger
+without bumping physical dimensions (HANDOFF flags further growth as
+GPU-risky). Approach: add named secondary mini-plazas.
+
+1. **8 new named secondary plazas.** `landmarkTiles()` now returns 13
+   instead of 5. Primary 5 keep their hero props and full rings; new
+   8 are flagged `primary: false` and skip the hero. New labels:
+   - Mid-cardinal way-stations: **Forest Edge**, **Desert Edge**,
+     **Ruins Crossing**, **Riverside Bend**.
+   - Biome corners: **Mistgrove** (NW), **Sunfall Grove** (NE),
+     **Old Ford** (SW), **Reedmoor** (SE).
+2. **`addSecondaryPlaza()` helper.** Each new plaza places a 6-prop
+   ring at radius 70 (mushrooms in forest, rocks in desert/ruins,
+   flowers in grasslands/riverside) plus a single pulsing gold
+   lantern (reusing the spawn-plaza lantern style at smaller scale).
+   Sway enabled for soft biomes, off for rocky ones. Radius 0 so the
+   plaza occupies one tile and doesn't break A*.
+3. **`landmarkLabel(lm)` now honors `lm.name` first.** Legacy
+   offset-based fallback retained for safety. Travel panel,
+   discovery banner, zone hint, and minimap markers all auto-pick up
+   the new entries because they iterate `landmarkTiles()`.
+4. **Travel panel: 2-column layout.** 13 rows wouldn't fit a single
+   column on 720-height viewports. Modal now lays out 7+6 in two
+   380-px columns with a 24-px gap; rowH 56 → 44.
+5. **Verification.** `node -c project-grasslands/game.js` exited 0.
+   Preview boots clean, no console errors.
+6. **Cache bump.** `?v=134` → `?v=135`.
+
+## 3.0. What we did in session 43
 
 Cache now at **`?v=134`**. Two more perf wins (invisible to player) plus
 one tactile cue for the sit-to-regen mechanic from session 42. All
@@ -1803,7 +1833,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=134`**. Next change should use `?v=135`.
+  change. Current: **`?v=135`**. Next change should use `?v=136`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
