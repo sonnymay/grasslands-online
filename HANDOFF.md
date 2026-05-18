@@ -286,6 +286,21 @@ wheel-zoom feature. All HUD work landed; gameplay logic untouched.
 13. **Bigfoot 3× bigger.** `MONSTER_TYPES.bigfoot.scaleMult` 2.2 → 6.6 to
     match Sonny's "make him 3× bigger" feedback. Lore/stats untouched.
 14. **Cache bump.** `?v=113` → `?v=114`.
+15. **"Ghost monster that follows the camera + can't be clicked" — root
+    cause + fix.** Adding the UI camera in session 29 broke pointer-to-
+    world conversion. Phaser's `pointer.worldX` / `pointer.worldY` is
+    resolved against whichever camera the input manager has selected; the
+    UI camera (added last, full-viewport) became the top camera, so
+    `worldX/Y` started returning *screen* coordinates. The monster click
+    test compares `Math.hypot(wx - sprite.x, wy - sprite.y) < 80` against
+    *world* coords, so every click missed. To the player it looked like a
+    sprite hovered near the cursor that couldn't be targeted. Fix: both
+    pointer paths (`pointermove` cursor + `pointerdown` click) now call
+    `pointer.positionToCamera(scene.cameras.main)` to get world coords
+    from the main camera explicitly. Added null-safety guards on
+    `b.sprite` / `b.sprite.scene` so stale references after death/cleanup
+    can't throw.
+16. **Cache bump.** `?v=114` → `?v=115`.
 7. **Verification.** `node -c project-grasslands/game.js` exited 0 after
    every edit. Browser preview was intentionally skipped — Sonny asked us
    to save tokens once the live wedge from rapid `location.reload()` cycles
@@ -1419,7 +1434,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=114`**. Next change should use `?v=115`.
+  change. Current: **`?v=115`**. Next change should use `?v=116`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1542,7 +1557,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=114`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=115`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.

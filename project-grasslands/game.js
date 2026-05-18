@@ -892,10 +892,16 @@ function create() {
 
   // Hover cursor: crosshair when over a monster, default otherwise.
   scene.input.on('pointermove', (pointer) => {
-    const wx = pointer.worldX, wy = pointer.worldY;
+    // Pointer.worldX/Y is computed against whichever camera the input
+    // manager picked. Since we added a screen-space UI camera in front,
+    // those properties now resolve in screen coords instead of world
+    // coords — every monster click missed. Resolve world coords from the
+    // main (world) camera explicitly so hit tests stay correct.
+    const wp = pointer.positionToCamera(scene.cameras.main);
+    const wx = wp.x, wy = wp.y;
     let over = false;
     for (const b of bloblings) {
-      if (!b.alive) continue;
+      if (!b.alive || !b.sprite || !b.sprite.scene) continue;
       if (Math.hypot(wx - b.sprite.x, wy - b.sprite.y) < 70) { over = true; break; }
     }
     scene.input.setDefaultCursor(over ? 'crosshair' : 'default');
@@ -910,12 +916,15 @@ function create() {
     // which interactive object was hit, so we check the hit list ourselves.
     const hits = scene.input.hitTestPointer(pointer);
     if (hits && hits.length > 0) return;
-    const wx = pointer.worldX;
-    const wy = pointer.worldY;
+    // See note above: resolve world coords from the main camera so the UI
+    // camera doesn't intercept pointer-to-world conversion.
+    const wp = pointer.positionToCamera(scene.cameras.main);
+    const wx = wp.x;
+    const wy = wp.y;
 
     let clicked = null;
     for (const b of bloblings) {
-      if (!b.alive) continue;
+      if (!b.alive || !b.sprite || !b.sprite.scene) continue;
       if (Math.hypot(wx - b.sprite.x, wy - b.sprite.y) < 80) { clicked = b; break; }
     }
 
