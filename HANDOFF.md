@@ -1,9 +1,9 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 35,
-> landmark plaza decoration rings + subtle static-prop ground shadows.
-> Code-only map beauty pass, bright/readable world preserved).
+> coding sessions. Last refresh: 2026-05-18 (post session 36,
+> generated Tier 0 map-art assets moved from Downloads into project folders
+> and resized to spec. Asset import only; not wired yet).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -208,7 +208,29 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 35 (latest)
+## 3. What we did in session 36 (latest)
+
+Cache stays at **`?v=127`** — asset import only, no `game.js` or
+`index.html` change.
+
+1. **Moved generated Tier 0 map assets from Downloads into the project.**
+   - Tiles: `forest_tileset.png`, `ruins_tileset.png`,
+     `riverside_tileset.png` → `project-grasslands/assets/tiles/`.
+   - Landmark props: `landmark_spawn_signpost.png`,
+     `landmark_forest_shrine.png`, `landmark_desert_obelisk.png`,
+     `landmark_ruins_well.png`, `landmark_riverside_bridge.png` →
+     `project-grasslands/assets/decorations/`.
+   - First deco pack: `forest_fern_01.png`,
+     `ruins_pillar_broken_01.png`, `riverside_cattail_01.png` →
+     `project-grasslands/assets/decorations/`.
+2. **Normalized generated image sizes to spec.**
+   - Tiles resized to `768×768`.
+   - Square decorations resized to `256×256`.
+   - Riverside bridge resized to `384×256`.
+3. **Not wired yet.** Next code pass should load/slice one biome tileset or
+   attach one landmark prop set at a time, with cache bump and `node -c`.
+
+## 3.1. What we did in session 35
 
 Cache now at **`?v=127`**. Continued the Ragnarok Online-style beauty pass
 with two code-only map readability upgrades: destinations and grounding.
@@ -232,7 +254,7 @@ with two code-only map readability upgrades: destinations and grounding.
 5. **Verification.** `node -c project-grasslands/game.js` exited 0.
 6. **Cache bump.** `?v=126` → `?v=127`.
 
-## 3.1. What we did in session 34
+## 3.2. What we did in session 34
 
 Cache now at **`?v=126`**. Sonny reported that the character body kept
 spinning while walking; goal was Ragnarok Online-style directional walking.
@@ -254,7 +276,7 @@ spinning while walking; goal was Ragnarok Online-style directional walking.
 4. **Verification.** `node -c project-grasslands/game.js` exited 0.
 5. **Cache bump.** `?v=125` → `?v=126`.
 
-## 3.2. What we did in session 33
+## 3.3. What we did in session 33
 
 Cache now at **`?v=125`**. Continued Sonny's "beautiful like Ragnarok
 Online" map pass with no new art and no atmospheric darkening.
@@ -277,7 +299,7 @@ Online" map pass with no new art and no atmospheric darkening.
 4. **Verification.** `node -c project-grasslands/game.js` exited 0.
 5. **Cache bump.** `?v=124` → `?v=125`.
 
-## 3.3. What we did in session 32
+## 3.4. What we did in session 32
 
 Cache now at **`?v=124`**. Sonny: "make it beautiful like Ragnarok
 Online." No new art yet — push the existing decoration set as far as it
@@ -302,7 +324,7 @@ goes via density + cluster patches.
 4. **Verification.** `node -c project-grasslands/game.js` exited 0.
 5. **Cache bump.** `?v=124` → `?v=124`.
 
-## 3.4. What we did in session 31
+## 3.5. What we did in session 31
 
 Cache now at **`?v=124`**. Pure-code map polish ahead of new art landing.
 
