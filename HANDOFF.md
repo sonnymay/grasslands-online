@@ -4,26 +4,29 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 5:50 PM CDT — post map edge-accent polish.**
+**State as of 2026-05-18 6:03 PM CDT — post grass checkerboard fix.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 49 adds biome-boundary and path-shoulder
-  accent decorations to make map transitions feel more organic.
-- **Cache version live in `project-grasslands/index.html`:** `?v=140`.
-- **Next change must use:** `?v=141`.
+- **Latest completed work:** session 50 fixes harsh grass checkerboarding by
+  making the base grass tiles cohesive and pushing variation into subtle
+  overlays/details.
+- **Cache version live in `project-grasslands/index.html`:** `?v=141`.
+- **Next change must use:** `?v=142`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
 
-**Where we left off (session 49):**
-- Added a visual-only `placeTileAccent()` pass inside `buildDecorations()`.
-- Grass tiles that touch biome boundaries now get capped, zone-specific
-  accent props: forest ferns/mushrooms, desert rocks/dry grass/cacti, ruins
-  rocks/pillars/bushes, riverside cattails/flowers, grasslands flowers/grass.
-- Grass tiles beside paths now get lighter shoulder accents so roads feel
-  less like hard geometric cuts.
-- Accents do not block cells and do not change gameplay, UI, map layout, or
-  lighting.
+**Where we left off (session 50):**
+- Root cause: `grass_tileset_v2.png` has a huge brightness spread across its
+  3×3 cells (source means ~69.7–143.2), and the renderer was randomly mixing
+  those cells with 90° rotations, alpha 0.85–1.00, and ±8 RGB jitter. That
+  produced the visible dark/bright square patchwork.
+- Fix: `grass_tileset` now maps semantic grass frames to the cohesive mid-row
+  source cells only (means ~101.8–110.9), removes 90° rotations, reduces tint
+  jitter to ±2, and keeps alpha nearly flat at 0.98–1.00.
+- Soft overlays and edge accents were reduced so decorative variation is
+  subtle instead of noisy.
+- No gameplay, enemy logic, combat, UI, map layout, or lighting changed.
 
 **Grass-polish state from session 47/48:**
 - `deco_grass_blob_soft_01.png` was not present in Downloads when Codex
@@ -60,7 +63,7 @@
      `// Macro-blob layer`), replace the random `softKeys` pick with
      the new key (or 70 % weight toward it) so blob soft masks the
      remaining grid seams.
-   - Bump `?v=140` → `?v=141` in `index.html`.
+   - Bump `?v=141` → `?v=142` in `index.html`.
 3. **Verify + ship.** `node -c project-grasslands/game.js`, reload
    preview, screenshot before/after, commit (`asset:` + `feat:` in
    two commits), push. Update HANDOFF.md §3 with the session entry.
@@ -86,8 +89,8 @@ surgical changes, goal-driven execution).
 
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 49, biome-boundary
-> and path-shoulder accent decorations. Cache `?v=140`).
+> coding sessions. Last refresh: 2026-05-18 (post session 50, grass
+> checkerboard / harsh square patchwork fix. Cache `?v=141`).
 >
 > (Pre-session-47 header line:) Last refresh: 2026-05-18 (post session 46,
 > `grass_tileset_v2.png` wired as the base grass tileset. Cache `?v=137`).
@@ -295,7 +298,48 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 49 (latest)
+## 3. What we did in session 50 (latest)
+
+Cache now at **`?v=141`**. Sonny reported the grass field looked like a
+harsh checkerboard / patchwork of big square bright and dark tiles. This
+session focused only on map ground visuals.
+
+1. **Diagnosis.** `grass_tileset_v2.png` is a 3×3 sheet whose cells vary
+   dramatically in value. Mean brightness across the 9 cells ranges from
+   about **69.7** to **143.2**. The previous slicer mapped semantic grass
+   frames across nearly the full range, then `buildMap()` added random 90°
+   rotations, alpha jitter from 0.85–1.00, and ±8 RGB tint jitter. Together
+   those choices made each 128 px tile read as a separate bright/dark square.
+2. **Cohesive grass base mapping.** Added `GRASS_TILESET_TILE_MAP_3X3` so
+   `grass_tileset` uses only the cohesive mid-row source cells for base
+   grass. The active grass semantic frames now range about **101.8–110.9**
+   in mean brightness instead of **69.7–143.2**.
+3. **Removed harsh tile transforms.** Grass tiles keep gentle flipX/flipY
+   variation, but no longer get random 90° rotations. The rotations amplified
+   directional lighting differences inside the generated art.
+4. **Reduced per-tile value jitter.** Tint jitter is now ±2 per RGB channel
+   instead of ±8, and grass tile alpha is 0.98–1.00 instead of 0.85–1.00.
+   This keeps the field cohesive while avoiding identical-copy repetition.
+5. **Calmed overlays/details.** Soft overlay scatter dropped 900 → 520,
+   macro overlay dropped 220 → 110, and both layers have lower alpha.
+   Session-49 edge accents were also reduced (520/360 caps → 320/220 caps)
+   so details stay decorative instead of noisy.
+6. **Scope preserved.** No gameplay, combat, enemy logic, UI, map layout,
+   day/night, vignette, halo, or dark overlay changes.
+7. **Verification.** `node -c project-grasslands/game.js` exited 0. Asset
+   brightness check confirmed the grass semantic range reduction above.
+8. **Cache bump.** `?v=140` → `?v=141`.
+
+### Honest art assessment
+
+This should greatly reduce the ugly checkerboard with code alone. The field
+will be more cohesive and readable, but the current grass sheet still has
+non-tile-safe lighting baked into individual 256 px cells. If Sonny wants the
+map to look truly RO-beautiful, the next high-impact asset is still a proper
+transparent soft grass overlay/blob and, after that, a tile-safe grass base
+sheet with no per-cell brightness bands.
+
+## 3.1. What we did in session 49
 
 Cache now at **`?v=140`**. Continued the RO-style map beauty pass with a
 small code-only decoration layer. No gameplay, UI, map-layout, or lighting
@@ -329,7 +373,7 @@ asset. When Sonny drops it into Downloads, move it to
 `project-grasslands/assets/decorations/`, resize to 256 px max, preload it,
 and weight the `// Macro-blob layer` toward that key.
 
-## 3.1. What we did in session 48
+## 3.2. What we did in session 48
 
 Cache now at **`?v=139`**. Claude Code's handoff asked for
 `deco_grass_blob_soft_01.png`, but that file was not in Downloads. The
@@ -366,7 +410,7 @@ When Sonny drops it into Downloads, move it to
 `project-grasslands/assets/decorations/`, resize to 256 px max, preload it,
 and weight the `// Macro-blob layer` toward that key.
 
-## 3.2. What we did in session 47
+## 3.3. What we did in session 47
 
 Cache now at **`?v=138`**. Sonny inspected v2 tileset wired in session
 46 and reported the 128 px square grid was still visible because v2
@@ -409,7 +453,7 @@ intrinsic to v2's tile-edge art. Highest-impact next image:
   original art."* Drop into `Downloads`, say the word, will move /
   resize / wire in `preload()` and the macro pass.
 
-## 3.3. What we did in session 46
+## 3.4. What we did in session 46
 
 Cache now at **`?v=137`**. Wired the generated grass replacement image
 from Downloads.
@@ -2133,7 +2177,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=140`**. Next change should use `?v=141`.
+  change. Current: **`?v=141`**. Next change should use `?v=142`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 

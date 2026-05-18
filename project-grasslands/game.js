@@ -862,6 +862,28 @@ function create() {
     [TILE.DIRT_OPEN]: 3,
     [TILE.TALL_GRASS]: 5,
   };
+  // grass_tileset_v2 has very dark top-row cells and very bright bottom-row
+  // cells. Using all 9 cells as base terrain creates a checkerboard of value
+  // blocks, so grasslands use the cohesive mid row for the ground and leave
+  // stronger variation to decoration sprites.
+  const GRASS_TILESET_TILE_MAP_3X3 = {
+    [TILE.GRASS]: 4,
+    [TILE.THICK_GRASS]: 4,
+    [TILE.FLOWER]: 4,
+    [TILE.FLOWERS_COLOR]: 5,
+    [TILE.ROCKS_SPARSE]: 3,
+    [TILE.ROCKS_DENSE]: 3,
+    [TILE.DIRT_PATCH]: 4,
+    [TILE.DIRT_HEAVY]: 3,
+    [TILE.DIRT_H]: 3,
+    [TILE.DIRT_H2]: 4,
+    [TILE.DIRT_V]: 3,
+    [TILE.DIRT_V2]: 4,
+    [TILE.DIRT_CORNER]: 3,
+    [TILE.DIRT_WIDE]: 4,
+    [TILE.DIRT_OPEN]: 4,
+    [TILE.TALL_GRASS]: 5,
+  };
   const sliceTileset = (texKey) => {
     if (!scene.textures.exists(texKey)) return;
     const img = scene.textures.get(texKey).getSourceImage();
@@ -869,8 +891,11 @@ function create() {
     const sw = Math.floor(img.width / grid);
     const sh = Math.floor(img.height / grid);
     const inset = Math.floor(sw * (TILESET_INSET_PCT[texKey] ?? 0.04));
+    const tileMap = texKey === 'grass_tileset'
+      ? GRASS_TILESET_TILE_MAP_3X3
+      : TILESET_TILE_MAP_3X3;
     for (let idx = 0; idx < 16; idx++) {
-      const srcIdx = grid === 3 ? TILESET_TILE_MAP_3X3[idx] : idx;
+      const srcIdx = grid === 3 ? tileMap[idx] : idx;
       const r = Math.floor(srcIdx / grid);
       const c = srcIdx % grid;
       scene.textures.get(texKey).add(
@@ -1460,23 +1485,19 @@ function buildMap(scene) {
         tilesetKey, `tile_${idx}`
       );
       img.setDisplaySize(TILE_SIZE + 2, TILE_SIZE + 2);
-      // 4 random 90° rotations × 4 flip combos = 16 visual variants per
-      // source tile. Edges between neighbors stop matching, killing the
-      // perceived square-grid pattern even with the v2 tileset.
+      // Gentle flip variation is enough for organic grass. Random 90°
+      // rotations made v2's directional lighting read as square patchwork.
       if (type === 'grass') {
         if (Math.random() < 0.5) img.setFlipX(true);
         if (Math.random() < 0.5) img.setFlipY(true);
-        const rot = Phaser.Math.Between(0, 3) * 90;
-        if (rot) img.setAngle(rot);
       }
       // Zone tint only when we're still drawing the grass tileset for a
       // non-grasslands biome. Real biome tiles are already the right palette.
-      // Per-tile micro RGB jitter (±8) + small alpha jitter breaks the
-      // visible 128 px grid by giving neighbors slightly different
-      // brightness/hue, so the eye stops reading the sharp square pattern.
+      // Per-tile RGB jitter stays tiny. Larger jitter and alpha variance
+      // create obvious bright/dark rectangles on large grass fields.
       const jitterTint = (base) => {
         const r = (base >> 16) & 0xff, g = (base >> 8) & 0xff, b = base & 0xff;
-        const j = () => Phaser.Math.Between(-8, 8);
+        const j = () => Phaser.Math.Between(-2, 2);
         const cl = (v) => Math.max(0, Math.min(255, v + j()));
         return (cl(r) << 16) | (cl(g) << 8) | cl(b);
       };
@@ -1489,9 +1510,7 @@ function buildMap(scene) {
           // shifts each tile imperceptibly, breaking grid recognition.
           img.setTint(jitterTint(0xffffff));
         }
-        // Wider alpha range gives stronger value variance between tiles
-        // — the eye scans for repeated patterns and finds none.
-        img.setAlpha(0.85 + Math.random() * 0.15);
+        img.setAlpha(0.98 + Math.random() * 0.02);
       } else if (tilesetKey === 'grass_tileset') {
         const tint = ZONE_TINTS[zone];
         if (tint && tint !== 0xffffff) img.setTint(tint);
@@ -1794,12 +1813,12 @@ function buildDecorations(scene) {
       const nearPath = [[1,0],[-1,0],[0,1],[0,-1]].some(([dr, dc]) =>
         getCellType(r + dr, c + dc) !== 'grass'
       );
-      if (nearBoundary && boundaryAccentCount < 520 && Math.random() < 0.28) {
+      if (nearBoundary && boundaryAccentCount < 320 && Math.random() < 0.20) {
         const accent = edgeAccentForZone(zone, false);
         placeTileAccent(r, c, accent.key, accent.h, accent.opts);
         boundaryAccentCount++;
       }
-      if (nearPath && pathShoulderCount < 360 && Math.random() < 0.18) {
+      if (nearPath && pathShoulderCount < 220 && Math.random() < 0.12) {
         const accent = edgeAccentForZone(zone, true);
         placeTileAccent(r, c, accent.key, accent.h, accent.opts);
         pathShoulderCount++;
@@ -1996,8 +2015,9 @@ function buildDecorations(scene) {
   // these blur the grid but don't obscure objects on the ground plane.
   // Skip dry biomes (desert/ruins) — those should read crisp and barren.
   const softKeys = [...flowerKeys, ...grassKeys];
-  // Mid-size overlay layer — dense enough to land 2-3 per tile on average.
-  const softCount = 900;
+  // Mid-size overlay layer — sparse and low-alpha so it adds organic
+  // variation without drawing attention as another large patch pattern.
+  const softCount = 520;
   for (let i = 0; i < softCount; i++) {
     const x = Phaser.Math.Between(0, WORLD_W);
     const y = Phaser.Math.Between(0, WORLD_H);
@@ -2010,7 +2030,7 @@ function buildDecorations(scene) {
     const img = scene.add.image(x, y, key);
     const baseH = Phaser.Math.Between(170, 260);
     img.setScale(baseH / img.height);
-    img.setAlpha(Phaser.Math.FloatBetween(0.10, 0.18));
+    img.setAlpha(Phaser.Math.FloatBetween(0.07, 0.12));
     img.setAngle(Phaser.Math.Between(0, 359));
     img.setDepth(-800);
     if (z === 'forest') img.setTint(0xb8d8a0);
@@ -2020,7 +2040,7 @@ function buildDecorations(scene) {
 
   // Macro-blob layer — larger, fainter sprites that span multiple tiles,
   // adding broad value variance and breaking long axis-aligned tile rows.
-  const macroCount = 220;
+  const macroCount = 110;
   for (let i = 0; i < macroCount; i++) {
     const x = Phaser.Math.Between(0, WORLD_W);
     const y = Phaser.Math.Between(0, WORLD_H);
@@ -2033,7 +2053,7 @@ function buildDecorations(scene) {
     const img = scene.add.image(x, y, key);
     const baseH = Phaser.Math.Between(320, 460);
     img.setScale(baseH / img.height);
-    img.setAlpha(Phaser.Math.FloatBetween(0.06, 0.12));
+    img.setAlpha(Phaser.Math.FloatBetween(0.04, 0.08));
     img.setAngle(Phaser.Math.Between(0, 359));
     img.setDepth(-820);
     if (z === 'forest') img.setTint(0xa8c898);
