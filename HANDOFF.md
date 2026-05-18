@@ -1,10 +1,11 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 30, Tier 0 asset
-> plan landed — `ASSET_PLAN.md` at repo root carries prompts + file paths
-> for forest/ruins/riverside tilesets, biome decorations, and 5 landmark
-> hero props. No code change, cache still at `?v=122`).
+> coding sessions. Last refresh: 2026-05-18 10:40am CDT (post session 31,
+> tile variety pass — wired 6 dead frames in `grass_tileset.png` into the
+> weighted random roll so grass cells stop looking like the same 2 frames
+> repeated; path tiles also alternate H/H2 and V/V2 so roads aren't
+> monoline. Code-only, no asset work).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -209,7 +210,26 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 30 (latest)
+## 3. What we did in session 31 (latest)
+
+Cache now at **`?v=123`**. Pure-code map polish ahead of new art landing.
+
+1. **Tile variety pass.** `buildMap()` was only using 4 of the 16 frames
+   in `grass_tileset.png` for grass cells; the other six valid frames
+   (FLOWERS_COLOR, ROCKS_SPARSE, ROCKS_DENSE, DIRT_H2, DIRT_V2,
+   TALL_GRASS) were dead code. They're now in a weighted roll —
+   GRASS 32 % / THICK_GRASS 26 % / TALL_GRASS 14 % / FLOWER 10 % /
+   FLOWERS_COLOR 6 % / ROCKS_SPARSE 6 % / ROCKS_DENSE 3 % / DIRT_PATCH 3 %
+   — so the field stops reading as the same two tiles repeated across
+   100×100 cells. Boundary cells get a separate richer roll
+   (FLOWER / FLOWERS_COLOR / DIRT_PATCH / TALL_GRASS).
+2. **Path variety.** Horizontal and vertical dirt path tiles now
+   alternate 55/45 between their primary and alt frames (DIRT_H/H2 and
+   DIRT_V/V2), breaking the monoline look of the roads.
+3. **Verification.** `node -c project-grasslands/game.js` exited 0.
+4. **Cache bump.** `?v=122` → `?v=123`.
+
+## 3.0. What we did in session 30
 
 Cache stays at **`?v=122`** — no `game.js` change. Tier 0 of the post-29
 map-art upgrade arc is a prompt/spec deliverable, not a code change.
@@ -1526,7 +1546,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=122`**. Next change should use `?v=123`.
+  change. Current: **`?v=123`**. Next change should use `?v=124`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1649,7 +1669,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=122`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=123`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.

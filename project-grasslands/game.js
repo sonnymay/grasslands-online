@@ -1210,17 +1210,34 @@ function buildMap(scene) {
       const type = getCellType(r, c);
       const zone = getZone(r, c);
       let idx;
+      // Path tiles: alternate horizontal/vertical variants so the
+      // road doesn't read as a perfectly straight monoline.
       if (type === 'path_cross' || type === 'path_open') idx = TILE.DIRT_OPEN;
-      else if (type === 'path_h') idx = TILE.DIRT_H;
-      else if (type === 'path_v') idx = TILE.DIRT_V;
+      else if (type === 'path_h') idx = Math.random() < 0.55 ? TILE.DIRT_H : TILE.DIRT_H2;
+      else if (type === 'path_v') idx = Math.random() < 0.55 ? TILE.DIRT_V : TILE.DIRT_V2;
       else if (type === 'path_loop') idx = Math.random() < 0.5 ? TILE.DIRT_WIDE : TILE.DIRT_PATCH;
       else if (type === 'path_diag') idx = Math.random() < 0.5 ? TILE.DIRT_CORNER : TILE.DIRT_HEAVY;
       else {
-        // Plain grass base, with subtle edge detail where biomes meet.
-        if (nearZoneBoundary(r, c) && Math.random() < 0.38) {
-          idx = Math.random() < 0.55 ? TILE.FLOWER : TILE.DIRT_PATCH;
+        // Grass base: weighted pick over every variant in the sheet so a
+        // 100×100 grid no longer reads as the same two frames repeated.
+        // Rare frames (rocks, colored flowers, tall grass) appear at low
+        // probability to break visual rhythm without flooding the map.
+        if (nearZoneBoundary(r, c) && Math.random() < 0.42) {
+          const roll = Math.random();
+          if      (roll < 0.34) idx = TILE.FLOWER;
+          else if (roll < 0.58) idx = TILE.FLOWERS_COLOR;
+          else if (roll < 0.78) idx = TILE.DIRT_PATCH;
+          else                  idx = TILE.TALL_GRASS;
         } else {
-          idx = (Math.random() < 0.55) ? TILE.GRASS : TILE.THICK_GRASS;
+          const roll = Math.random();
+          if      (roll < 0.32) idx = TILE.GRASS;
+          else if (roll < 0.58) idx = TILE.THICK_GRASS;
+          else if (roll < 0.72) idx = TILE.TALL_GRASS;
+          else if (roll < 0.82) idx = TILE.FLOWER;
+          else if (roll < 0.88) idx = TILE.FLOWERS_COLOR;
+          else if (roll < 0.94) idx = TILE.ROCKS_SPARSE;
+          else if (roll < 0.97) idx = TILE.ROCKS_DENSE;
+          else                  idx = TILE.DIRT_PATCH;
         }
       }
 
