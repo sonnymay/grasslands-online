@@ -1,8 +1,13 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 8:40pm CDT (post session 26,
-> Tier-2 Knight browser verification).
+> coding sessions. Last refresh: 2026-05-17 9:05pm CDT (post session 26,
+> fullscreen + sprite size flicker fix).
+>
+> **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
+> (think before coding, simplicity first, surgical changes, goal-driven
+> execution). It carries the project's authoring rules; this file carries
+> the project's state.
 
 ---
 
@@ -188,7 +193,25 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ## 3. What we did in session 26 (latest, in order)
 
-Cache now at **`?v=98`**. Picked three items from §4 queue.
+Cache now at **`?v=99`**. Picked five items from §4 queue.
+
+7. **Quest pity timer** (item #4) — every quest stamps `bornAt` +
+   `baseReward` at roll. `tickQuestPity()` runs each frame from
+   `UIManager.update` and bumps the reward by +25/+50/+75% of base at
+   3/5/7 minutes, capped. HUD shows `⌛+50%` on the bumped line; chat
+   surfaces a one-time message per tier. Browser-verified: backdated
+   bornAt to 8 min ago → tier 3 fired, rewards went 270→473z + 775→1356z.
+8. **Title earn pulse** — `_refreshNameTag` now tracks `_lastTitleLabel`
+   + `_titleInit` so the first refresh after load doesn't spoof an
+   earn event. Subsequent title changes fire chat callout
+   (`✨ Title earned: ...`), Back.easeOut scale on the titleTag, and a
+   sparkle float over the player.
+
+Commit: `b36e1d2`.
+
+---
+
+Cache previously at **`?v=99`**. Picked three items from §4 queue.
 
 6. **Cosmetic milestone title above name** (item #2) — added `titleTag`
    text 14px above the existing class/level `nameTag`. Hidden until the
@@ -543,9 +566,8 @@ The user is paused while context recharges. Pick freely.
    (Veteran/Boss Hunter/Streak Master/Tycoon/Plaza Wanderer/Wayfarer).
 3. ~~**Class switch cost**~~ — DONE in session 26. First pick free;
    swap cost 5k → 10k → 20k → 40k → 80k zeny (cap).
-4. **Quest pity timer** — if the player hasn't completed the same
-    quest in N minutes, increase its reward each tick so unwanted
-    quest mobs eventually pay out.
+4. ~~**Quest pity timer**~~ — DONE in session 26. +25/+50/+75% at
+    3/5/7 min, HUD ⌛ glyph + chat notice on each tier.
 
 **Bigger features (1–2 hr):**
 11. **Trophy room** — a small instanced sub-zone (or a corner of
@@ -1147,7 +1169,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=98`**. Next change should use `?v=99`.
+  change. Current: **`?v=99`**. Next change should use `?v=99`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1270,7 +1292,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=98`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=99`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.

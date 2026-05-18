@@ -1347,6 +1347,19 @@ class PlayerController {
     this.sprite = scene.add.sprite(x, y, 'rookie_idle_south');
     this.basePScale = PLAYER_DISPLAY_H / this.sprite.height;
     this.sprite.setScale(this.basePScale);
+    // Texture-swap helper: source PNGs vary in pixel height (rookie 96 vs
+    // knight 512 etc), so we recompute scale each swap to keep on-screen
+    // size locked at PLAYER_DISPLAY_H — same trick MonsterController uses.
+    // Preserves the current squash ratio (walk-bob sets scaleY < scaleX) so
+    // the bob isn't wiped by the texture swap that happens later in update.
+    this._setPlayerTexture = (dir, frame) => {
+      const squashRatio = this.basePScale ? this.sprite.scaleY / this.basePScale : 1;
+      applyRookieTexture(this.sprite, dir, frame);
+      const h = this.sprite.height || 1;
+      this.basePScale = PLAYER_DISPLAY_H / h;
+      this.sprite.scaleX = this.basePScale;
+      this.sprite.scaleY = this.basePScale * squashRatio;
+    };
     this.groundY = y;
     this.shadow = scene.add.ellipse(
       x,
@@ -1502,7 +1515,7 @@ class PlayerController {
 
   update(time, delta) {
     if (this.dead) {
-      applyRookieTexture(this.sprite, this.dir, 'dead');
+      this._setPlayerTexture(this.dir, 'dead');
       this.sprite.setFlipX(false);
       this.sprite.setOrigin(0.5, 0.5);
       this.sprite.scaleY = this.basePScale;
@@ -1634,13 +1647,13 @@ class PlayerController {
     if (!moving) this.frame = 'idle';
 
     if (showingAttack) {
-      applyRookieTexture(this.sprite, this.dir, 'attack');
+      this._setPlayerTexture(this.dir, 'attack');
       // For the (classless) rookie attack pose only, mirror for west — the
       // single rookie_attack PNG faces east. When a class is chosen we trust
       // applyRookieTexture's flip choice (south fallback faces forward).
       if (!this.classId) this.sprite.setFlipX(this.dir === 'west');
     } else {
-      applyRookieTexture(this.sprite, this.dir, this.frame);
+      this._setPlayerTexture(this.dir, this.frame);
     }
 
     // Pursue / auto-attack a clicked target.
@@ -2895,7 +2908,7 @@ function selectClass(scene, id, container) {
   // sprite right now (applyRookieTexture clears the tint when it lands on
   // a real class key).
   player.sprite.setTint(cdef.tint);
-  applyRookieTexture(player.sprite, player.dir || 'south', player.frame || 'idle');
+  player._setPlayerTexture(player.dir || 'south', player.frame || 'idle');
   player._refreshNameTag();
 
   // Dramatic full-screen flash.
@@ -3900,6 +3913,31 @@ class UIManager {
       ui.message(hudCompact ? 'HUD compact mode ON.' : 'HUD compact mode OFF.');
     });
     addTip(this.compactBg, 'Hide extra HUD chips + shrink chat', btnX, huY + btnH / 2);
+
+    // Fullscreen toggle — uses Phaser's scale manager, which needs a
+    // user gesture (pointerdown qualifies). Label flips with state.
+    const fsY = huY + btnH + 6;
+    this.fsBg = scene.add.rectangle(btnX, fsY, btnW, btnH, 0x222244, 0.9)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
+      .setStrokeStyle(2, 0x88aaff, 0.95)
+      .setInteractive({ useHandCursor: true });
+    this.fsText = scene.add.text(btnX + btnW / 2, fsY + btnH / 2, '⛶ Fullscreen', {
+      fontSize: '12px', color: '#cce0ff', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    this.fsBg.on('pointerdown', () => {
+      if (!scene.scale) return;
+      if (scene.scale.isFullscreen) {
+        scene.scale.stopFullscreen();
+      } else {
+        scene.scale.startFullscreen();
+      }
+    });
+    // Sync label on browser-driven exits (Esc key, etc).
+    if (scene.scale && scene.scale.on) {
+      scene.scale.on('enterfullscreen', () => this.fsText.setText('⛶ Exit Full'));
+      scene.scale.on('leavefullscreen', () => this.fsText.setText('⛶ Fullscreen'));
+    }
+    addTip(this.fsBg, 'Toggle fullscreen', btnX, fsY + btnH / 2);
 
     // Quest tracker — top-left badge.
     this.questBg = scene.add.rectangle(10, 10, 330, 54, 0x000000, 0.65)
