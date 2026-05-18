@@ -1,9 +1,9 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 34,
-> player walk animation no longer spins through south-facing fallback frames.
-> Code-only, RO-style directional walking readability fix).
+> coding sessions. Last refresh: 2026-05-18 (post session 35,
+> landmark plaza decoration rings + subtle static-prop ground shadows.
+> Code-only map beauty pass, bright/readable world preserved).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -208,7 +208,31 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 34 (latest)
+## 3. What we did in session 35 (latest)
+
+Cache now at **`?v=127`**. Continued the Ragnarok Online-style beauty pass
+with two code-only map readability upgrades: destinations and grounding.
+
+1. **Landmark plaza decoration rings.** Existing landmark halos now get
+   zone-themed decoration rings so plazas read as destinations instead of
+   flat colored discs:
+   - Spawn/grasslands: flower + tall-grass ring with a couple outer trees.
+   - Forest: mushroom/grass ring with outer trees.
+   - Desert: cactus + sun-bleached rock ring.
+   - Ruins: rock + dead-bush ring.
+   - Riverside: flower + tall-grass ring.
+2. **Subtle static-prop ground shadows.** Trees, bushes, rocks, cacti, and
+   larger clustered props now get local soft ellipse shadows, matching the
+   grounding monsters already had. No fullscreen darkening or vignette.
+3. **Cluster visual grounding.** `placeCluster()` now honors `alignBottom`
+   for tall clustered props and can attach shadows when requested, so cactus
+   oases and rock piles sit on the ground better.
+4. **Bright-world rule preserved.** No atmospheric overlays, no player halo,
+   no spotlights, no day/night changes.
+5. **Verification.** `node -c project-grasslands/game.js` exited 0.
+6. **Cache bump.** `?v=126` → `?v=127`.
+
+## 3.1. What we did in session 34
 
 Cache now at **`?v=126`**. Sonny reported that the character body kept
 spinning while walking; goal was Ragnarok Online-style directional walking.
@@ -230,7 +254,7 @@ spinning while walking; goal was Ragnarok Online-style directional walking.
 4. **Verification.** `node -c project-grasslands/game.js` exited 0.
 5. **Cache bump.** `?v=125` → `?v=126`.
 
-## 3.1. What we did in session 33
+## 3.2. What we did in session 33
 
 Cache now at **`?v=125`**. Continued Sonny's "beautiful like Ragnarok
 Online" map pass with no new art and no atmospheric darkening.
@@ -253,7 +277,7 @@ Online" map pass with no new art and no atmospheric darkening.
 4. **Verification.** `node -c project-grasslands/game.js` exited 0.
 5. **Cache bump.** `?v=124` → `?v=125`.
 
-## 3.2. What we did in session 32
+## 3.3. What we did in session 32
 
 Cache now at **`?v=124`**. Sonny: "make it beautiful like Ragnarok
 Online." No new art yet — push the existing decoration set as far as it
@@ -278,7 +302,7 @@ goes via density + cluster patches.
 4. **Verification.** `node -c project-grasslands/game.js` exited 0.
 5. **Cache bump.** `?v=124` → `?v=124`.
 
-## 3.3. What we did in session 31
+## 3.4. What we did in session 31
 
 Cache now at **`?v=124`**. Pure-code map polish ahead of new art landing.
 
