@@ -4,18 +4,28 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 5:43 PM CDT — post Hunter tier-2 art import.**
+**State as of 2026-05-18 5:50 PM CDT — post map edge-accent polish.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 48 imports the first Hunter sprites for
-  Archer tier 2.
-- **Cache version live in `project-grasslands/index.html`:** `?v=139`.
-- **Next change must use:** `?v=140`.
+- **Latest completed work:** session 49 adds biome-boundary and path-shoulder
+  accent decorations to make map transitions feel more organic.
+- **Cache version live in `project-grasslands/index.html`:** `?v=140`.
+- **Next change must use:** `?v=141`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
 
-**Where we left off (session 48):**
+**Where we left off (session 49):**
+- Added a visual-only `placeTileAccent()` pass inside `buildDecorations()`.
+- Grass tiles that touch biome boundaries now get capped, zone-specific
+  accent props: forest ferns/mushrooms, desert rocks/dry grass/cacti, ruins
+  rocks/pillars/bushes, riverside cattails/flowers, grasslands flowers/grass.
+- Grass tiles beside paths now get lighter shoulder accents so roads feel
+  less like hard geometric cuts.
+- Accents do not block cells and do not change gameplay, UI, map layout, or
+  lighting.
+
+**Grass-polish state from session 47/48:**
 - `deco_grass_blob_soft_01.png` was not present in Downloads when Codex
   resumed Claude Code's handoff.
 - Four generated Hunter sprites were present instead:
@@ -27,7 +37,6 @@
 - Missing Hunter east / southeast / northeast directions intentionally fall
   back to the existing Archer art until Sonny generates those images.
 
-**Grass-polish state from session 47:**
 - `grass_tileset.png` is now backed by `grass_tileset_v2.png` (3×3 grid,
   wired through the existing biome tileset slicer).
 - Code-only mitigations to soften the 128 px tile grid maxed out:
@@ -51,7 +60,7 @@
      `// Macro-blob layer`), replace the random `softKeys` pick with
      the new key (or 70 % weight toward it) so blob soft masks the
      remaining grid seams.
-   - Bump `?v=139` → `?v=140` in `index.html`.
+   - Bump `?v=140` → `?v=141` in `index.html`.
 3. **Verify + ship.** `node -c project-grasslands/game.js`, reload
    preview, screenshot before/after, commit (`asset:` + `feat:` in
    two commits), push. Update HANDOFF.md §3 with the session entry.
@@ -77,8 +86,8 @@ surgical changes, goal-driven execution).
 
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 48, first Hunter
-> tier-2 Archer sprites wired. Cache `?v=139`).
+> coding sessions. Last refresh: 2026-05-18 (post session 49, biome-boundary
+> and path-shoulder accent decorations. Cache `?v=140`).
 >
 > (Pre-session-47 header line:) Last refresh: 2026-05-18 (post session 46,
 > `grass_tileset_v2.png` wired as the base grass tileset. Cache `?v=137`).
@@ -286,7 +295,41 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 48 (latest)
+## 3. What we did in session 49 (latest)
+
+Cache now at **`?v=140`**. Continued the RO-style map beauty pass with a
+small code-only decoration layer. No gameplay, UI, map-layout, or lighting
+rules changed.
+
+1. **Biome-boundary accents.** `buildDecorations()` now scans grass tiles
+   that touch a zone boundary and adds capped, zone-specific props at
+   sub-tile offsets:
+   - Forest: ferns, tall grass, mushrooms.
+   - Desert: rocks, dry grass, occasional cactus.
+   - Ruins: rocks, broken pillars, dry bushes.
+   - Riverside: cattails, flowers, tall grass.
+   - Grasslands: flowers and tall grass.
+2. **Path-shoulder accents.** Grass tiles beside roads/plazas get a lighter
+   accent pass so paths read as worn into the world instead of perfectly
+   hard tile cuts.
+3. **No A* impact.** New accents are cosmetic only. They do not call
+   `blockCells()`, so roads, plazas, and field movement stay unchanged.
+4. **Bright-world rule preserved.** No vignette, halo, cloud shadow, dark
+   overlay, or day/night change.
+5. **Bounded density.** Boundary accents cap at 520 and path shoulders cap
+   at 360, so this stays a visual polish pass rather than another broad
+   density spike.
+6. **Verification.** `node -c project-grasslands/game.js` exited 0.
+7. **Cache bump.** `?v=139` → `?v=140`.
+
+### Next asset still needed for grass
+
+`deco_grass_blob_soft_01.png` is still the highest-impact remaining grass-grid
+asset. When Sonny drops it into Downloads, move it to
+`project-grasslands/assets/decorations/`, resize to 256 px max, preload it,
+and weight the `// Macro-blob layer` toward that key.
+
+## 3.1. What we did in session 48
 
 Cache now at **`?v=139`**. Claude Code's handoff asked for
 `deco_grass_blob_soft_01.png`, but that file was not in Downloads. The
@@ -323,7 +366,7 @@ When Sonny drops it into Downloads, move it to
 `project-grasslands/assets/decorations/`, resize to 256 px max, preload it,
 and weight the `// Macro-blob layer` toward that key.
 
-## 3.1. What we did in session 47
+## 3.2. What we did in session 47
 
 Cache now at **`?v=138`**. Sonny inspected v2 tileset wired in session
 46 and reported the 128 px square grid was still visible because v2
@@ -366,7 +409,7 @@ intrinsic to v2's tile-edge art. Highest-impact next image:
   original art."* Drop into `Downloads`, say the word, will move /
   resize / wire in `preload()` and the macro pass.
 
-## 3.2. What we did in session 46
+## 3.3. What we did in session 46
 
 Cache now at **`?v=137`**. Wired the generated grass replacement image
 from Downloads.
@@ -2090,7 +2133,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=139`**. Next change should use `?v=140`.
+  change. Current: **`?v=140`**. Next change should use `?v=141`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 

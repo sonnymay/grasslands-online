@@ -1743,6 +1743,70 @@ function buildDecorations(scene) {
     return img;
   };
 
+  const placeTileAccent = (tile_r, tile_c, key, displayH, opts = {}) => {
+    if (!scene.textures.exists(key)) return null;
+    const x = tile_c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-42, 42);
+    const y = tile_r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-36, 36);
+    return placeLandmarkDeco(key, x, y, displayH, {
+      depth: -540,
+      alpha: opts.alpha ?? 0.88,
+      maxAngle: opts.maxAngle ?? 18,
+      tint: opts.tint,
+      alignBottom: opts.alignBottom,
+      shadow: opts.shadow,
+      shadowAlpha: opts.shadowAlpha ?? 0.10,
+      allowFlip: opts.allowFlip,
+    });
+  };
+
+  const edgeAccentForZone = (zone, nearPath) => {
+    if (zone === 'forest') {
+      if (Math.random() < 0.45) return { key: Phaser.Utils.Array.GetRandom(forestFernKeys), h: 48, opts: { tint: forestTint } };
+      if (Math.random() < 0.72) return { key: Phaser.Utils.Array.GetRandom(grassKeys), h: 46, opts: { tint: forestTint, alpha: 0.78 } };
+      return { key: Phaser.Utils.Array.GetRandom(mushroomKeys), h: 40, opts: { alpha: 0.9, maxAngle: 8 } };
+    }
+    if (zone === 'desert') {
+      if (Math.random() < 0.58 || nearPath) return { key: Phaser.Utils.Array.GetRandom(rockKeys), h: 44, opts: { tint: desertRockTint, alignBottom: true, shadow: true, maxAngle: 12 } };
+      if (Math.random() < 0.80) return { key: Phaser.Utils.Array.GetRandom(grassKeys), h: 30, opts: { tint: 0xd6c178, alpha: 0.48 } };
+      return { key: 'cactus_set', h: 62, opts: { alignBottom: true, shadow: true, maxAngle: 5 } };
+    }
+    if (zone === 'ruins') {
+      if (ruinsPillarKeys.length && Math.random() < 0.16) return { key: Phaser.Utils.Array.GetRandom(ruinsPillarKeys), h: 82, opts: { alignBottom: true, shadow: true, maxAngle: 5 } };
+      if (Math.random() < 0.72 || nearPath) return { key: Phaser.Utils.Array.GetRandom(rockKeys), h: 46, opts: { tint: ruinTint, alignBottom: true, shadow: true, maxAngle: 14 } };
+      return { key: Phaser.Utils.Array.GetRandom(bushKeys), h: 54, opts: { tint: 0xa89878, alignBottom: true, shadow: true, maxAngle: 6 } };
+    }
+    if (zone === 'riverside') {
+      if (Math.random() < 0.45) return { key: Phaser.Utils.Array.GetRandom(riversideCattailKeys), h: 56, opts: { alignBottom: true, shadow: true, maxAngle: 9 } };
+      if (Math.random() < 0.74) return { key: Phaser.Utils.Array.GetRandom(flowerKeys), h: 48, opts: { alpha: 0.86, maxAngle: 14 } };
+      return { key: Phaser.Utils.Array.GetRandom(grassKeys), h: 48, opts: { alpha: 0.82, maxAngle: 18 } };
+    }
+    if (Math.random() < 0.56 || nearPath) return { key: Phaser.Utils.Array.GetRandom(flowerKeys), h: 48, opts: { alpha: 0.88, maxAngle: 14 } };
+    return { key: Phaser.Utils.Array.GetRandom(grassKeys), h: 46, opts: { alpha: 0.82, maxAngle: 18 } };
+  };
+
+  let boundaryAccentCount = 0;
+  let pathShoulderCount = 0;
+  for (let r = 1; r < MAP_ROWS - 1; r++) {
+    for (let c = 1; c < MAP_COLS - 1; c++) {
+      if (getCellType(r, c) !== 'grass') continue;
+      const zone = getZone(r, c);
+      const nearBoundary = nearZoneBoundary(r, c);
+      const nearPath = [[1,0],[-1,0],[0,1],[0,-1]].some(([dr, dc]) =>
+        getCellType(r + dr, c + dc) !== 'grass'
+      );
+      if (nearBoundary && boundaryAccentCount < 520 && Math.random() < 0.28) {
+        const accent = edgeAccentForZone(zone, false);
+        placeTileAccent(r, c, accent.key, accent.h, accent.opts);
+        boundaryAccentCount++;
+      }
+      if (nearPath && pathShoulderCount < 360 && Math.random() < 0.18) {
+        const accent = edgeAccentForZone(zone, true);
+        placeTileAccent(r, c, accent.key, accent.h, accent.opts);
+        pathShoulderCount++;
+      }
+    }
+  }
+
   const addLandmarkRing = (tile_r, tile_c, zone) => {
     const x = tile_c * TILE_SIZE + TILE_SIZE / 2;
     const y = tile_r * TILE_SIZE + TILE_SIZE / 2;
