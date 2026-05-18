@@ -1452,10 +1452,14 @@ function buildMap(scene) {
         tilesetKey, `tile_${idx}`
       );
       img.setDisplaySize(TILE_SIZE + 2, TILE_SIZE + 2);
-      // Random flip + 180° rotation break grid repetition for free.
+      // 4 random 90° rotations × 4 flip combos = 16 visual variants per
+      // source tile. Edges between neighbors stop matching, killing the
+      // perceived square-grid pattern even with the v2 tileset.
       if (type === 'grass') {
         if (Math.random() < 0.5) img.setFlipX(true);
         if (Math.random() < 0.5) img.setFlipY(true);
+        const rot = Phaser.Math.Between(0, 3) * 90;
+        if (rot) img.setAngle(rot);
       }
       // Zone tint only when we're still drawing the grass tileset for a
       // non-grasslands biome. Real biome tiles are already the right palette.
@@ -1477,7 +1481,9 @@ function buildMap(scene) {
           // shifts each tile imperceptibly, breaking grid recognition.
           img.setTint(jitterTint(0xffffff));
         }
-        img.setAlpha(0.95 + Math.random() * 0.05);
+        // Wider alpha range gives stronger value variance between tiles
+        // — the eye scans for repeated patterns and finds none.
+        img.setAlpha(0.85 + Math.random() * 0.15);
       } else if (tilesetKey === 'grass_tileset') {
         const tint = ZONE_TINTS[zone];
         if (tint && tint !== 0xffffff) img.setTint(tint);
@@ -1918,7 +1924,8 @@ function buildDecorations(scene) {
   // these blur the grid but don't obscure objects on the ground plane.
   // Skip dry biomes (desert/ruins) — those should read crisp and barren.
   const softKeys = [...flowerKeys, ...grassKeys];
-  const softCount = 480;
+  // Mid-size overlay layer — dense enough to land 2-3 per tile on average.
+  const softCount = 900;
   for (let i = 0; i < softCount; i++) {
     const x = Phaser.Math.Between(0, WORLD_W);
     const y = Phaser.Math.Between(0, WORLD_H);
@@ -1929,15 +1936,37 @@ function buildDecorations(scene) {
     const key = Phaser.Utils.Array.GetRandom(softKeys);
     if (!scene.textures.exists(key)) continue;
     const img = scene.add.image(x, y, key);
-    const baseH = Phaser.Math.Between(160, 240);
+    const baseH = Phaser.Math.Between(170, 260);
     img.setScale(baseH / img.height);
-    img.setAlpha(Phaser.Math.FloatBetween(0.12, 0.20));
+    img.setAlpha(Phaser.Math.FloatBetween(0.10, 0.18));
     img.setAngle(Phaser.Math.Between(0, 359));
     img.setDepth(-800);
-    // Subtle biome wash so overlays don't look like raw flowers floating.
     if (z === 'forest') img.setTint(0xb8d8a0);
     else if (z === 'riverside') img.setTint(0xc8e8d8);
     else img.setTint(0xd8e8c0);
+  }
+
+  // Macro-blob layer — larger, fainter sprites that span multiple tiles,
+  // adding broad value variance and breaking long axis-aligned tile rows.
+  const macroCount = 220;
+  for (let i = 0; i < macroCount; i++) {
+    const x = Phaser.Math.Between(0, WORLD_W);
+    const y = Phaser.Math.Between(0, WORLD_H);
+    const tile_r = Math.floor(y / TILE_SIZE), tile_c = Math.floor(x / TILE_SIZE);
+    const z = getZone(tile_r, tile_c);
+    if (z === 'desert' || z === 'ruins') continue;
+    if (getCellType(tile_r, tile_c) !== 'grass') continue;
+    const key = Phaser.Utils.Array.GetRandom(softKeys);
+    if (!scene.textures.exists(key)) continue;
+    const img = scene.add.image(x, y, key);
+    const baseH = Phaser.Math.Between(320, 460);
+    img.setScale(baseH / img.height);
+    img.setAlpha(Phaser.Math.FloatBetween(0.06, 0.12));
+    img.setAngle(Phaser.Math.Between(0, 359));
+    img.setDepth(-820);
+    if (z === 'forest') img.setTint(0xa8c898);
+    else if (z === 'riverside') img.setTint(0xb8d8c8);
+    else img.setTint(0xc8d8a8);
   }
 }
 
