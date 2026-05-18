@@ -1,9 +1,9 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 36,
-> generated Tier 0 map-art assets moved from Downloads into project folders
-> and resized to spec. Asset import only; not wired yet).
+> coding sessions. Last refresh: 2026-05-18 (post session 37,
+> T-Rex and original Kaiju Titan boss-style monsters wired with generated art.
+> Cache `?v=128`; T-Rex in desert, Kaiju Titan in ruins).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -208,7 +208,28 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 36 (latest)
+## 3. What we did in session 37 (latest)
+
+Cache now at **`?v=128`**. Sonny generated boss-style T-Rex and original
+kaiju sprite sets and asked for both to behave like Bigfoot: one monster
+each, giant scale, aggressive chase, different zones.
+
+1. **Moved and resized generated monster sprites.** Added:
+   - `trex_{idle,aggro,chase,attack,hit,dead}.png`
+   - `kaiju_titan_{idle,aggro,chase,attack,hit,dead}.png`
+   under `project-grasslands/assets/sprites/`, resized to max `512`.
+2. **Wired new preload + alpha-key pass.** Both six-state sprite sets load
+   in `preload()` and run through `keyOutWhite()` like Bigfoot.
+3. **Added desert T-Rex.** `MONSTER_TYPES.trex` is count `1`, boss,
+   fixed Lv50, `scaleMult: 6.6`, aggressive, uses generated aggro/chase/
+   attack/hit/dead sprites, and spawns in the **desert**.
+4. **Added ruins Kaiju Titan.** `MONSTER_TYPES.kaiju_titan` is count `1`,
+   boss, fixed Lv50, `scaleMult: 6.6`, aggressive, uses generated aggro/
+   chase/attack/hit/dead sprites, and spawns in the **ruins**.
+5. **Verification.** `node -c project-grasslands/game.js` exited 0.
+6. **Cache bump.** `?v=127` → `?v=128`.
+
+## 3.1. What we did in session 36
 
 Cache stays at **`?v=127`** — asset import only, no `game.js` or
 `index.html` change.
@@ -230,7 +251,7 @@ Cache stays at **`?v=127`** — asset import only, no `game.js` or
 3. **Not wired yet.** Next code pass should load/slice one biome tileset or
    attach one landmark prop set at a time, with cache bump and `node -c`.
 
-## 3.1. What we did in session 35
+## 3.2. What we did in session 35
 
 Cache now at **`?v=127`**. Continued the Ragnarok Online-style beauty pass
 with two code-only map readability upgrades: destinations and grounding.
@@ -254,7 +275,7 @@ with two code-only map readability upgrades: destinations and grounding.
 5. **Verification.** `node -c project-grasslands/game.js` exited 0.
 6. **Cache bump.** `?v=126` → `?v=127`.
 
-## 3.2. What we did in session 34
+## 3.3. What we did in session 34
 
 Cache now at **`?v=126`**. Sonny reported that the character body kept
 spinning while walking; goal was Ragnarok Online-style directional walking.
@@ -276,7 +297,7 @@ spinning while walking; goal was Ragnarok Online-style directional walking.
 4. **Verification.** `node -c project-grasslands/game.js` exited 0.
 5. **Cache bump.** `?v=125` → `?v=126`.
 
-## 3.3. What we did in session 33
+## 3.4. What we did in session 33
 
 Cache now at **`?v=125`**. Continued Sonny's "beautiful like Ragnarok
 Online" map pass with no new art and no atmospheric darkening.
@@ -299,7 +320,7 @@ Online" map pass with no new art and no atmospheric darkening.
 4. **Verification.** `node -c project-grasslands/game.js` exited 0.
 5. **Cache bump.** `?v=124` → `?v=125`.
 
-## 3.4. What we did in session 32
+## 3.5. What we did in session 32
 
 Cache now at **`?v=124`**. Sonny: "make it beautiful like Ragnarok
 Online." No new art yet — push the existing decoration set as far as it
@@ -324,7 +345,7 @@ goes via density + cluster patches.
 4. **Verification.** `node -c project-grasslands/game.js` exited 0.
 5. **Cache bump.** `?v=124` → `?v=124`.
 
-## 3.5. What we did in session 31
+## 3.6. What we did in session 31
 
 Cache now at **`?v=124`**. Pure-code map polish ahead of new art landing.
 

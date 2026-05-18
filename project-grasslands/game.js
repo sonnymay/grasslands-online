@@ -142,6 +142,28 @@ const MONSTER_TYPES = {
     minSpawnDistance: 2400, // keep him in far forest so new players don't walk into a one-shot
     boss: true,
   },
+  trex: {
+    name: 'T-Rex',
+    idleKey: 'trex_idle', hitKey: 'trex_hit', deadKey: 'trex_dead',
+    aggroKey: 'trex_aggro', chaseKey: 'trex_chase', attackKey: 'trex_attack',
+    maxHP: 880, atk: 190, expReward: 520, speed: 50,
+    nameColor: '#8ee06a', count: 1, scaleMult: 6.6,
+    fixedLevel: 50, noLevelScaling: true, aggressive: true, aggroRange: 560, oneShotBelowLevel: 50,
+    zones: ['desert'],
+    minSpawnDistance: 2600,
+    boss: true,
+  },
+  kaiju_titan: {
+    name: 'Kaiju Titan',
+    idleKey: 'kaiju_titan_idle', hitKey: 'kaiju_titan_hit', deadKey: 'kaiju_titan_dead',
+    aggroKey: 'kaiju_titan_aggro', chaseKey: 'kaiju_titan_chase', attackKey: 'kaiju_titan_attack',
+    maxHP: 1100, atk: 240, expReward: 650, speed: 42,
+    nameColor: '#66ddff', count: 1, scaleMult: 6.6,
+    fixedLevel: 50, noLevelScaling: true, aggressive: true, aggroRange: 600, oneShotBelowLevel: 50,
+    zones: ['ruins'],
+    minSpawnDistance: 2600,
+    boss: true,
+  },
 };
 
 const EQUIPMENT_DROPS = {
@@ -642,6 +664,11 @@ function preload() {
   this.load.image('bigfoot_attack', 'assets/sprites/bigfoot_attack.png');
   this.load.image('bigfoot_hit', 'assets/sprites/bigfoot_hit.png');
   this.load.image('bigfoot_dead', 'assets/sprites/bigfoot_dead.png');
+  for (const prefix of ['trex', 'kaiju_titan']) {
+    for (const state of ['idle', 'aggro', 'chase', 'attack', 'hit', 'dead']) {
+      this.load.image(`${prefix}_${state}`, `assets/sprites/${prefix}_${state}.png`);
+    }
+  }
   // Class selection card art.
   this.load.image('swordsman_card', 'assets/sprites/swordsman_card.png');
   this.load.image('mage_card',      'assets/sprites/mage_card.png');
@@ -735,6 +762,8 @@ function create() {
     'mooham_idle','mooham_hit','mooham_dead',
     'moowaan_idle','moowaan_hit','moowaan_dead',
     'bigfoot_idle','bigfoot_aggro','bigfoot_chase','bigfoot_attack','bigfoot_hit','bigfoot_dead',
+    'trex_idle','trex_aggro','trex_chase','trex_attack','trex_hit','trex_dead',
+    'kaiju_titan_idle','kaiju_titan_aggro','kaiju_titan_chase','kaiju_titan_attack','kaiju_titan_hit','kaiju_titan_dead',
     'cactling_idle','cactling_hit','cactling_dead',
     'cactus_set','deco_sand_dune',
     'swordsman_idle_south','swordsman_walk_south',
