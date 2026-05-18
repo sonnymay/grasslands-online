@@ -352,6 +352,13 @@ wheel-zoom feature. All HUD work landed; gameplay logic untouched.
 31. **Halo falloff at night.** The player halo shrinks ~45 % at midnight
     so nights feel like a tight lantern instead of an even glow.
 32. **Cache bump.** `?v=119` → `?v=120`.
+33. **Wind sway + pond shimmer.** `place()` gained `sway` and `shimmer`
+    options. Grass tufts and flower clusters now oscillate ±2–3° on a
+    1.6–3.2 s yoyo with randomized start delay so the field breathes
+    instead of swaying in lock-step. Ponds breathe scale 1.0 ↔ 1.04 +
+    a subtle alpha dip so the water catches light. ~1300 sway tweens +
+    22 shimmer tweens, well within Phaser's tween manager budget.
+34. **Cache bump.** `?v=120` → `?v=121`.
 7. **Verification.** `node -c project-grasslands/game.js` exited 0 after
    every edit. Browser preview was intentionally skipped — Sonny asked us
    to save tokens once the live wedge from rapid `location.reload()` cycles
@@ -1485,7 +1492,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=120`**. Next change should use `?v=121`.
+  change. Current: **`?v=121`**. Next change should use `?v=122`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1608,7 +1615,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=120`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=121`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.
