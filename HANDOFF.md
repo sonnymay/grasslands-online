@@ -329,6 +329,19 @@ wheel-zoom feature. All HUD work landed; gameplay logic untouched.
     the player stays visible on the bigger world (`r 4` → `r 5` plus an
     `r 9` outline ring).
 24. **Cache bump.** `?v=117` → `?v=118`.
+25. **Biome tint rebalance.** `ZONE_TINTS` pushed toward richer hues so
+    each biome reads as a distinct mood (forest 0x6b8a5a →
+    0x88b070 mossy green, ruins 0xb0a890 → 0xc2b89e warm stone,
+    riverside 0xa8c8b0 → 0xb8d8c8 cool mint). Kills the muddy-olive
+    look noted in §17.
+26. **Cinematic vignette.** Four MULTIPLY-blend dark quads anchored to
+    the viewport corners frame the camera without dimming the centre.
+    Lives on the UI camera (`scrollFactor 0`) so it stays fixed. Resize
+    handler repositions corners on browser resize.
+27. **Warm player halo.** Soft additive light circle under the player
+    (`scene.__playerHalo`) creates a focal lantern and pulls the eye on
+    busy backdrops. Alpha breathes slightly per frame.
+28. **Cache bump.** `?v=118` → `?v=119`.
 7. **Verification.** `node -c project-grasslands/game.js` exited 0 after
    every edit. Browser preview was intentionally skipped — Sonny asked us
    to save tokens once the live wedge from rapid `location.reload()` cycles
@@ -1462,7 +1475,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=118`**. Next change should use `?v=119`.
+  change. Current: **`?v=119`**. Next change should use `?v=120`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1585,7 +1598,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=118`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=119`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.

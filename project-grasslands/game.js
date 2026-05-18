@@ -198,12 +198,16 @@ const CLASS_TIER_THRESHOLDS = [
   { level: 100, tier: 4, dHP: 200, dAtk: 60 },
 ];
 
+// Biome tints multiply the grass tileset for non-desert zones. Older
+// values read as muddy/olive when grass green was multiplied by a
+// desaturated colour. These are pushed toward richer, more saturated
+// hues so each biome reads as a distinct mood at a glance.
 const ZONE_TINTS = {
   grasslands: 0xffffff,
-  forest:     0x6b8a5a,
+  forest:     0x88b070, // mossy green, warmer than the old olive
   desert:     0xe8c878,
-  ruins:      0xb0a890,
-  riverside:  0xa8c8b0,
+  ruins:      0xc2b89e, // warm sun-bleached stone instead of grey-mud
+  riverside:  0xb8d8c8, // cool teal-mint rather than washed grey
 };
 const ANIM_FRAME_MS = 180;
 const WALK_FRAME_MS = 120;
@@ -959,6 +963,46 @@ function create() {
   dayNightOverlay = scene.add.rectangle(0, 0, GAME_W, GAME_H, 0x0a1a44, 0)
     .setOrigin(0, 0).setScrollFactor(0).setDepth(9000);
 
+  // ------- Cinematic vignette -------
+  // Soft dark corners that frame the viewport without dimming the action
+  // in the centre. Four big radial-feel quads at the corners using a
+  // MULTIPLY blend mode read as a clean RPG vignette.
+  const vignetteCorners = [];
+  const vSize = 520;
+  const vAlpha = 0.55;
+  const cornerSpecs = [
+    { ox: 0,        oy: 0,        cx: 0, cy: 0 }, // top-left
+    { ox: 1,        oy: 0,        cx: 1, cy: 0 }, // top-right
+    { ox: 0,        oy: 1,        cx: 0, cy: 1 }, // bottom-left
+    { ox: 1,        oy: 1,        cx: 1, cy: 1 }, // bottom-right
+  ];
+  for (const s of cornerSpecs) {
+    const q = scene.add.rectangle(
+      s.cx * scene.scale.width,
+      s.cy * scene.scale.height,
+      vSize, vSize, 0x000000, vAlpha,
+    ).setOrigin(s.ox, s.oy).setScrollFactor(0).setDepth(9500);
+    q.setBlendMode(Phaser.BlendModes.MULTIPLY);
+    vignetteCorners.push(q);
+  }
+  scene.__vignette = vignetteCorners;
+  // Keep the corners glued to the viewport edges through resize events.
+  scene.scale.on('resize', (size) => {
+    if (!scene.__vignette) return;
+    const [tl, tr, bl, br] = scene.__vignette;
+    tl.setPosition(0, 0);
+    tr.setPosition(size.width, 0);
+    bl.setPosition(0, size.height);
+    br.setPosition(size.width, size.height);
+  });
+
+  // ------- Warm player halo -------
+  // Soft warm light circle underneath the player. Reads as a focal lantern
+  // and pulls the eye toward the protagonist on busy biome backgrounds.
+  scene.__playerHalo = scene.add.circle(0, 0, 110, 0xffe9b0, 0.13)
+    .setDepth(-50)
+    .setBlendMode(Phaser.BlendModes.ADD);
+
   // UI
   ui = new UIManager(scene);
   // Apply saved progress (level / exp / zeny / position) if present.
@@ -1006,6 +1050,13 @@ function update(time, delta) {
 
   // Road sparkles + biome ambience particles. Pure feel, no rules.
   if (player && !player.dead) {
+    // Warm halo sticks under the player. Gentle alpha pulse so it
+    // breathes without distracting.
+    if (player.scene.__playerHalo) {
+      const halo = player.scene.__playerHalo;
+      halo.setPosition(player.sprite.x, player.sprite.y + 6);
+      halo.alpha = 0.11 + Math.sin(time / 720) * 0.025;
+    }
     tickRoadSparkles(player.scene, time);
     tickAmbience(player.scene, time, delta);
   }
