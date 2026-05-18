@@ -4703,6 +4703,12 @@ class UIManager {
   }
 
   drawMinimap() {
+    // Perf: throttle to ~10 Hz. The minimap scans 150×150 = 22 500 tiles
+    // for road cells; at 60 fps that was 1.35M getCellType() calls/sec
+    // and the biggest single per-frame cost in the game.
+    const now = (player && player.scene) ? player.scene.time.now : 0;
+    if (this._miniLastDraw && now - this._miniLastDraw < 100) return;
+    this._miniLastDraw = now;
     const g = this.miniGfx;
     g.clear();
     const zoom = minimapZoom || 1;
@@ -4745,21 +4751,28 @@ class UIManager {
       }
     }
     // Road network: center cross, grasslands loop, diagonal biome feeders,
-    // and plazas. Draw from map tiles so minimap matches the actual world.
-    g.fillStyle(0xd0a35a, 0.72);
-    for (let r = 0; r < MAP_ROWS; r++) {
-      for (let c = 0; c < MAP_COLS; c++) {
-        const t = getCellType(r, c);
-        if (t === 'grass') continue;
-        const p = toMini(c * TILE_SIZE, r * TILE_SIZE);
-        const q = toMini((c + 1) * TILE_SIZE, (r + 1) * TILE_SIZE);
-        if (q.x < this.miniX || p.x > this.miniX + this.miniW || q.y < this.miniY || p.y > this.miniY + this.miniH) continue;
-        const x = Math.max(this.miniX, p.x);
-        const y = Math.max(this.miniY, p.y);
-        const w = Math.max(2, Math.min(this.miniX + this.miniW, q.x) - x);
-        const h = Math.max(2, Math.min(this.miniY + this.miniH, q.y) - y);
-        g.fillRect(x, y, w + 0.5, h + 0.5);
+    // and plazas. Cache non-grass cells once — map is static after gen.
+    if (!UIManager._roadCells) {
+      const cells = [];
+      for (let r = 0; r < MAP_ROWS; r++) {
+        for (let c = 0; c < MAP_COLS; c++) {
+          if (getCellType(r, c) !== 'grass') cells.push((r << 16) | c);
+        }
       }
+      UIManager._roadCells = cells;
+    }
+    g.fillStyle(0xd0a35a, 0.72);
+    for (const rc of UIManager._roadCells) {
+      const r = rc >>> 16;
+      const c = rc & 0xffff;
+      const p = toMini(c * TILE_SIZE, r * TILE_SIZE);
+      const q = toMini((c + 1) * TILE_SIZE, (r + 1) * TILE_SIZE);
+      if (q.x < this.miniX || p.x > this.miniX + this.miniW || q.y < this.miniY || p.y > this.miniY + this.miniH) continue;
+      const x = Math.max(this.miniX, p.x);
+      const y = Math.max(this.miniY, p.y);
+      const w = Math.max(2, Math.min(this.miniX + this.miniW, q.x) - x);
+      const h = Math.max(2, Math.min(this.miniY + this.miniH, q.y) - y);
+      g.fillRect(x, y, w + 0.5, h + 0.5);
     }
     g.lineStyle(1, 0xffe0a0, 0.75);
     for (const p of landmarkTiles()) {
