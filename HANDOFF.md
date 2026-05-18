@@ -1,9 +1,9 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 40,
-> T-Rex and Kaiju Titan minimap markers changed to red boss markers. Cache
-> `?v=131`).
+> coding sessions. Last refresh: 2026-05-18 (post session 41,
+> minimap perf fix — throttle to 10 Hz + cache road tiles. Cache
+> `?v=132`).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -208,7 +208,27 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 40 (latest)
+## 3. What we did in session 41 (latest)
+
+Cache now at **`?v=132`**. User reported the game was lagging. Found the
+top per-frame hotspot and applied two surgical fixes.
+
+1. **Root cause.** `UIManager.drawMinimap()` ran every frame from
+   `ui.update()` and inside it scanned **all 22 500 map cells** via
+   `getCellType(r, c)` to render the road network. At 60 fps that's
+   ~1.35M calls/sec — by far the biggest per-frame cost.
+2. **Throttle minimap to ~10 Hz.** Early-return if last draw was
+   < 100 ms ago. Player visually can't tell the difference at this
+   minimap size, frees ~83 % of the budget the minimap was eating.
+3. **Cache road tile list.** Map is static after `buildMap()`, so the
+   non-grass cells are computed once and stored on `UIManager._roadCells`
+   as packed `(r<<16)|c` ints. Subsequent draws iterate only the
+   hundreds of actual road/plaza cells instead of all 22 500 tiles.
+4. **Verification.** `node -c project-grasslands/game.js` exited 0.
+   Preview reload confirmed game boots, minimap renders, no console errors.
+5. **Cache bump.** `?v=131` → `?v=132`.
+
+## 3.0. What we did in session 40
 
 Cache now at **`?v=131`**.
 
@@ -1733,7 +1753,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=124`**. Next change should use `?v=125`.
+  change. Current: **`?v=132`**. Next change should use `?v=133`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
