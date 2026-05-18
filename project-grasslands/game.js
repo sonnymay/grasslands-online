@@ -1282,12 +1282,26 @@ function mapCenter() {
 
 function landmarkTiles() {
   const { midRow, midCol, coreHalf } = mapCenter();
+  const half = Math.floor((coreHalf + 8) / 2);
+  // 5 primary plazas (full halo + ring + hero prop) + 8 secondary mini
+  // plazas (halo + smaller ring + warm lantern) so the world has more
+  // discoverable destinations without growing physical dimensions.
   return [
-    { r: midRow, c: midCol, radius: 1 },
-    { r: midRow - coreHalf - 8, c: midCol, radius: 1 },
-    { r: midRow + coreHalf + 8, c: midCol, radius: 1 },
-    { r: midRow, c: midCol - coreHalf - 8, radius: 1 },
-    { r: midRow, c: midCol + coreHalf + 8, radius: 1 },
+    { r: midRow, c: midCol, radius: 1, name: 'Spawn Plaza', primary: true },
+    { r: midRow - coreHalf - 8, c: midCol, radius: 1, name: 'Forest Heart', primary: true },
+    { r: midRow + coreHalf + 8, c: midCol, radius: 1, name: 'Desert Heart', primary: true },
+    { r: midRow, c: midCol - coreHalf - 8, radius: 1, name: 'Ruins Plaza', primary: true },
+    { r: midRow, c: midCol + coreHalf + 8, radius: 1, name: 'Riverside Plaza', primary: true },
+    // Mid-cardinal secondaries — way-stations between center and primary biome.
+    { r: midRow - half, c: midCol, radius: 0, name: 'Forest Edge' },
+    { r: midRow + half, c: midCol, radius: 0, name: 'Desert Edge' },
+    { r: midRow, c: midCol - half, radius: 0, name: 'Ruins Crossing' },
+    { r: midRow, c: midCol + half, radius: 0, name: 'Riverside Bend' },
+    // Diagonals — biome corners, less-traveled.
+    { r: midRow - coreHalf, c: midCol - coreHalf, radius: 0, name: 'Mistgrove' },
+    { r: midRow - coreHalf, c: midCol + coreHalf, radius: 0, name: 'Sunfall Grove' },
+    { r: midRow + coreHalf, c: midCol - coreHalf, radius: 0, name: 'Old Ford' },
+    { r: midRow + coreHalf, c: midCol + coreHalf, radius: 0, name: 'Reedmoor' },
   ];
 }
 
@@ -1752,9 +1766,44 @@ function buildDecorations(scene) {
     placeLandmarkDeco(hero.key, x, y, hero.h, hero.opts);
   };
 
+  // Secondary plaza: small biome-themed deco ring + 1 warm lantern.
+  // Pure cosmetic, no hero prop, fits inside one tile so A* stays clean.
+  const addSecondaryPlaza = (tile_r, tile_c, zone) => {
+    const cx = tile_c * TILE_SIZE + TILE_SIZE / 2;
+    const cy = tile_r * TILE_SIZE + TILE_SIZE / 2;
+    // 6 props in a ring at radius 70.
+    const pick = () => {
+      if (zone === 'forest') return Phaser.Utils.Array.GetRandom(mushroomKeys);
+      if (zone === 'desert') return Phaser.Utils.Array.GetRandom(rockKeys);
+      if (zone === 'ruins') return Phaser.Utils.Array.GetRandom(rockKeys);
+      if (zone === 'riverside') return Phaser.Utils.Array.GetRandom(flowerKeys);
+      return Phaser.Utils.Array.GetRandom(flowerKeys);
+    };
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const px = cx + Math.cos(a) * 70;
+      const py = cy + Math.sin(a) * 70;
+      placeLandmarkDeco(pick(), px, py, 48, { maxAngle: 12, sway: zone !== 'desert' && zone !== 'ruins', swayAmp: 2 });
+    }
+    // Warm lantern centerpiece (reuse spawn-lantern style, single).
+    const glow = scene.add.ellipse(cx, cy + 4, 100, 48, 0xffd060, 0.30)
+      .setDepth(-620);
+    scene.tweens.add({ targets: glow, alpha: 0.48, scaleX: 1.08, scaleY: 1.08,
+      duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    const core = scene.add.ellipse(cx, cy - 4, 14, 14, 0xfff2a8, 0.95)
+      .setDepth(cy);
+    scene.tweens.add({ targets: core, alpha: 0.65, scaleX: 1.15, scaleY: 1.15,
+      duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+  };
+
   for (const p of landmarkTiles()) {
-    addLandmarkRing(p.r, p.c, getZone(p.r, p.c));
-    addLandmarkHero(p.r, p.c, getZone(p.r, p.c));
+    const z = getZone(p.r, p.c);
+    if (p.primary) {
+      addLandmarkRing(p.r, p.c, z);
+      addLandmarkHero(p.r, p.c, z);
+    } else {
+      addSecondaryPlaza(p.r, p.c, z);
+    }
   }
 
   // Spawn plaza warm lanterns — 3 pulsing gold ellipses around the spawn
@@ -3568,6 +3617,7 @@ function shopItemPrice(item, bought) {
 // Map landmark plaza coords to friendly biome names based on offset from
 // center. The 5 plazas are: spawn (0,0), N forest, S desert, W ruins, E riverside.
 function landmarkLabel(lm) {
+  if (lm && lm.name) return lm.name;
   const { midRow, midCol } = mapCenter();
   if (lm.r === midRow && lm.c === midCol) return 'Spawn Plaza';
   if (lm.r < midRow) return 'Forest Heart';
@@ -3621,12 +3671,19 @@ function showTravel(scene) {
     player.visitedLandmarks[spawnKey] = true;
   }
 
-  const rowW = 460, rowH = 56;
-  const startY = 150;
+  // Two-column layout since the list grew to 13 plazas (5 primary + 8
+  // secondary). Wider modal works better than a too-tall single column.
+  const rowW = 380, rowH = 44;
+  const startY = 140;
+  const colGap = 24;
   const tiles = landmarkTiles();
+  const rowsPerCol = Math.ceil(tiles.length / 2);
+  const totalW = rowW * 2 + colGap;
   tiles.forEach((lm, i) => {
-    const ry = startY + i * (rowH + 10);
-    const rx = (GAME_W - rowW) / 2;
+    const col = Math.floor(i / rowsPerCol);
+    const rowIdx = i % rowsPerCol;
+    const ry = startY + rowIdx * (rowH + 8);
+    const rx = (GAME_W - totalW) / 2 + col * (rowW + colGap);
     const key = `${lm.r},${lm.c}`;
     const visited = !!(player && player.visitedLandmarks && player.visitedLandmarks[key]);
     const fill = visited ? 0x1c3a5e : 0x222222;
