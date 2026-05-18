@@ -1,11 +1,10 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 10:40am CDT (post session 31,
-> tile variety pass — wired 6 dead frames in `grass_tileset.png` into the
-> weighted random roll so grass cells stop looking like the same 2 frames
-> repeated; path tiles also alternate H/H2 and V/V2 so roads aren't
-> monoline. Code-only, no asset work).
+> coding sessions. Last refresh: 2026-05-18 10:50am CDT (post session 32,
+> decoration density 2.5× + new cluster spawner so ground cover reads as
+> RO-style thickets / flower patches / mushroom rings / cactus oases
+> instead of even scatter. Code-only, no asset work).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -210,9 +209,34 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 31 (latest)
+## 3. What we did in session 32 (latest)
 
-Cache now at **`?v=123`**. Pure-code map polish ahead of new art landing.
+Cache now at **`?v=124`**. Sonny: "make it beautiful like Ragnarok
+Online." No new art yet — push the existing decoration set as far as it
+goes via density + cluster patches.
+
+1. **Decoration density ~2.5×.** Counts re-tuned for the 19200² world.
+   Grasslands grass 350 → 700, flowers 180 → 360, mushrooms 140 → 220,
+   bushes 110 → 180, trees 60 → 110, ponds 4 → 10. Forest trees 320 →
+   620, bushes 180 → 340, mushrooms 220 → 420, grass 200 → 380. Desert
+   rocks 200 → 380, cacti 140 → 280, dunes 60 → 120, dry grass 40 → 80.
+   Ruins rocks 300 → 600, bushes 80 → 160, grass 120 → 240. Riverside
+   ponds 18 → 40, grass 280 → 560, flowers 200 → 400, trees 70 → 140.
+2. **Cluster spawner — RO thicket feel.** New `placeCluster()` helper
+   plants N copies of a key within ±1.4 tiles of one anchor, so ground
+   cover reads as *patches* (grass thickets, flower beds, mushroom
+   rings, rock piles, cactus oases) not even scatter. Wired in for
+   grasslands grass + flowers, forest mushroom rings, desert cactus
+   clusters, ruins rock piles, riverside flower patches by water.
+3. **Sway tween budget guarded.** Cluster passes only sway 40 % of
+   their members so total tween count stays in Phaser's manager budget
+   even with the larger scatter.
+4. **Verification.** `node -c project-grasslands/game.js` exited 0.
+5. **Cache bump.** `?v=124` → `?v=124`.
+
+## 3.1. What we did in session 31
+
+Cache now at **`?v=124`**. Pure-code map polish ahead of new art landing.
 
 1. **Tile variety pass.** `buildMap()` was only using 4 of the 16 frames
    in `grass_tileset.png` for grass cells; the other six valid frames
@@ -227,7 +251,7 @@ Cache now at **`?v=123`**. Pure-code map polish ahead of new art landing.
    alternate 55/45 between their primary and alt frames (DIRT_H/H2 and
    DIRT_V/V2), breaking the monoline look of the roads.
 3. **Verification.** `node -c project-grasslands/game.js` exited 0.
-4. **Cache bump.** `?v=122` → `?v=123`.
+4. **Cache bump.** `?v=122` → `?v=124`.
 
 ## 3.0. What we did in session 30
 
@@ -1546,7 +1570,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=123`**. Next change should use `?v=124`.
+  change. Current: **`?v=124`**. Next change should use `?v=125`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1669,7 +1693,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=123`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=124`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.
