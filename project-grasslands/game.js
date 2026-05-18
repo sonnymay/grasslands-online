@@ -317,6 +317,7 @@ const SAVE_INTERVAL_MS = 3000;
 let ui;
 let autopilotOn = false;
 let autopilotLastScan = 0;
+let lastSwayCull = 0; // throttles off-screen sway tween pause/resume sweep
 let classSelectOpen = false;
 let shopOpen = false;
 let travelOpen = false;
@@ -1117,6 +1118,25 @@ function update(time, delta) {
     tickAmbience(player.scene, time, delta);
   }
 
+  // Off-screen sway tween cull. ~1.3k sway tweens drive grass/flowers; only
+  // the few hundred near the player are visible. Every 300ms, pause tweens
+  // beyond ~1400 px of the player and resume those near. Big tween-manager
+  // win on the 19200² world.
+  if (player && !player.dead && player.scene && player.scene.__swayProps &&
+      time - lastSwayCull > 300) {
+    lastSwayCull = time;
+    const list = player.scene.__swayProps;
+    const cx = player.sprite.x, cy = player.sprite.y;
+    const R = 1400, R2 = R * R;
+    for (const e of list) {
+      if (!e.img || !e.tween) continue;
+      const dx = e.img.x - cx, dy = e.img.y - cy;
+      const far = (dx * dx + dy * dy) > R2;
+      if (far && !e.tween.isPaused()) e.tween.pause();
+      else if (!far && e.tween.isPaused()) e.tween.resume();
+    }
+  }
+
   // Autopilot: when on, pick the nearest safe live monster as attack target.
   // "Safe" = not aggressive, not boss-tier reward, maxHP not >1.5x player.
   if (autopilotOn && !player.dead &&
@@ -1136,17 +1156,32 @@ function update(time, delta) {
       if (m.maxHP > safeCap) return false;
       return true;
     };
+    // Perf: pre-bucket safe monsters by 400-px cells. Density count becomes
+    // O(N) instead of O(N²) — was 440² = 193k ops/scan at full spawn density.
+    const safeMon = [];
+    const bucket = new Map();
     for (const m of bloblings) {
       if (!safe(m)) continue;
+      safeMon.push(m);
+      const bk = (Math.floor(m.sprite.x / 400) << 16) | (Math.floor(m.sprite.y / 400) & 0xffff);
+      bucket.set(bk, (bucket.get(bk) || 0) + 1);
+    }
+    for (const m of safeMon) {
       const d = Math.hypot(m.sprite.x - player.sprite.x, m.sprite.y - player.sprite.y);
       // Prefer the active quest target — gives autopilot a real goal.
       const mz = getZone(Math.floor(m.sprite.y / TILE_SIZE), Math.floor(m.sprite.x / TILE_SIZE));
       const isQuestTarget = activeQuests.some(q => q.kind === 'zone' ? q.zoneKey === mz : q.monsterTypeId === m.typeId);
-      let neighbors = 0;
-      for (const n of bloblings) {
-        if (n === m || !safe(n)) continue;
-        if (Math.hypot(n.sprite.x - m.sprite.x, n.sprite.y - m.sprite.y) < 400) neighbors++;
+      // Density = sum of safe monsters in this and 8 neighboring 400-px
+      // cells (covers ~3-cell radius around candidate). Subtract self once.
+      const bx = Math.floor(m.sprite.x / 400), by = Math.floor(m.sprite.y / 400);
+      let neighbors = -1;
+      for (let dxk = -1; dxk <= 1; dxk++) {
+        for (let dyk = -1; dyk <= 1; dyk++) {
+          const k = ((bx + dxk) << 16) | ((by + dyk) & 0xffff);
+          neighbors += bucket.get(k) || 0;
+        }
       }
+      if (neighbors < 0) neighbors = 0;
       const score = d - neighbors * 120 - (isQuestTarget ? 800 : 0);
       if (score < bestScore) { bestScore = score; best = m; }
     }
@@ -1508,7 +1543,7 @@ function buildDecorations(scene) {
       const base = img.angle;
       const amp = opts.swayAmp ?? 3;
       const dur = Phaser.Math.Between(1600, 3200);
-      scene.tweens.add({
+      const tw = scene.tweens.add({
         targets: img,
         angle: base + amp,
         duration: dur,
@@ -1517,6 +1552,7 @@ function buildDecorations(scene) {
         repeat: -1,
         ease: 'Sine.easeInOut',
       });
+      (scene.__swayProps || (scene.__swayProps = [])).push({ img, tween: tw });
     }
     // Water shimmer: pond decorations breathe between two near-identical
     // scales so the surface looks like it's catching light.
@@ -1584,11 +1620,12 @@ function buildDecorations(scene) {
         const base = img.angle;
         const amp = opts.swayAmp ?? 3;
         const dur = Phaser.Math.Between(1600, 3200);
-        scene.tweens.add({
+        const tw = scene.tweens.add({
           targets: img, angle: base + amp, duration: dur,
           delay: Phaser.Math.Between(0, dur), yoyo: true, repeat: -1,
           ease: 'Sine.easeInOut',
         });
+        (scene.__swayProps || (scene.__swayProps = [])).push({ img, tween: tw });
       }
     }
   };
@@ -1645,7 +1682,7 @@ function buildDecorations(scene) {
       const base = img.angle;
       const amp = opts.swayAmp ?? 2;
       const dur = Phaser.Math.Between(1800, 3200);
-      scene.tweens.add({
+      const tw = scene.tweens.add({
         targets: img,
         angle: base + amp,
         duration: dur,
@@ -1654,6 +1691,7 @@ function buildDecorations(scene) {
         repeat: -1,
         ease: 'Sine.easeInOut',
       });
+      (scene.__swayProps || (scene.__swayProps = [])).push({ img, tween: tw });
     }
     return img;
   };
@@ -2188,6 +2226,11 @@ class PlayerController {
       this.lastRegen = time;
       const amount = Math.max(1, Math.floor(this.maxHP * regenPct));
       this.hp = Math.min(this.maxHP, this.hp + amount);
+      // Tactile feedback for sit-regen: green "+N HP" float on rest ticks.
+      if (resting && typeof spawnFloatText === 'function') {
+        spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 28,
+          `+${amount} HP`, 0x88ff99, { fontSize: '13px' });
+      }
     }
 
     // Advance the current step.
