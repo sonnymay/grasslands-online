@@ -1,8 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 10:55pm CDT (post session 27,
-> fullscreen-by-default viewport + camera zoom out + Codex handoff).
+> coding sessions. Last refresh: 2026-05-18 12:08am CDT (post session 28,
+> true viewport fullscreen + readable HUD/UI polish).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -127,11 +127,18 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 - Soft ground shadow under every monster / loot for grounding.
 
 ### UI
-- Bottom bar: red HP bar (left), purple EXP bar (centre), Lv + Zeny (right).
-- Chat box, bottom-left, last 10 messages.
+- Phaser now uses `Scale.RESIZE` with `GAME_W/GAME_H` derived from the
+  browser viewport. The game canvas fills the available browser surface
+  instead of letterboxing a fixed 16:9 frame.
+- Bottom status band: dark olive full-width backing with framed HP, EXP,
+  Lv, and Zeny panels. Text is larger with heavy stroke for readability.
+- Chat box, bottom-left, last 10 messages, padded with stronger backing and
+  larger outlined text.
 - Mini-map, top-right, 160×160 px: white = player, red = Blobling,
   orange = MooHam, green = MooWaan, large yellow = Boss MooHam,
   small yellow = loot. Faint dirt path drawn under markers.
+- Right toolbar is grouped into Navigation / Settings / Actions, with one
+  shared olive button style and color reserved for state / call-to-action.
 - Floating damage numbers: white (to player), red (to enemy), yellow
   bigger+`!` (crit), grey (`MISS`).
 - Player HP bar above sprite, hidden at full HP.
@@ -191,7 +198,48 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 27 (latest, in order)
+## 3. What we did in session 28 (latest, in order)
+
+Cache now at **`?v=105`**. Continued from Sonny's UI/HUD polish queue, then
+responded to direct feedback that the game needed true fullscreen and the text
+was too small / hard to read. Pre-existing sprite asset changes were left
+untouched.
+
+1. **Right-side toolbar unified.** Replaced the one-off stack of differently
+   colored buttons with a shared toolbar button factory and three labeled
+   sections: Navigation, Settings, and Actions. Buttons now share the same
+   olive backing, border weight, font size, and text treatment.
+2. **Color semantics tightened.** Gold is reserved for action buttons
+   (Travel / Change Class / Shop), muted green-grey for passive toggles, and
+   red only for warning/debug state (Hard Mode on, hidden debug level buttons
+   when `debug=1`).
+3. **Navigation order clarified.** Map Zoom, Return Home, and Travel sit
+   together; Music / Auto / Hard / HUD sit together; class and shop actions
+   sit together. Existing click handlers, tooltips, persisted settings, and
+   debug gating were preserved.
+4. **True viewport fullscreen.** Replaced fixed-canvas `Phaser.Scale.FIT`
+   with `Phaser.Scale.RESIZE`, and derive `GAME_W/GAME_H` from the browser
+   viewport at load. This fills the available browser surface without faking
+   it by zooming the camera in or cropping HUD corners.
+5. **HUD readability pass.** Bottom HP / EXP / Lv / Zeny were consolidated
+   into framed dark-olive panels; chat got padding, opacity, outline, and
+   larger text; top-left quest/gear/streak/discovery cards now share backing,
+   border weight, padding, and larger type.
+6. **Toolbar readability pass.** Toolbar labels and buttons were enlarged,
+   section headers got stronger stroke, and hidden debug buttons no longer
+   reserve empty vertical space for normal players.
+7. **Cache bump.** `project-grasslands/index.html` now loads
+   `game.js?v=105`.
+8. **Verification:**
+   - `node -c project-grasslands/game.js` exited 0.
+   - `rg` confirmed `index.html` references `game.js?v=105`.
+   - Browser preview was intentionally skipped after the user said not to
+     spend more time/tokens on preview reloads.
+9. **Dirty asset caveat.** Before this session began, the working tree already
+   had eight modified `knight_*.png` files and ten untracked
+   `wizard_*.png` files. This session left those asset changes untouched.
+
+### (legacy) session 27
 
 Cache now at **`?v=102`**. Focus shifted from feature queue to player-facing
 polish based on Sonny's feedback (`UI/HUD 5/10`, `game feels too small`,
@@ -1260,7 +1308,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=102`**. Next change should use `?v=103`.
+  change. Current: **`?v=105`**. Next change should use `?v=106`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1383,7 +1431,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=102`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=105`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.

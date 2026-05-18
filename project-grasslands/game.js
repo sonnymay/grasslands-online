@@ -1,8 +1,8 @@
 // Grasslands Online — Phase 1 (single-player MVP)
 // Phaser 3.70 — no build tools.
 
-const GAME_W = 1280;
-const GAME_H = 720;
+const GAME_W = Math.max(1, Math.floor(window.innerWidth || 1280));
+const GAME_H = Math.max(1, Math.floor(window.innerHeight || 720));
 const WORLD_W = 6400;
 const WORLD_H = 6400;
 const TILE_SIZE = 128;
@@ -233,10 +233,9 @@ const config = {
   backgroundColor: '#3a6b35',
   pixelArt: false,
   scale: {
-    // FIT preserves the 4:3 aspect so the HUD (anchored to canvas corners)
-    // stays in view on every viewport. Body bg matches the game's earthy
-    // green so any letterbox bars blend visually with the world.
-    mode: Phaser.Scale.FIT,
+    // RESIZE makes the canvas match the browser viewport instead of scaling a
+    // fixed 16:9 frame into letterbox bars. Camera zoom stays independent.
+    mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
   physics: {
@@ -3546,37 +3545,51 @@ class UIManager {
     this.scene = scene;
     this.messages = [];
 
-    // Bottom bar
-    this.bar = scene.add.rectangle(0, GAME_H - 60, GAME_W, 60, 0x000000, 0.6)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10000);
+    // Bottom status band
+    this.bottomH = 74;
+    this.bar = scene.add.rectangle(0, GAME_H - this.bottomH, GAME_W, this.bottomH, 0x162316, 0.88)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10000)
+      .setStrokeStyle(2, 0x3f5732, 0.9);
+    this.hpBarW = Math.max(180, Math.min(320, GAME_W * 0.25));
+    this.expBarW = Math.max(260, Math.min(460, GAME_W * 0.36));
+    const bottomY = GAME_H - this.bottomH;
+    const hpX = 24;
+    const hpY = bottomY + 27;
+    const expX = (GAME_W - this.expBarW) / 2;
+    const expY = bottomY + 27;
+    const panelH = 34;
 
-    // HP bar (left top)
-    this.hpBg = scene.add.rectangle(20, GAME_H - 46, 200, 14, 0x333333)
-      .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10001);
-    this.hpFill = scene.add.rectangle(20, GAME_H - 46, 200, 14, 0xcc2222)
+    this.hpPanel = scene.add.rectangle(hpX - 10, hpY - panelH / 2, this.hpBarW + 20, panelH, 0x0d150d, 0.62)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10001)
+      .setStrokeStyle(1, 0xb8d29b, 0.45);
+    this.hpBg = scene.add.rectangle(hpX, hpY, this.hpBarW, 16, 0x2c302a)
       .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10002);
-    this.hpText = scene.add.text(120, GAME_H - 46, '', {
-      fontSize: '12px', color: '#ffffff', stroke: '#000', strokeThickness: 3,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10003);
+    this.hpFill = scene.add.rectangle(hpX, hpY, this.hpBarW, 16, 0xcc3333)
+      .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10003);
+    this.hpText = scene.add.text(hpX + this.hpBarW / 2, hpY, '', {
+      fontSize: '16px', color: '#fff7ef', stroke: '#000', strokeThickness: 4,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
 
-    // EXP bar (center)
-    this.expBg = scene.add.rectangle(GAME_W / 2 - 150, GAME_H - 40, 300, 20, 0x333333)
-      .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10001);
-    this.expFill = scene.add.rectangle(GAME_W / 2 - 150, GAME_H - 40, 300, 20, 0x9933cc)
+    this.expPanel = scene.add.rectangle(expX - 10, expY - panelH / 2, this.expBarW + 20, panelH, 0x0d150d, 0.62)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10001)
+      .setStrokeStyle(1, 0xb8d29b, 0.45);
+    this.expBg = scene.add.rectangle(expX, expY, this.expBarW, 16, 0x2c302a)
       .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10002);
-    this.expText = scene.add.text(GAME_W / 2, GAME_H - 40, '', {
-      fontSize: '14px', color: '#ffffff', stroke: '#000', strokeThickness: 3,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10003);
+    this.expFill = scene.add.rectangle(expX, expY, this.expBarW, 16, 0x8e50d6)
+      .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10003);
+    this.expText = scene.add.text(expX + this.expBarW / 2, expY, '', {
+      fontSize: '16px', color: '#fff7ef', stroke: '#000', strokeThickness: 4,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
 
-    // Level (right)
-    this.lvlText = scene.add.text(GAME_W - 20, GAME_H - 28, 'Lv.1', {
-      fontSize: '18px', color: '#ffff88', stroke: '#000', strokeThickness: 3,
-    }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10003);
-
-    // Zeny (right, under level)
-    this.zenyText = scene.add.text(GAME_W - 20, GAME_H - 8, 'Zeny: 0', {
-      fontSize: '14px', color: '#ffd24a', stroke: '#000', strokeThickness: 3,
-    }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10003);
+    this.statusPanel = scene.add.rectangle(GAME_W - 178, bottomY + 14, 154, 46, 0x0d150d, 0.68)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10001)
+      .setStrokeStyle(1, 0xffe066, 0.5);
+    this.lvlText = scene.add.text(GAME_W - 101, bottomY + 27, 'Lv.1', {
+      fontSize: '20px', color: '#ffff88', stroke: '#000', strokeThickness: 4,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
+    this.zenyText = scene.add.text(GAME_W - 101, bottomY + 48, 'Zeny: 0', {
+      fontSize: '15px', color: '#ffd24a', stroke: '#000', strokeThickness: 4,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
 
     // Auto-save indicator — dim idle glyph that pulses whenever saveGame()
     // writes successfully.
@@ -3602,7 +3615,7 @@ class UIManager {
     this.miniHpFill = scene.add.rectangle(this.miniX + 2, miniHpY + 2, this.miniW - 4, 12, 0xcc2222, 0.95)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10011);
     this.miniHpText = scene.add.text(this.miniX + this.miniW / 2, miniHpY + 8, '', {
-      fontSize: '11px', color: '#ffffff', stroke: '#000', strokeThickness: 2,
+      fontSize: '12px', color: '#ffffff', stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10012);
 
     this.tipBg = scene.add.rectangle(0, 0, 10, 22, 0x000000, 0.86)
@@ -3627,10 +3640,41 @@ class UIManager {
       });
     };
 
-    const btnW = 90, btnH = 26;
-    const btnX = this.miniX + this.miniW - btnW;
-    const btnY = miniHpY + 22;
+    const btnW = 128, btnH = 30;
+    const btnX = this.miniX + 16;
+    let toolbarY = miniHpY + 22;
+    const TOOLBAR_FILL = 0x142018;
+    const TOOLBAR_STROKE = 0xb8d29b;
+    const TOOLBAR_TEXT = '#f2f7df';
+    const TOOLBAR_MUTED = '#c7d2b0';
+    const TOOLBAR_GOLD = '#ffe066';
+    const TOOLBAR_RED = '#ff9999';
+    const addSection = (label) => {
+      scene.add.text(btnX, toolbarY, label, {
+        fontSize: '11px', fontStyle: 'bold', color: '#d8e7bd',
+        stroke: '#000', strokeThickness: 3,
+      }).setOrigin(0, 0).setScrollFactor(0).setDepth(10011);
+      toolbarY += 17;
+    };
+    const addToolbarButton = (label, role = 'passive') => {
+      const y = toolbarY;
+      const isAction = role === 'action';
+      const isWarning = role === 'warning';
+      const bg = scene.add.rectangle(btnX, y, btnW, btnH, isWarning ? 0x2f1a18 : TOOLBAR_FILL, 0.88)
+        .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
+        .setStrokeStyle(2, isAction ? 0xffe066 : isWarning ? 0xff7777 : TOOLBAR_STROKE, isAction ? 1 : 0.82)
+        .setInteractive({ useHandCursor: true });
+      const text = scene.add.text(btnX + btnW / 2, y + btnH / 2, label, {
+        fontSize: '14px',
+        color: isAction ? TOOLBAR_GOLD : isWarning ? TOOLBAR_RED : role === 'toggle' ? TOOLBAR_MUTED : TOOLBAR_TEXT,
+        stroke: '#000',
+        strokeThickness: 3,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+      toolbarY += btnH + 6;
+      return { bg, text, y };
+    };
 
+    addSection('NAVIGATION');
     // Mini-map zoom toggle — cycle from whole-world view to local detail.
     const MAP_ZOOM_KEY = 'grasslands_minimap_zoom_v1';
     const MAP_ZOOMS = [1, 2, 3];
@@ -3641,13 +3685,9 @@ class UIManager {
       if (idx >= 0) mapZoomIdx = idx;
     } catch (e) { mapZoomIdx = 0; }
     minimapZoom = MAP_ZOOMS[mapZoomIdx];
-    this.mapZoomBg = scene.add.rectangle(btnX, btnY, btnW, btnH, 0x1c2f44, 0.86)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
-      .setStrokeStyle(2, 0x88ddff, 0.85)
-      .setInteractive({ useHandCursor: true });
-    this.mapZoomText = scene.add.text(btnX + btnW / 2, btnY + btnH / 2, `Map ${minimapZoom}x`, {
-      fontSize: '13px', color: '#aaddff', stroke: '#000', strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    let row = addToolbarButton(`Map ${minimapZoom}x`, 'toggle');
+    this.mapZoomBg = row.bg;
+    this.mapZoomText = row.text;
     this.mapZoomBg.on('pointerdown', () => {
       mapZoomIdx = (mapZoomIdx + 1) % MAP_ZOOMS.length;
       minimapZoom = MAP_ZOOMS[mapZoomIdx];
@@ -3655,81 +3695,12 @@ class UIManager {
       try { localStorage.setItem(MAP_ZOOM_KEY, String(minimapZoom)); } catch (e) { /* ignore */ }
       ui.message(`Mini-map zoom: ${minimapZoom}x.`);
     });
-    addTip(this.mapZoomBg, 'Cycle mini-map zoom (1x/2x/3x)', btnX, btnY + btnH / 2);
-
-    // Music mute toggle — small button under the minimap.
-    const musicY = btnY + btnH + 6;
-    this.muteBg = scene.add.rectangle(btnX, musicY, btnW, btnH, 0x000000, 0.7)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
-      .setStrokeStyle(2, 0xffffff, 0.8)
-      .setInteractive({ useHandCursor: true });
-    // Cycle 5 volume steps instead of binary mute (0 / 0.25 / 0.5 / 0.75 / 1.0
-    // of the BGM's natural volume = 0.35). Persisted as an index.
-    const VOL_KEY = 'grasslands_volume_v2';
-    const VOL_LEVELS = [0, 0.25, 0.5, 0.75, 1.0];
-    let volIdx = 2; // default 50%
-    try { const s = localStorage.getItem(VOL_KEY); if (s !== null) volIdx = Math.max(0, Math.min(VOL_LEVELS.length - 1, parseInt(s, 10))); } catch (e) { /* ignore */ }
-    const applyVol = () => {
-      const bgm = scene.bgm; if (!bgm) return;
-      const mult = VOL_LEVELS[volIdx];
-      bgm.setVolume(0.35 * mult);
-      bgm.setMute(mult === 0);
-    };
-    applyVol();
-    const volLabel = () => `♪ Music ${Math.round(VOL_LEVELS[volIdx] * 100)}%`;
-    this.muteText = scene.add.text(btnX + btnW / 2, musicY + btnH / 2, volLabel(), {
-      fontSize: '13px', color: '#ffffff', stroke: '#000', strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
-    this.muteBg.on('pointerdown', () => {
-      const bgm = scene.bgm; if (!bgm) return;
-      volIdx = (volIdx + 1) % VOL_LEVELS.length;
-      applyVol();
-      // If we just unmuted and BGM never started (autoplay block), kick it off.
-      if (VOL_LEVELS[volIdx] > 0 && !bgm.isPlaying) {
-        try {
-          if (scene.sound.context && scene.sound.context.state === 'suspended') {
-            scene.sound.context.resume();
-          }
-          bgm.play();
-        } catch (e) { /* ignore */ }
-      }
-      this.muteText.setText(volLabel());
-      try { localStorage.setItem(VOL_KEY, String(volIdx)); } catch (e) { /* ignore */ }
-    });
-    addTip(this.muteBg, 'Cycle music volume (0/25/50/75/100%)', btnX, musicY + btnH / 2);
-
-    // Autopilot toggle — auto-targets nearest safe monster, avoids bosses
-    // and overleveled enemies. Sits right below the mute button.
-    const apY = musicY + btnH + 6;
-    const AP_KEY = 'grasslands_autopilot_v1';
-    try { autopilotOn = localStorage.getItem(AP_KEY) === '1'; } catch (e) { autopilotOn = false; }
-    this.apBg = scene.add.rectangle(btnX, apY, btnW, btnH, autopilotOn ? 0x1f6b3a : 0x000000, 0.75)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
-      .setStrokeStyle(2, 0xffffff, 0.8)
-      .setInteractive({ useHandCursor: true });
-    this.apText = scene.add.text(btnX + btnW / 2, apY + btnH / 2,
-      autopilotOn ? '⚙ Auto: ON' : '⚙ Auto: OFF', {
-      fontSize: '13px', color: '#ffffff', stroke: '#000', strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
-    this.apBg.on('pointerdown', () => {
-      autopilotOn = !autopilotOn;
-      autopilotLastScan = 0; // force immediate scan on next update tick
-      this.apText.setText(autopilotOn ? '⚙ Auto: ON' : '⚙ Auto: OFF');
-      this.apBg.setFillStyle(autopilotOn ? 0x1f6b3a : 0x000000, 0.75);
-      try { localStorage.setItem(AP_KEY, autopilotOn ? '1' : '0'); } catch (e) { /* ignore */ }
-      ui.message(autopilotOn ? 'Autopilot ON — avoiding bosses + strong monsters.' : 'Autopilot OFF.');
-    });
-    addTip(this.apBg, 'Auto-target safe quest monsters', btnX, apY + btnH / 2);
+    addTip(this.mapZoomBg, 'Cycle mini-map zoom (1x/2x/3x)', btnX, row.y + btnH / 2);
 
     // Return-to-spawn (Kafra warp). Instant teleport, no cost yet.
-    const rsY = apY + btnH + 6;
-    this.rsBg = scene.add.rectangle(btnX, rsY, btnW, btnH, 0x223366, 0.85)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
-      .setStrokeStyle(2, 0xffffff, 0.8)
-      .setInteractive({ useHandCursor: true });
-    this.rsText = scene.add.text(btnX + btnW / 2, rsY + btnH / 2, '⌂ Return Home', {
-      fontSize: '13px', color: '#ffffff', stroke: '#000', strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    row = addToolbarButton('⌂ Return Home', 'passive');
+    this.rsBg = row.bg;
+    this.rsText = row.text;
     this.rsBg.on('pointerdown', () => {
       if (!player || player.dead) return;
       const cx = Math.floor(GRID_COLS / 2);
@@ -3746,59 +3717,111 @@ class UIManager {
       ui.message('Warped home.');
       sfxPickup();
     });
-    addTip(this.rsBg, 'Warp back to spawn', btnX, rsY + btnH / 2);
+    addTip(this.rsBg, 'Warp back to spawn', btnX, row.y + btnH / 2);
 
     // Fast Travel button — opens overlay listing discovered plazas.
-    const tvY = rsY + btnH + 6;
-    this.tvBg = scene.add.rectangle(btnX, tvY, btnW, btnH, 0x224466, 0.9)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
-      .setStrokeStyle(2, 0x88ddff, 0.95)
-      .setInteractive({ useHandCursor: true });
-    this.tvText = scene.add.text(btnX + btnW / 2, tvY + btnH / 2, '🧭 Travel', {
-      fontSize: '13px', color: '#aaddff', stroke: '#000', strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    row = addToolbarButton('🧭 Travel', 'action');
+    this.tvBg = row.bg;
+    this.tvText = row.text;
     this.tvBg.on('pointerdown', () => {
       if (!player || player.dead) return;
       showTravel(scene);
     });
-    addTip(this.tvBg, 'Fast travel to discovered plazas', btnX, tvY + btnH / 2);
+    addTip(this.tvBg, 'Fast travel to discovered plazas', btnX, row.y + btnH / 2);
+
+    toolbarY += 4;
+    addSection('SETTINGS');
+
+    // Music mute toggle — small button under the minimap.
+    // Cycle 5 volume steps instead of binary mute (0 / 0.25 / 0.5 / 0.75 / 1.0
+    // of the BGM's natural volume = 0.35). Persisted as an index.
+    const VOL_KEY = 'grasslands_volume_v2';
+    const VOL_LEVELS = [0, 0.25, 0.5, 0.75, 1.0];
+    let volIdx = 2; // default 50%
+    try { const s = localStorage.getItem(VOL_KEY); if (s !== null) volIdx = Math.max(0, Math.min(VOL_LEVELS.length - 1, parseInt(s, 10))); } catch (e) { /* ignore */ }
+    const applyVol = () => {
+      const bgm = scene.bgm; if (!bgm) return;
+      const mult = VOL_LEVELS[volIdx];
+      bgm.setVolume(0.35 * mult);
+      bgm.setMute(mult === 0);
+    };
+    applyVol();
+    const volLabel = () => `♪ Music ${Math.round(VOL_LEVELS[volIdx] * 100)}%`;
+    row = addToolbarButton(volLabel(), 'toggle');
+    this.muteBg = row.bg;
+    this.muteText = row.text;
+    this.muteBg.on('pointerdown', () => {
+      const bgm = scene.bgm; if (!bgm) return;
+      volIdx = (volIdx + 1) % VOL_LEVELS.length;
+      applyVol();
+      // If we just unmuted and BGM never started (autoplay block), kick it off.
+      if (VOL_LEVELS[volIdx] > 0 && !bgm.isPlaying) {
+        try {
+          if (scene.sound.context && scene.sound.context.state === 'suspended') {
+            scene.sound.context.resume();
+          }
+          bgm.play();
+        } catch (e) { /* ignore */ }
+      }
+      this.muteText.setText(volLabel());
+      try { localStorage.setItem(VOL_KEY, String(volIdx)); } catch (e) { /* ignore */ }
+    });
+    addTip(this.muteBg, 'Cycle music volume (0/25/50/75/100%)', btnX, row.y + btnH / 2);
+
+    // Autopilot toggle — auto-targets nearest safe monster, avoids bosses
+    // and overleveled enemies. Sits right below the mute button.
+    const AP_KEY = 'grasslands_autopilot_v1';
+    try { autopilotOn = localStorage.getItem(AP_KEY) === '1'; } catch (e) { autopilotOn = false; }
+    row = addToolbarButton(autopilotOn ? '⚙ Auto: ON' : '⚙ Auto: OFF', 'toggle');
+    this.apBg = row.bg;
+    this.apText = row.text;
+    this.apBg.setFillStyle(autopilotOn ? 0x264c2d : TOOLBAR_FILL, 0.88);
+    this.apBg.setStrokeStyle(2, autopilotOn ? 0x8ee894 : TOOLBAR_STROKE, autopilotOn ? 0.95 : 0.82);
+    this.apText.setColor(autopilotOn ? '#ddffdd' : TOOLBAR_MUTED);
+    this.apBg.on('pointerdown', () => {
+      autopilotOn = !autopilotOn;
+      autopilotLastScan = 0; // force immediate scan on next update tick
+      this.apText.setText(autopilotOn ? '⚙ Auto: ON' : '⚙ Auto: OFF');
+      this.apText.setColor(autopilotOn ? '#ddffdd' : TOOLBAR_MUTED);
+      this.apBg.setFillStyle(autopilotOn ? 0x264c2d : TOOLBAR_FILL, 0.88);
+      this.apBg.setStrokeStyle(2, autopilotOn ? 0x8ee894 : TOOLBAR_STROKE, autopilotOn ? 0.95 : 0.82);
+      try { localStorage.setItem(AP_KEY, autopilotOn ? '1' : '0'); } catch (e) { /* ignore */ }
+      ui.message(autopilotOn ? 'Autopilot ON — avoiding bosses + strong monsters.' : 'Autopilot OFF.');
+    });
+    addTip(this.apBg, 'Auto-target safe quest monsters', btnX, row.y + btnH / 2);
 
     // Hard Mode toggle — doubles monster damage, EXP, and zeny.
     const HARD_KEY = 'grasslands_hardmode_v1';
     try { hardMode = localStorage.getItem(HARD_KEY) === '1'; } catch (e) { hardMode = false; }
-    const hmY = tvY + btnH + 6;
-    this.hmBg = scene.add.rectangle(btnX, hmY, btnW, btnH, hardMode ? 0x882222 : 0x222222, 0.9)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
-      .setStrokeStyle(2, hardMode ? 0xff5566 : 0x888888, 0.95)
-      .setInteractive({ useHandCursor: true });
-    this.hmText = scene.add.text(btnX + btnW / 2, hmY + btnH / 2,
-      hardMode ? '⚔ Hard: ON' : '⚔ Hard: OFF', {
-      fontSize: '13px', color: hardMode ? '#ffcccc' : '#cccccc',
-      stroke: '#000', strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    row = addToolbarButton(hardMode ? '⚔ Hard: ON' : '⚔ Hard: OFF', 'warning');
+    this.hmBg = row.bg;
+    this.hmText = row.text;
+    if (!hardMode) {
+      this.hmBg.setFillStyle(TOOLBAR_FILL, 0.88);
+      this.hmBg.setStrokeStyle(2, TOOLBAR_STROKE, 0.82);
+      this.hmText.setColor(TOOLBAR_MUTED);
+    }
     this.hmBg.on('pointerdown', () => {
       hardMode = !hardMode;
       this.hmText.setText(hardMode ? '⚔ Hard: ON' : '⚔ Hard: OFF');
-      this.hmText.setColor(hardMode ? '#ffcccc' : '#cccccc');
-      this.hmBg.setFillStyle(hardMode ? 0x882222 : 0x222222, 0.9);
-      this.hmBg.setStrokeStyle(2, hardMode ? 0xff5566 : 0x888888, 0.95);
+      this.hmText.setColor(hardMode ? TOOLBAR_RED : TOOLBAR_MUTED);
+      this.hmBg.setFillStyle(hardMode ? 0x2f1a18 : TOOLBAR_FILL, 0.88);
+      this.hmBg.setStrokeStyle(2, hardMode ? 0xff7777 : TOOLBAR_STROKE, hardMode ? 0.95 : 0.82);
       try { localStorage.setItem(HARD_KEY, hardMode ? '1' : '0'); } catch (e) { /* ignore */ }
       ui.message(hardMode ? '⚔ Hard mode ON — ×2 damage, ×2 EXP, ×2 zeny.' : '⚔ Hard mode OFF.');
       sfxMiss();
     });
-    addTip(this.hmBg, 'Hard mode: ×2 damage / EXP / zeny', btnX, hmY + btnH / 2);
+    addTip(this.hmBg, 'Hard mode: ×2 damage / EXP / zeny', btnX, row.y + btnH / 2);
+
+    toolbarY += 4;
+    addSection('ACTIONS');
 
     // Change Class button — always visible. Below Lv 10 it just tells the
     // player to keep leveling. At Lv 10+ it opens the class chooser
     // (re-pickable at any time). Sits below Hard Mode toggle.
-    const clY = hmY + btnH + 6;
-    this.clBg = scene.add.rectangle(btnX, clY, btnW, btnH, 0x664422, 0.9)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
-      .setStrokeStyle(2, 0xffe066, 1)
-      .setInteractive({ useHandCursor: true });
-    this.clText = scene.add.text(btnX + btnW / 2, clY + btnH / 2, '✦ Change Class', {
-      fontSize: '13px', color: '#ffe066', stroke: '#000', strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    row = addToolbarButton('✦ Change Class', 'action');
+    this.clBg = row.bg;
+    this.clText = row.text;
     this.clBg.on('pointerdown', () => {
       if (!player) return;
       if (player.level < 10) {
@@ -3812,7 +3835,7 @@ class UIManager {
       }
       showClassSelect(scene);
     });
-    addTip(this.clBg, 'Choose or change class', btnX, clY + btnH / 2);
+    addTip(this.clBg, 'Choose or change class', btnX, row.y + btnH / 2);
 
     let debugUi = false;
     try {
@@ -3820,116 +3843,85 @@ class UIManager {
         localStorage.getItem('grasslands_debug_v1') === '1';
     } catch (e) { debugUi = false; }
 
-    // Cheat button — manually bump level by 1. Triggers normal levelUp() so
-    // tier upgrades + class select prompt fire as if earned organically.
-    const lvY = clY + btnH + 6;
-    this.lvBg = scene.add.rectangle(btnX, lvY, btnW, btnH, 0x444444, 0.85)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
-      .setStrokeStyle(2, 0xffffff, 0.7)
-      .setInteractive({ useHandCursor: true });
-    this.lvText = scene.add.text(btnX + btnW / 2, lvY + btnH / 2, '⇧ +1 Level', {
-      fontSize: '13px', color: '#ffffff', stroke: '#000', strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
-    this.lvBg.on('pointerdown', () => {
-      if (!player || player.dead) return;
-      player.levelUp();
-    });
-    addTip(this.lvBg, 'Debug: gain 1 level', btnX, lvY + btnH / 2);
+    if (debugUi) {
+      // Cheat button — manually bump level by 1. Triggers normal levelUp() so
+      // tier upgrades + class select prompt fire as if earned organically.
+      row = addToolbarButton('⇧ +1 Level', 'warning');
+      this.lvBg = row.bg;
+      this.lvText = row.text;
+      this.lvBg.on('pointerdown', () => {
+        if (!player || player.dead) return;
+        player.levelUp();
+      });
+      addTip(this.lvBg, 'Debug: gain 1 level', btnX, row.y + btnH / 2);
 
-    // +10 Levels cheat — bulk up for testing tier thresholds.
-    const lv10Y = lvY + btnH + 6;
-    this.lv10Bg = scene.add.rectangle(btnX, lv10Y, btnW, btnH, 0x444444, 0.85)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
-      .setStrokeStyle(2, 0xffffff, 0.7)
-      .setInteractive({ useHandCursor: true });
-    this.lv10Text = scene.add.text(btnX + btnW / 2, lv10Y + btnH / 2, '⇧ +10 Levels', {
-      fontSize: '13px', color: '#ffffff', stroke: '#000', strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
-    this.lv10Bg.on('pointerdown', () => {
-      if (!player || player.dead) return;
-      for (let i = 0; i < 10; i++) player.levelUp();
-    });
-    addTip(this.lv10Bg, 'Debug: gain 10 levels', btnX, lv10Y + btnH / 2);
+      // +10 Levels cheat — bulk up for testing tier thresholds.
+      row = addToolbarButton('⇧ +10 Levels', 'warning');
+      this.lv10Bg = row.bg;
+      this.lv10Text = row.text;
+      this.lv10Bg.on('pointerdown', () => {
+        if (!player || player.dead) return;
+        for (let i = 0; i < 10; i++) player.levelUp();
+      });
+      addTip(this.lv10Bg, 'Debug: gain 10 levels', btnX, row.y + btnH / 2);
 
-    // -1 Level cheat — reverses one level's per-level stat grant (20 HP /
-    // 3 ATK / 1 DEF). Tier bonuses are NOT refunded (they're permanent).
-    const lvMY = lv10Y + btnH + 6;
-    this.lvMBg = scene.add.rectangle(btnX, lvMY, btnW, btnH, 0x553333, 0.85)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
-      .setStrokeStyle(2, 0xffffff, 0.7)
-      .setInteractive({ useHandCursor: true });
-    this.lvMText = scene.add.text(btnX + btnW / 2, lvMY + btnH / 2, '⇩ -1 Level', {
-      fontSize: '13px', color: '#ffaaaa', stroke: '#000', strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
-    this.lvMBg.on('pointerdown', () => {
-      if (!player || player.dead || player.level <= 1) return;
-      player.level -= 1;
-      player.maxHP = Math.max(1, player.maxHP - 20);
-      player.atk  = Math.max(1, player.atk  - 3);
-      player.def  = Math.max(0, player.def  - 1);
-      player.hp = Math.min(player.hp, player.maxHP);
-      player.exp = 0;
-      player._refreshNameTag();
-      ui.message(`Level down. Now Lv.${player.level}.`);
-      saveGame();
-    });
-    addTip(this.lvMBg, 'Debug: lower level by 1', btnX, lvMY + btnH / 2);
-    if (!debugUi) {
-      for (const obj of [this.lvBg, this.lvText, this.lv10Bg, this.lv10Text, this.lvMBg, this.lvMText]) {
-        obj.setVisible(false);
-      }
-      for (const obj of [this.lvBg, this.lv10Bg, this.lvMBg]) obj.disableInteractive();
+      // -1 Level cheat — reverses one level's per-level stat grant (20 HP /
+      // 3 ATK / 1 DEF). Tier bonuses are NOT refunded (they're permanent).
+      row = addToolbarButton('⇩ -1 Level', 'warning');
+      this.lvMBg = row.bg;
+      this.lvMText = row.text;
+      this.lvMBg.on('pointerdown', () => {
+        if (!player || player.dead || player.level <= 1) return;
+        player.level -= 1;
+        player.maxHP = Math.max(1, player.maxHP - 20);
+        player.atk  = Math.max(1, player.atk  - 3);
+        player.def  = Math.max(0, player.def  - 1);
+        player.hp = Math.min(player.hp, player.maxHP);
+        player.exp = 0;
+        player._refreshNameTag();
+        ui.message(`Level down. Now Lv.${player.level}.`);
+        saveGame();
+      });
+      addTip(this.lvMBg, 'Debug: lower level by 1', btnX, row.y + btnH / 2);
     }
 
     // Shop button — spend zeny on permanent upgrades + full-heal potion.
-    const shY = (debugUi ? lvMY : clY) + btnH + 6;
-    this.shBg = scene.add.rectangle(btnX, shY, btnW, btnH, 0x553300, 0.9)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
-      .setStrokeStyle(2, 0xffe066, 1)
-      .setInteractive({ useHandCursor: true });
-    this.shText = scene.add.text(btnX + btnW / 2, shY + btnH / 2, '⚒ Shop', {
-      fontSize: '13px', color: '#ffe066', stroke: '#000', strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    row = addToolbarButton('⚒ Shop', 'action');
+    this.shBg = row.bg;
+    this.shText = row.text;
     this.shBg.on('pointerdown', () => {
       if (!player || player.dead) return;
       showShop(scene);
     });
-    addTip(this.shBg, 'Spend zeny on upgrades', btnX, shY + btnH / 2);
+    addTip(this.shBg, 'Spend zeny on upgrades', btnX, row.y + btnH / 2);
 
     // Compact HUD toggle — hides secondary progress chips and shortens chat.
     const HUD_KEY = 'grasslands_hud_compact_v1';
     try { hudCompact = localStorage.getItem(HUD_KEY) === '1'; } catch (e) { hudCompact = false; }
-    const huY = shY + btnH + 6;
-    this.compactBg = scene.add.rectangle(btnX, huY, btnW, btnH, hudCompact ? 0x224422 : 0x222222, 0.9)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
-      .setStrokeStyle(2, hudCompact ? 0x99ff99 : 0x888888, 0.95)
-      .setInteractive({ useHandCursor: true });
-    this.compactText = scene.add.text(btnX + btnW / 2, huY + btnH / 2,
-      hudCompact ? 'HUD: Compact' : 'HUD: Full', {
-      fontSize: '12px', color: hudCompact ? '#ddffdd' : '#dddddd',
-      stroke: '#000', strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+    row = addToolbarButton(hudCompact ? 'HUD: Compact' : 'HUD: Full', 'toggle');
+    this.compactBg = row.bg;
+    this.compactText = row.text;
     this.compactBg.on('pointerdown', () => {
       hudCompact = !hudCompact;
       this.applyCompactHud();
       try { localStorage.setItem(HUD_KEY, hudCompact ? '1' : '0'); } catch (e) { /* ignore */ }
       ui.message(hudCompact ? 'HUD compact mode ON.' : 'HUD compact mode OFF.');
     });
-    addTip(this.compactBg, 'Hide extra HUD chips + shrink chat', btnX, huY + btnH / 2);
+    addTip(this.compactBg, 'Hide extra HUD chips + shrink chat', btnX, row.y + btnH / 2);
 
     // Quest tracker — top-left badge.
-    this.questBg = scene.add.rectangle(10, 10, 330, 54, 0x000000, 0.65)
+    this.questBg = scene.add.rectangle(12, 12, 330, 58, 0x10180f, 0.78)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
-      .setStrokeStyle(2, 0xffe066, 0.9);
-    this.questText = scene.add.text(20, 18, '', {
-      fontSize: '13px', color: '#ffffff', stroke: '#000', strokeThickness: 3,
+      .setStrokeStyle(2, 0xb8d29b, 0.72);
+    this.questText = scene.add.text(24, 22, '', {
+      fontSize: '15px', color: '#ffffff', stroke: '#000', strokeThickness: 4,
       lineSpacing: 2,
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
     this.questBg.setVisible(false);
     this.questText.setVisible(false);
-    this.gearBg = scene.add.rectangle(10, 70, 330, 38, 0x000000, 0.55)
+    this.gearBg = scene.add.rectangle(12, 78, 330, 40, 0x10180f, 0.74)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
-      .setStrokeStyle(1, 0x88ddff, 0.7)
+      .setStrokeStyle(2, 0xb8d29b, 0.58)
       .setInteractive({ useHandCursor: true });
     this.gearBg.on('pointerdown', () => {
       const w = player.equipment.weapon;
@@ -3943,39 +3935,39 @@ class UIManager {
       ui.message(`Weapon: ${wDesc}.  Armor: ${aDesc}.  Trophies: ${trophies}.`);
       showTrophyInspector(scene);
     });
-    this.gearText = scene.add.text(20, 78, '', {
-      fontSize: '11px', color: '#d8f7ff', stroke: '#000', strokeThickness: 2,
+    this.gearText = scene.add.text(24, 87, '', {
+      fontSize: '14px', color: '#d8f7ff', stroke: '#000', strokeThickness: 3,
       lineSpacing: 2,
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
 
     // Boss ticker — small persistent line under the gear bar showing the
     // current biome's boss state (roaming / respawning in MM:SS).
-    this.bossTickerBg = scene.add.rectangle(10, 112, 330, 24, 0x000000, 0.55)
+    this.bossTickerBg = scene.add.rectangle(12, 126, 330, 26, 0x10180f, 0.74)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
-      .setStrokeStyle(1, 0xff8866, 0.7);
-    this.bossTickerText = scene.add.text(20, 117, '', {
-      fontSize: '12px', color: '#ffcc99', stroke: '#000', strokeThickness: 2,
+      .setStrokeStyle(2, 0xff8866, 0.62);
+    this.bossTickerText = scene.add.text(24, 132, '', {
+      fontSize: '14px', color: '#ffcc99', stroke: '#000', strokeThickness: 3,
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
     this.bossTickerBg.setVisible(false);
     this.bossTickerText.setVisible(false);
 
     // Discovery progress badge — show "Biomes: N/5" so player has a clear
     // completionist hook for visiting every landmark plaza.
-    this.discoveryBg = scene.add.rectangle(10, 168, 200, 22, 0x113322, 0.65)
+    this.discoveryBg = scene.add.rectangle(12, 190, 210, 26, 0x10180f, 0.74)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
-      .setStrokeStyle(1, 0x66ff99, 0.7);
-    this.discoveryText = scene.add.text(20, 172, '', {
-      fontSize: '11px', fontStyle: 'bold', color: '#aaffcc',
-      stroke: '#000', strokeThickness: 2,
+      .setStrokeStyle(2, 0xb8d29b, 0.58);
+    this.discoveryText = scene.add.text(24, 196, '', {
+      fontSize: '14px', fontStyle: 'bold', color: '#aaffcc',
+      stroke: '#000', strokeThickness: 3,
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
 
     // Hot-streak indicator — only visible when streak > 0.
-    this.streakBg = scene.add.rectangle(10, 142, 200, 24, 0x331100, 0.7)
+    this.streakBg = scene.add.rectangle(12, 158, 210, 26, 0x10180f, 0.74)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
-      .setStrokeStyle(1, 0xffaa33, 0.8);
-    this.streakText = scene.add.text(20, 147, '', {
-      fontSize: '12px', fontStyle: 'bold', color: '#ffcc66',
-      stroke: '#000', strokeThickness: 2,
+      .setStrokeStyle(2, 0xffaa33, 0.62);
+    this.streakText = scene.add.text(24, 164, '', {
+      fontSize: '14px', fontStyle: 'bold', color: '#ffcc66',
+      stroke: '#000', strokeThickness: 3,
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
     this.streakBg.setVisible(false);
     this.streakText.setVisible(false);
@@ -4001,10 +3993,13 @@ class UIManager {
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10007).setVisible(false);
 
     // Chat box
-    this.chatBg = scene.add.rectangle(10, GAME_H - 220, 320, 150, 0x000000, 0.5)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10000);
-    this.chatText = scene.add.text(18, GAME_H - 215, '', {
-      fontSize: '12px', color: '#ffffff', wordWrap: { width: 300 },
+    this.chatW = 348;
+    this.chatBg = scene.add.rectangle(12, GAME_H - 232, this.chatW, 150, 0x10180f, 0.76)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10000)
+      .setStrokeStyle(2, 0xb8d29b, 0.46);
+    this.chatText = scene.add.text(24, GAME_H - 220, '', {
+      fontSize: '14px', color: '#ffffff', stroke: '#000', strokeThickness: 3,
+      lineSpacing: 2, wordWrap: { width: this.chatW - 24 },
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10001);
     this.applyCompactHud();
   }
@@ -4035,16 +4030,16 @@ class UIManager {
   applyCompactHud() {
     const compact = !!hudCompact;
     const chatH = compact ? 92 : 150;
-    const chatY = GAME_H - 70 - chatH;
+    const chatY = GAME_H - this.bottomH - 12 - chatH;
     this.chatBg.y = chatY;
     this.chatBg.height = chatH;
     this.chatBg.displayHeight = chatH;
-    this.chatText.y = chatY + 5;
+    this.chatText.y = chatY + 12;
     this.chatText.setText(this.visibleMessages().join('\n'));
     this.compactText.setText(compact ? 'HUD: Compact' : 'HUD: Full');
     this.compactText.setColor(compact ? '#ddffdd' : '#dddddd');
-    this.compactBg.setFillStyle(compact ? 0x224422 : 0x222222, 0.9);
-    this.compactBg.setStrokeStyle(2, compact ? 0x99ff99 : 0x888888, 0.95);
+    this.compactBg.setFillStyle(compact ? 0x264c2d : 0x142018, 0.88);
+    this.compactBg.setStrokeStyle(2, compact ? 0x8ee894 : 0xb8d29b, compact ? 0.95 : 0.82);
     for (const obj of [this.bossTickerBg, this.bossTickerText, this.streakBg, this.streakText, this.discoveryBg, this.discoveryText]) {
       obj.setVisible(false);
     }
@@ -4052,13 +4047,13 @@ class UIManager {
 
   update() {
     const hpPct = Math.max(0, player.hp / player.maxHP);
-    this.hpFill.width = 200 * hpPct;
+    this.hpFill.width = this.hpBarW * hpPct;
     this.hpText.setText(`HP ${player.hp}/${player.maxHP}`);
     this.miniHpFill.width = (this.miniW - 4) * hpPct;
     this.miniHpText.setText(`HP ${player.hp}/${player.maxHP}`);
 
     const expPct = Math.max(0, Math.min(1, player.exp / player.expNeeded()));
-    this.expFill.width = 300 * expPct;
+    this.expFill.width = this.expBarW * expPct;
     this.expText.setText(`EXP ${player.exp}/${player.expNeeded()}`);
 
     this.lvlText.setText(`Lv.${player.level}`);
@@ -4078,6 +4073,7 @@ class UIManager {
     const swapCost = player.classId ? classSwitchCost() : 0;
     const canAfford = player.zeny >= swapCost;
     this.clText.setColor(canAfford ? '#ffe066' : '#ff9999');
+    this.clText.setFontSize(this.clText.width > 118 ? 12 : 14);
 
     // Quest tracker badge — color-coded per kind via tint hint in label.
     tickQuestPity();
