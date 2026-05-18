@@ -1036,6 +1036,19 @@ function create() {
       if (Math.hypot(wx - b.sprite.x, wy - b.sprite.y) < 80) { clicked = b; break; }
     }
 
+    // Spawn signpost is clickable — opens Travel panel as a world-anchored
+    // way-finder. Coords match the grasslands landmark hero placement in
+    // buildDecorations(): center tile + (TILE_SIZE/2, TILE_SIZE/2 + 8).
+    if (!clicked) {
+      const { midRow: _smr, midCol: _smc } = mapCenter();
+      const signX = _smc * TILE_SIZE + TILE_SIZE / 2;
+      const signY = _smr * TILE_SIZE + TILE_SIZE / 2 + 8;
+      if (Math.hypot(wx - signX, wy - signY) < 80) {
+        showTravel(scene);
+        return;
+      }
+    }
+
     if (clicked) {
       player.startAttacking(clicked);
     } else {
@@ -1706,6 +1719,30 @@ function buildDecorations(scene) {
     addLandmarkHero(p.r, p.c, getZone(p.r, p.c));
   }
 
+  // Spawn plaza warm lanterns — 3 pulsing gold ellipses around the spawn
+  // signpost so the center plaza reads as a town hub. Pure cosmetic.
+  const { midRow: _mr, midCol: _mc } = mapCenter();
+  const spX = _mc * TILE_SIZE + TILE_SIZE / 2;
+  const spY = _mr * TILE_SIZE + TILE_SIZE / 2 + 8;
+  const lanternOffsets = [
+    { dx: -150, dy:  10 },
+    { dx:  150, dy:  10 },
+    { dx:    0, dy: 150 },
+  ];
+  for (const off of lanternOffsets) {
+    const lx = spX + off.dx, ly = spY + off.dy;
+    // Warm glow disc (under feet depth).
+    const glow = scene.add.ellipse(lx, ly + 4, 120, 56, 0xffd060, 0.32)
+      .setDepth(-620);
+    scene.tweens.add({ targets: glow, alpha: 0.5, scaleX: 1.08, scaleY: 1.08,
+      duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    // Small bright core.
+    const core = scene.add.ellipse(lx, ly - 6, 18, 18, 0xfff2a8, 0.95)
+      .setDepth(ly);
+    scene.tweens.add({ targets: core, alpha: 0.65, scaleX: 1.15, scaleY: 1.15,
+      duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+  }
+
   // Grasslands (center) — dense ground cover + scattered focal trees.
   // Counts ~2.5× the pre-19200 baseline so the 9× area doesn't read as
   // sparse, plus cluster passes for the RO-style thicket feel.
@@ -1803,6 +1840,11 @@ class PlayerController {
     this._specialGlow = null;
     this.stunUntil = 0;
     this.lastRegen = 0;
+    // RO-style sit-to-regen: track how long player has stood still (no path,
+    // no target, no stun). After 1.5s idle, regen jumps from 2% / 3s to
+    // 5% / 1.5s. No new key — auto-detect.
+    this.idleSince = 0;
+    this.restGlyph = null;
 
     // Tile-grid movement state.
     this.cellCol = Math.floor(x / CELL_SIZE);
@@ -2115,10 +2157,36 @@ class PlayerController {
       }
     }
 
+    // RO-style sit-to-regen idle detection. Idle = no stun, finished step,
+    // no path, no live attack target. Idle ≥1.5s → 2.5× regen.
+    const fullyIdle = !stunned && this.stepT >= 1 && this.path.length === 0 &&
+      (!this.attackTarget || !this.attackTarget.alive);
+    if (fullyIdle) {
+      if (!this.idleSince) this.idleSince = time;
+    } else {
+      this.idleSince = 0;
+    }
+    const resting = fullyIdle && this.idleSince && (time - this.idleSince) > 1500;
+    // Show/hide little "💤" glyph above head while resting.
+    if (resting) {
+      if (!this.restGlyph) {
+        this.restGlyph = this.scene.add.text(this.sprite.x, this.sprite.y - 56, '💤', {
+          fontSize: '18px', stroke: '#000', strokeThickness: 3, resolution: 2,
+        }).setOrigin(0.5).setDepth(this.sprite.y + 1);
+        this.scene.tweens.add({ targets: this.restGlyph, y: this.sprite.y - 64,
+          alpha: 0.7, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      }
+      this.restGlyph.x = this.sprite.x;
+    } else if (this.restGlyph) {
+      this.restGlyph.destroy();
+      this.restGlyph = null;
+    }
     // Slow passive HP regen. Pauses while stunned (in combat hit recently).
-    if (!stunned && this.hp < this.maxHP && time - this.lastRegen >= HP_REGEN_INTERVAL_MS) {
+    const regenInterval = resting ? 1500 : HP_REGEN_INTERVAL_MS;
+    const regenPct = resting ? 0.05 : HP_REGEN_PCT;
+    if (!stunned && this.hp < this.maxHP && time - this.lastRegen >= regenInterval) {
       this.lastRegen = time;
-      const amount = Math.max(1, Math.floor(this.maxHP * HP_REGEN_PCT));
+      const amount = Math.max(1, Math.floor(this.maxHP * regenPct));
       this.hp = Math.min(this.maxHP, this.hp + amount);
     }
 
@@ -2242,6 +2310,8 @@ class PlayerController {
     this.hotStreak = 0;
     if (this._specialRing) this._specialRing.setVisible(false);
     if (this._specialGlow) this._specialGlow.setVisible(false);
+    if (this.restGlyph) { this.restGlyph.destroy(); this.restGlyph = null; }
+    this.idleSince = 0;
     this.path = [];
     this.stepT = 1;
     this.attackTarget = null;
