@@ -48,6 +48,7 @@ const BLOBLING_ATTACK_RANGE = 80;
 const BLOBLING_COUNT = 150;
 const MOOHAM_COUNT = 100;
 const MOOWAAN_COUNT = 75;
+const MOODENG_COUNT = 55;
 const DUNE_BLOB_COUNT = 60;
 const BIGFOOT_COUNT = 1;
 const BIOME_BOSS_COUNT = 1;
@@ -74,6 +75,13 @@ const MONSTER_TYPES = {
     maxHP: 60, atk: 6, expReward: 14, speed: 90,
     nameColor: '#d6ffd0', count: MOOWAAN_COUNT, scaleMult: 0.9,
     zones: ['forest', 'riverside'],
+  },
+  moodeng: {
+    name: 'MooDeng',
+    idleKey: 'moodeng_idle', hitKey: 'moodeng_hit', deadKey: 'moodeng_dead',
+    maxHP: 95, atk: 7, expReward: 20, speed: 65,
+    nameColor: '#ffc0dd', count: MOODENG_COUNT, scaleMult: 1.05,
+    zones: ['riverside'],
   },
   cactling: {
     name: 'Cactling',
@@ -658,6 +666,9 @@ function preload() {
   this.load.image('moowaan_idle', 'assets/sprites/moowaan_idle.png');
   this.load.image('moowaan_hit', 'assets/sprites/moowaan_hit.png');
   this.load.image('moowaan_dead', 'assets/sprites/moowaan_dead.png');
+  this.load.image('moodeng_idle', 'assets/sprites/moodeng_idle.png');
+  this.load.image('moodeng_hit', 'assets/sprites/moodeng_hit.png');
+  this.load.image('moodeng_dead', 'assets/sprites/moodeng_dead.png');
   this.load.image('bigfoot_idle', 'assets/sprites/bigfoot_idle.png');
   this.load.image('bigfoot_aggro', 'assets/sprites/bigfoot_aggro.png');
   this.load.image('bigfoot_chase', 'assets/sprites/bigfoot_chase.png');
@@ -761,6 +772,7 @@ function create() {
     'blobling_idle','blobling_hit','blobling_dead',
     'mooham_idle','mooham_hit','mooham_dead',
     'moowaan_idle','moowaan_hit','moowaan_dead',
+    'moodeng_idle','moodeng_hit','moodeng_dead',
     'bigfoot_idle','bigfoot_aggro','bigfoot_chase','bigfoot_attack','bigfoot_hit','bigfoot_dead',
     'trex_idle','trex_aggro','trex_chase','trex_attack','trex_hit','trex_dead',
     'kaiju_titan_idle','kaiju_titan_aggro','kaiju_titan_chase','kaiju_titan_attack','kaiju_titan_hit','kaiju_titan_dead',
@@ -4693,6 +4705,7 @@ class UIManager {
       let outline = null;
       if (m.typeId === 'mooham') color = 0xffaa55;
       else if (m.typeId === 'moowaan') color = 0x55ff88;
+      else if (m.typeId === 'moodeng') color = 0xff9fcf;
       else if (m.typeId === 'cactling') color = 0xbce86a;
       else if (m.typeId === 'rare_mooham') { color = 0xffe066; r = 4; outline = 0xffffff; }
       else if (m.typeId === 'bigfoot') { color = 0xff2222; r = 5; outline = 0x000000; }
