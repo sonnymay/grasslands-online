@@ -806,7 +806,7 @@ function create() {
   // Camera follow
   scene.cameras.main.startFollow(player.sprite, true, 0.1, 0.1);
   // RO camera reveals ~12-15 tiles wide — zoom out a touch.
-  scene.cameras.main.setZoom(0.85);
+  scene.cameras.main.setZoom(0.65);
 
   // Tab cycles to the nearest live monster as the new attack target.
   scene.input.keyboard.on('keydown-TAB', (e) => {
@@ -3916,31 +3916,6 @@ class UIManager {
       ui.message(hudCompact ? 'HUD compact mode ON.' : 'HUD compact mode OFF.');
     });
     addTip(this.compactBg, 'Hide extra HUD chips + shrink chat', btnX, huY + btnH / 2);
-
-    // Fullscreen toggle — uses Phaser's scale manager, which needs a
-    // user gesture (pointerdown qualifies). Label flips with state.
-    const fsY = huY + btnH + 6;
-    this.fsBg = scene.add.rectangle(btnX, fsY, btnW, btnH, 0x222244, 0.9)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
-      .setStrokeStyle(2, 0x88aaff, 0.95)
-      .setInteractive({ useHandCursor: true });
-    this.fsText = scene.add.text(btnX + btnW / 2, fsY + btnH / 2, '⛶ Fullscreen', {
-      fontSize: '12px', color: '#cce0ff', stroke: '#000', strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
-    this.fsBg.on('pointerdown', () => {
-      if (!scene.scale) return;
-      if (scene.scale.isFullscreen) {
-        scene.scale.stopFullscreen();
-      } else {
-        scene.scale.startFullscreen();
-      }
-    });
-    // Sync label on browser-driven exits (Esc key, etc).
-    if (scene.scale && scene.scale.on) {
-      scene.scale.on('enterfullscreen', () => this.fsText.setText('⛶ Exit Full'));
-      scene.scale.on('leavefullscreen', () => this.fsText.setText('⛶ Fullscreen'));
-    }
-    addTip(this.fsBg, 'Toggle fullscreen', btnX, fsY + btnH / 2);
 
     // Quest tracker — top-left badge.
     this.questBg = scene.add.rectangle(10, 10, 330, 54, 0x000000, 0.65)
