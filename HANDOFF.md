@@ -1,9 +1,10 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 1:55am CDT (post session 29 v2,
-> bottom-right separator + Change Class flicker + Music ON/OFF + UL
-> consolidation + crisper nameplate).
+> coding sessions. Last refresh: 2026-05-18 (post session 30, Tier 0 asset
+> plan landed — `ASSET_PLAN.md` at repo root carries prompts + file paths
+> for forest/ruins/riverside tilesets, biome decorations, and 5 landmark
+> hero props. No code change, cache still at `?v=122`).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -208,7 +209,31 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 29 (latest, in order)
+## 3. What we did in session 30 (latest)
+
+Cache stays at **`?v=122`** — no `game.js` change. Tier 0 of the post-29
+map-art upgrade arc is a prompt/spec deliverable, not a code change.
+
+1. **`ASSET_PLAN.md` created at repo root.** Single doc with the exact
+   ChatGPT image-gen prompts + filenames + paths for:
+   - Tier 0a: forest / ruins / riverside tilesets (768×768, 3×3 grid,
+     mirror the existing grass + sand sets so `sliceTileset` works as-is).
+   - Tier 0b: 5 biome-defining decorations per missing biome (forest /
+     ruins / riverside), 256×256, near-white background.
+   - Tier 0c: one hero landmark prop per biome (spawn signpost, forest
+     shrine, desert obelisk, ruins well, riverside bridge).
+2. **Bright-world rule enforced in every prompt.** No deep shadows, no
+   fog, no night palette — locks in Sonny's reject of the session 29
+   atmospheric pass.
+3. **Wiring order documented.** Each asset class lists the exact game.js
+   touch points (preload line, buildMap branch at game.js:1229, scatter
+   table append, cache bump) so the swap is one small commit per biome.
+4. **No code touched.** `node -c project-grasslands/game.js` not re-run
+   because no `.js` changed; `index.html` still references `game.js?v=122`.
+
+Commit on `main`: `(see latest push)`.
+
+## 3.1. What we did in session 29 (in order)
 
 Cache now at **`?v=112`**. Sonny opened with "HUD text is small and blurry —
 make it crisp, screen-space, edge-anchored, responsive." Several rounds of
