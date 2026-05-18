@@ -348,11 +348,12 @@ function rollNewQuest() {
   const canBossQuest = player && player.level >= 10 && !activeQuests.some(q => q.kind === 'boss');
   const zoneQuest = player && player.level >= 4 && !activeQuests.some(q => q.kind === 'zone') && Math.random() < 0.25;
   const bossQuest = !zoneQuest && canBossQuest && Math.random() < 0.25;
+  const bornAt = Date.now();
   if (zoneQuest) {
     const zoneKey = QUEST_ZONE_POOL[Math.floor(Math.random() * QUEST_ZONE_POOL.length)];
     const target = 8;
     const reward = zoneKey === 'grasslands' ? 120 : 180;
-    activeQuests.push({ kind: 'zone', zoneKey, zoneName: ZONE_LABELS[zoneKey] || zoneKey, target, count: 0, reward });
+    activeQuests.push({ kind: 'zone', zoneKey, zoneName: ZONE_LABELS[zoneKey] || zoneKey, target, count: 0, reward, baseReward: reward, bornAt, pityTier: 0 });
     if (typeof ui !== 'undefined' && ui) ui.message(`New quest: clear ${target} in ${ZONE_LABELS[zoneKey] || zoneKey} (${fmt(reward)} zeny).`);
     saveGame();
     return;
@@ -362,11 +363,36 @@ function rollNewQuest() {
   const cfg = MONSTER_TYPES[id];
   const target = bossQuest ? 1 : 10;
   const reward = bossQuest ? Math.round((cfg.expReward || 80) * 5) : Math.round((cfg.expReward || 10) * target * 1.5);
-  activeQuests.push({ kind: bossQuest ? 'boss' : 'slay', monsterTypeId: id, monsterName: cfg.name, target, count: 0, reward });
+  activeQuests.push({ kind: bossQuest ? 'boss' : 'slay', monsterTypeId: id, monsterName: cfg.name, target, count: 0, reward, baseReward: reward, bornAt, pityTier: 0 });
   if (typeof ui !== 'undefined' && ui) {
     ui.message(`New quest: ${bossQuest ? 'hunt' : 'slay'} ${target} ${cfg.name} (${fmt(reward)} zeny).`);
   }
   saveGame();
+}
+
+// Quest pity timer: every 2 minutes past the 3-minute mark, bump the
+// quest's reward by 25% of its base, capped at 3 tiers (+75%). Stops the
+// player from being stuck farming a rare quest mob with no payoff bump.
+function tickQuestPity() {
+  if (!activeQuests.length) return;
+  const now = Date.now();
+  for (const q of activeQuests) {
+    if (!q.bornAt) { q.bornAt = now; q.baseReward = q.baseReward || q.reward; q.pityTier = q.pityTier || 0; }
+    const ageMs = now - q.bornAt;
+    const ageMin = ageMs / 60000;
+    let desiredTier = 0;
+    if (ageMin >= 3) desiredTier = 1;
+    if (ageMin >= 5) desiredTier = 2;
+    if (ageMin >= 7) desiredTier = 3;
+    if (desiredTier <= (q.pityTier || 0)) continue;
+    q.pityTier = desiredTier;
+    const base = q.baseReward || q.reward;
+    q.reward = Math.round(base * (1 + 0.25 * desiredTier));
+    const name = q.kind === 'zone' ? q.zoneName : q.monsterName;
+    if (typeof ui !== 'undefined' && ui) {
+      ui.message(`⌛ Quest reward bumped (+${25 * desiredTier}%): ${name} → ${fmt(q.reward)}z`);
+    }
+  }
 }
 
 function onMonsterKilledForQuest(monsterOrTypeId) {
@@ -1357,13 +1383,34 @@ class PlayerController {
       this.nameTag.setText(`${title} Lv.${this.level}`);
       this.nameTag.setColor(color);
       const cosmetic = pickPlayerTitle(this);
+      const prev = this._lastTitleLabel;
       if (cosmetic) {
         this.titleTag.setText(`« ${cosmetic.label} »`);
         this.titleTag.setColor(cosmetic.color);
         this.titleTag.setVisible(true);
+        // Pulse + chat callout on first earn (or on upgrade to a new title).
+        // Skip the very first refresh after spawn/load so titles already in
+        // the save don't fire a stale pulse.
+        if (this._titleInit && prev !== cosmetic.label) {
+          if (typeof ui !== 'undefined' && ui) {
+            ui.message(`✨ Title earned: ${cosmetic.label}`);
+          }
+          if (this.scene && this.scene.tweens) {
+            this.titleTag.setScale(1.6).setAlpha(1);
+            this.scene.tweens.add({
+              targets: this.titleTag, scale: 1, duration: 380, ease: 'Back.easeOut',
+            });
+            spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 86,
+              `✨ ${cosmetic.label} ✨`, parseInt(cosmetic.color.slice(1), 16),
+              { fontSize: '20px' });
+          }
+        }
+        this._lastTitleLabel = cosmetic.label;
       } else {
         this.titleTag.setVisible(false);
+        this._lastTitleLabel = null;
       }
+      this._titleInit = true;
     };
 
     // HP bar above the player (matches monster bars; only shows when wounded).
@@ -4017,6 +4064,7 @@ class UIManager {
     this.clText.setColor(canAfford ? '#ffe066' : '#ff9999');
 
     // Quest tracker badge — color-coded per kind via tint hint in label.
+    tickQuestPity();
     if (activeQuests.length) {
       const colorFor = (k) => k === 'boss' ? '#ff8866' : k === 'zone' ? '#88c8ff' : '#bce86a';
       const tagFor   = (k) => k === 'boss' ? 'BOSS' : k === 'zone' ? 'CLEAR' : 'SLAY';
@@ -4024,7 +4072,8 @@ class UIManager {
       // showing a small colored chip glyph at the start of each line.
       const txt = activeQuests.map((q) => {
         const target = q.kind === 'zone' ? q.zoneName : q.monsterName;
-        return `■ ${tagFor(q.kind)}  ${q.count}/${q.target}  ${target}`;
+        const pity = q.pityTier ? ` ⌛+${25 * q.pityTier}%` : '';
+        return `■ ${tagFor(q.kind)}  ${q.count}/${q.target}  ${target}${pity}`;
       }).join('\n');
       if (this.questText.text !== txt) this.questText.setText(txt);
       // Color the whole block by the highest-priority quest (boss > zone > slay).
