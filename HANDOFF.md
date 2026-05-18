@@ -188,7 +188,22 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ## 3. What we did in session 26 (latest, in order)
 
-Cache now at **`?v=97`**. Picked two items from §4 queue.
+Cache now at **`?v=98`**. Picked three items from §4 queue.
+
+6. **Cosmetic milestone title above name** (item #2) — added `titleTag`
+   text 14px above the existing class/level `nameTag`. Hidden until the
+   player qualifies for one of the milestones. `pickPlayerTitle(p)`
+   priority: Veteran (Lv40+) → Boss Hunter (5+ unique bosses) → Streak
+   Master (best streak ≥25) → Tycoon (100k zeny) → Plaza Wanderer (all
+   landmarks) → Wayfarer (3+ class swaps). Re-evaluated once per second
+   in `player.update()` so any counter unlock surfaces automatically
+   without callsite plumbing. Browser-verified: seeded Lv25 Knight with
+   bestStreak 30 → `« Streak Master »` rendered above `Knight Lv.25`.
+   Commit `1f401e8`.
+
+---
+
+Cache previously at **`?v=97`**. Picked two items from §4 queue.
 
 1. **Class-switch zeny cost** (item #3) — `classSwitchCost()` returns 0 for
    the first class pick and `min(80000, 5000 * 2^n)` for swaps (5k → 10k →
@@ -524,9 +539,8 @@ The user is paused while context recharges. Pick freely.
    class color) that trails behind the player by 1 cell. No
    combat, pure cosmetic. Toggle in shop or as a one-time 5000z
    buy.
-2. **Cosmetic title above name** — picked from milestones (e.g.
-   "Plaza Wanderer" after all 5 landmarks, "Boss Hunter" after
-   5 trophies). Visible above the level/title nameTag.
+2. ~~**Cosmetic title above name**~~ — DONE in session 26. Six titles
+   (Veteran/Boss Hunter/Streak Master/Tycoon/Plaza Wanderer/Wayfarer).
 3. ~~**Class switch cost**~~ — DONE in session 26. First pick free;
    swap cost 5k → 10k → 20k → 40k → 80k zeny (cap).
 4. **Quest pity timer** — if the player hasn't completed the same
@@ -1133,7 +1147,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=97`**. Next change should use `?v=98`.
+  change. Current: **`?v=98`**. Next change should use `?v=99`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1256,7 +1270,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=97`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=98`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.
