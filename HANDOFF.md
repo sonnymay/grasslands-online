@@ -1,7 +1,11 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 46,
+> coding sessions. Last refresh: 2026-05-18 (post session 47, 90° tile
+> rotation + dual soft-overlay layer to further soften v2 grass grid.
+> Cache `?v=138`).
+>
+> (Pre-session-47 header line:) Last refresh: 2026-05-18 (post session 46,
 > `grass_tileset_v2.png` wired as the base grass tileset. Cache `?v=137`).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
@@ -207,7 +211,50 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 46 (latest)
+## 3. What we did in session 47 (latest)
+
+Cache now at **`?v=138`**. Sonny inspected v2 tileset wired in session
+46 and reported the 128 px square grid was still visible because v2
+tiles have asymmetric dark/light patches per source frame, so
+neighbors don't match at edges. Code-only mitigations pushed harder.
+
+1. **Random 90° rotation on grass tiles.** Step 0/90/180/270 added
+   on top of existing flipX/flipY in `buildMap()`. 4 rotations × 4
+   flip combos = 16 visual variants per source frame; neighbors
+   stop matching at any orientation. Path tiles untouched so the
+   cross network still reads as roads.
+2. **Wider per-tile alpha jitter.** Range 0.95–1.00 → **0.85–1.00**
+   on grass tiles. Each tile now has noticeably different
+   transparency, adding broad value variance the eye can't lock onto
+   as a repeating pattern.
+3. **Mid-overlay scatter bumped 480 → 900 sprites** (170–260 px,
+   alpha 0.10–0.18, depth -800). Lands 2–3 overlays per grass tile
+   on average across grasslands / forest / riverside.
+4. **New macro-overlay layer.** 220 large sprites (320–460 px, alpha
+   0.06–0.12, depth -820) that span multiple tiles. Breaks long
+   axis-aligned tile rows and adds broad biome value variance.
+   Skips desert + ruins like the mid layer.
+5. **Verification.** `node -c project-grasslands/game.js` exited 0.
+   Preview reload boots clean. Grid is meaningfully softened; some
+   square boundaries still faintly visible where v2 source frames
+   have their darkest patches — code ceiling reached on this art.
+6. **Cache bump.** `?v=137` → `?v=138`.
+
+### Next asset to generate (one-image-at-a-time)
+
+Code-only mitigation hit its ceiling — the remaining faint grid is
+intrinsic to v2's tile-edge art. Highest-impact next image:
+
+- **`deco_grass_blob_soft_01.png` (256×256).** A single very soft
+  irregular dark-green grass blob with a feathered radial alpha
+  gradient (no hard outline, no straight edges). Will be added to
+  the macro-overlay scatter to mask the remaining tile seams.
+  Prompt suffix: *"transparent background PNG with alpha channel,
+  soft anime / Ragnarok Online style, no hard outlines, no text,
+  original art."* Drop into `Downloads`, say the word, will move /
+  resize / wire in `preload()` and the macro pass.
+
+## 3.1. What we did in session 46
 
 Cache now at **`?v=137`**. Wired the generated grass replacement image
 from Downloads.
@@ -1931,7 +1978,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=137`**. Next change should use `?v=138`.
+  change. Current: **`?v=138`**. Next change should use `?v=139`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
