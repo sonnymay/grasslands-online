@@ -301,6 +301,22 @@ wheel-zoom feature. All HUD work landed; gameplay logic untouched.
     `b.sprite` / `b.sprite.scene` so stale references after death/cleanup
     can't throw.
 16. **Cache bump.** `?v=114` → `?v=115`.
+17. **Ranged Archer + Mage.** Added a `playerAttackRange()` helper:
+    Archer = 560 px, Mage = 380 px, Swordsman / no-class = 100 px (the
+    old `ATTACK_RANGE`). The two range checks (update loop + the
+    `attemptPlayerAttack` swing gate) both call the helper instead of the
+    constant. `_repathToTarget` now early-returns when the target is
+    already inside the class's range — ranged classes don't chase, they
+    fire from where they stand. The existing `spawnClassAttackFx` already
+    tweens an orb/arrow from the player to the target, so the visual
+    works at any distance with no asset changes.
+18. **"Endless" map (4× area).** `WORLD_W` / `WORLD_H` bumped 6400 →
+    12800. All derived values (`MAP_COLS`, `MAP_ROWS`, `GRID_COLS`,
+    `GRID_ROWS`) scale automatically. Camera bounds, physics bounds, and
+    spawn jitter are all defined off the same constants so they expand
+    together. This is "feels endless" not literally infinite — true
+    infinite scrolling would need a chunked terrain refactor (deferred).
+19. **Cache bump.** `?v=115` → `?v=116`.
 7. **Verification.** `node -c project-grasslands/game.js` exited 0 after
    every edit. Browser preview was intentionally skipped — Sonny asked us
    to save tokens once the live wedge from rapid `location.reload()` cycles
@@ -1434,7 +1450,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=115`**. Next change should use `?v=116`.
+  change. Current: **`?v=116`**. Next change should use `?v=117`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1557,7 +1573,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=115`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=116`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.

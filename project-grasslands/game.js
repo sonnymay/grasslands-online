@@ -4,8 +4,11 @@
 const GAME_W = Math.max(1, Math.floor(window.innerWidth || 1280));
 const GAME_H = Math.max(1, Math.floor(window.innerHeight || 720));
 const UI_TEXT_RESOLUTION = Math.max(2, Math.min(3, window.devicePixelRatio || 2));
-const WORLD_W = 6400;
-const WORLD_H = 6400;
+// World dimensions. Doubled from 6400 → 12800 (4× area) so the map feels
+// effectively endless during normal play. The tile system is still bounded;
+// true infinite scrolling would need a chunked terrain refactor.
+const WORLD_W = 12800;
+const WORLD_H = 12800;
 const TILE_SIZE = 128;
 const MAP_COLS = Math.ceil(WORLD_W / TILE_SIZE); // 25
 const MAP_ROWS = Math.ceil(WORLD_H / TILE_SIZE);
@@ -200,7 +203,17 @@ const ANIM_FRAME_MS = 180;
 const WALK_FRAME_MS = 120;
 const BOB_AMPLITUDE = 3;     // subtle lift; too much reads as bounce, not walking
 const STEP_SQUASH = 0.04;    // tiny squash so feet stay visually planted
-const ATTACK_RANGE = 100; // melee click-attack range
+const ATTACK_RANGE = 100; // melee click-attack range (swordsman/no-class)
+// Ranged classes attack from a distance without closing in. Archer outranges
+// Mage. Used by playerAttackRange() below.
+const MAGE_ATTACK_RANGE = 380;
+const ARCHER_ATTACK_RANGE = 560;
+function playerAttackRange() {
+  if (!player || !player.classId) return ATTACK_RANGE;
+  if (player.classId === 'archer') return ARCHER_ATTACK_RANGE;
+  if (player.classId === 'mage') return MAGE_ATTACK_RANGE;
+  return ATTACK_RANGE;
+}
 const RESPAWN_MS = 5000;
 const BOSS_RESPAWN_MS = 60000;
 const PLAYER_RESPAWN_MS = 3000;
@@ -1529,7 +1542,15 @@ class PlayerController {
 
   _repathToTarget() {
     if (!this.attackTarget || !this.attackTarget.alive) return;
-    // Walk to a cell adjacent to the target so we end up inside ATTACK_RANGE.
+    // If the target is already inside our class's attack range, don't move
+    // at all — ranged classes (Archer / Mage) shoot from where they stand.
+    const dxNow = this.attackTarget.sprite.x - this.sprite.x;
+    const dyNow = this.attackTarget.sprite.y - this.sprite.y;
+    if (Math.hypot(dxNow, dyNow) <= playerAttackRange()) {
+      this.path = [];
+      return;
+    }
+    // Walk to a cell adjacent to the target so we end up inside attack range.
     const tCol = Math.floor(this.attackTarget.sprite.x / CELL_SIZE);
     const tRow = Math.floor(this.attackTarget.sprite.y / CELL_SIZE);
     const adj = findAdjacentReachableCell(this.cellCol, this.cellRow, tCol, tRow);
@@ -1742,7 +1763,7 @@ class PlayerController {
         const dx = this.attackTarget.sprite.x - this.sprite.x;
         const dy = this.attackTarget.sprite.y - this.sprite.y;
         const d = Math.hypot(dx, dy);
-        if (d <= ATTACK_RANGE) {
+        if (d <= playerAttackRange()) {
           // In range: stop walking, face target, swing on cooldown.
           this.path = [];
           if (this.stepT < 1) {
@@ -3503,7 +3524,7 @@ function attemptPlayerAttack(scene, target) {
   const now = scene.time.now;
   if (now - lastPlayerAttack < PLAYER_ATTACK_COOLDOWN) return;
   const d = Math.hypot(target.sprite.x - player.sprite.x, target.sprite.y - player.sprite.y);
-  if (d > ATTACK_RANGE) return;
+  if (d > playerAttackRange()) return;
   lastPlayerAttack = now;
   player.attackPoseUntil = now + 250;
 
