@@ -1272,6 +1272,7 @@ class PlayerController {
     this.trophyMilestones = {};
     this.classId = null;   // 'swordsman' | 'mage' | 'archer'
     this.classTier = 0;    // 0 = unselected, 1..4 once chosen
+    this.classSwitches = 0; // count of paid swaps; first class pick is free
     this.shopBought = { hp: 0, atk: 0, def: 0, pot: 0 };
     this.visitedLandmarks = {}; // '<r>,<c>' -> true
     this._lastPanicAt = 0;
@@ -1828,6 +1829,7 @@ function saveGame() {
       atk: player.atk, def: player.def, zeny: player.zeny,
       kills: player.kills, hotStreak: player.hotStreak, bestStreak: player.bestStreak,
       classId: player.classId, classTier: player.classTier,
+      classSwitches: player.classSwitches,
       shopBought: player.shopBought,
       visitedLandmarks: player.visitedLandmarks,
       activeQuests: activeQuests, activeQuest: activeQuests[0] || null,
@@ -1867,6 +1869,7 @@ function applySave() {
   player.trophyMilestones = Object.assign({}, save.trophyMilestones || {});
   player.classId   = save.classId   ?? null;
   player.classTier = save.classTier ?? 0;
+  player.classSwitches = save.classSwitches ?? 0;
   player.shopBought = Object.assign({ hp:0, atk:0, def:0, pot:0 }, save.shopBought || {});
   player.visitedLandmarks = save.visitedLandmarks || {};
   activeQuests = Array.isArray(save.activeQuests) ? save.activeQuests.slice(0, 2) : (save.activeQuest ? [save.activeQuest] : []);
@@ -2645,6 +2648,14 @@ function showBossZoneHint(scene, zoneKey) {
 }
 
 // ---------- Class selection overlay ----------
+// First class pick is free. Each later swap costs escalating zeny so the
+// choice carries weight without locking the player out for long.
+function classSwitchCost() {
+  if (!player || !player.classId) return 0;
+  const n = player.classSwitches || 0;
+  return Math.min(80000, 5000 * Math.pow(2, n));
+}
+
 // Renders 3 cards centered on screen at GAME_W x GAME_H. Cards use cardImage
 // keys if loaded, otherwise a tinted colored panel placeholder.
 function showClassSelect(scene) {
@@ -2763,6 +2774,22 @@ function selectClass(scene, id, container) {
   const cdef = CLASS_DEFS[id];
   if (!cdef) return;
   const isSwap = !!player.classId;
+  // Block & refund-click if the swap can't be paid for. Gate again here in
+  // case the player accumulated/spent zeny between opening the panel and
+  // picking a card.
+  if (isSwap) {
+    const cost = classSwitchCost();
+    if (player.classId === id) {
+      ui.message('Already on that class — no swap needed.');
+      return;
+    }
+    if (player.zeny < cost) {
+      ui.message(`Need ${fmt(cost)}z to swap class. (Have ${fmt(player.zeny)}z)`);
+      return;
+    }
+    player.zeny -= cost;
+    player.classSwitches = (player.classSwitches || 0) + 1;
+  }
   player.classId = id;
   // First-time: set tier from current level's threshold (1 baseline, plus
   // any higher tier the player already qualifies for). On swap, recompute
@@ -3672,6 +3699,11 @@ class UIManager {
         ui.message(`Reach Lv.10 to choose a class. (Currently Lv.${player.level})`);
         return;
       }
+      const cost = classSwitchCost();
+      if (cost > 0 && player.zeny < cost) {
+        ui.message(`Need ${fmt(cost)}z to swap class. (Have ${fmt(player.zeny)}z)`);
+        return;
+      }
       showClassSelect(scene);
     });
     addTip(this.clBg, 'Choose or change class', btnX, clY + btnH / 2);
@@ -3927,9 +3959,19 @@ class UIManager {
     this.zenyText.setText(`Zeny: ${fmt(player.zeny)}`);
 
     // Label flips between Choose / Change based on whether a class is set.
-    // Always visible; the click handler gates by level.
-    const wantedLbl = player.classId ? '✦ Change Class' : '✦ Choose Class';
+    // Show escalating swap cost so the player can plan zeny spend.
+    let wantedLbl;
+    if (!player.classId) {
+      wantedLbl = '✦ Choose Class';
+    } else {
+      const cost = classSwitchCost();
+      wantedLbl = `✦ Change Class (${fmt(cost)}z)`;
+    }
     if (this.clText.text !== wantedLbl) this.clText.setText(wantedLbl);
+    // Dim button red when player can't afford the next swap.
+    const swapCost = player.classId ? classSwitchCost() : 0;
+    const canAfford = player.zeny >= swapCost;
+    this.clText.setColor(canAfford ? '#ffe066' : '#ff9999');
 
     // Quest tracker badge — color-coded per kind via tint hint in label.
     if (activeQuests.length) {
@@ -4000,7 +4042,7 @@ class UIManager {
     if (streak > 0 && !hudCompact) {
       const next = 5 - (streak % 5);
       const best = player.bestStreak || streak;
-      const label = `🔥 ×${streak}   next +${next === 5 ? 5 : next}   best ×${best}`;
+      const label = `🔥 ×${streak}   next in ${next}   best ×${best}`;
       if (this.streakText.text !== label) this.streakText.setText(label);
       this.streakBg.setVisible(true);
       this.streakText.setVisible(true);
