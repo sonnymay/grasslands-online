@@ -1,9 +1,9 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 42,
-> sit-to-regen + spawn plaza lanterns + clickable signpost. Cache
-> `?v=133`).
+> coding sessions. Last refresh: 2026-05-18 (post session 43,
+> O(N) autopilot + off-screen sway cull + resting heal float. Cache
+> `?v=134`).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -208,7 +208,32 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 42 (latest)
+## 3. What we did in session 43 (latest)
+
+Cache now at **`?v=134`**. Two more perf wins (invisible to player) plus
+one tactile cue for the sit-to-regen mechanic from session 42. All
+preserve the click-only design — no new buttons.
+
+1. **Autopilot density scan O(N²) → O(N).** With ~440 monsters at full
+   spawn density the nested neighbor loop ran 193k ops every 400 ms
+   scan. Replaced with a single 400-px Map bucket pre-pass; each
+   candidate then sums its own cell plus the 8 neighbors (covers a
+   ~3-cell ≈ 600-px radius). Same score formula, much cheaper.
+2. **Off-screen sway tween cull.** ~1.3k grass/flower sway tweens drive
+   ambient motion across the 19200² world; only the few hundred near
+   the player are visible. Three sway-spawning sites (`place()`,
+   `placeCluster()`, `placeLandmarkDeco()`) now register
+   `{img, tween}` into `scene.__swayProps`. Every 300 ms the main
+   update loop pauses tweens beyond 1400 px of the player and resumes
+   nearby ones. Big tween-manager win.
+3. **Resting heal float.** Sit-to-regen tick now spawns a green
+   `+N HP` float over the player so the buff is visible, not just
+   numerical. Already-shipped 💤 glyph still indicates the rest state.
+4. **Verification.** `node -c project-grasslands/game.js` exited 0.
+   Preview reload boots clean, no console errors.
+5. **Cache bump.** `?v=133` → `?v=134`.
+
+## 3.0. What we did in session 42
 
 Cache now at **`?v=133`**. Three RO-feel additions: tactile rest, town
 hub beauty, world-prop utility. All preserve the simple click-to-play
@@ -1778,7 +1803,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=133`**. Next change should use `?v=134`.
+  change. Current: **`?v=134`**. Next change should use `?v=135`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
