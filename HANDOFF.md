@@ -1,8 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 12:08am CDT (post session 28,
-> true viewport fullscreen + readable HUD/UI polish).
+> coding sessions. Last refresh: 2026-05-18 12:24am CDT (post session 28,
+> crisp screen-space HUD + visible cheat button).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -130,6 +130,8 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 - Phaser now uses `Scale.RESIZE` with `GAME_W/GAME_H` derived from the
   browser viewport. The game canvas fills the available browser surface
   instead of letterboxing a fixed 16:9 frame.
+- Phaser `resolution` is capped to device pixel ratio (max 2), and HUD text
+  objects use high-resolution text rendering to reduce blur.
 - Bottom status band: dark olive full-width backing with framed HP, EXP,
   Lv, and Zeny panels. Text is larger with heavy stroke for readability.
 - Chat box, bottom-left, last 10 messages, padded with stronger backing and
@@ -139,9 +141,14 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
   small yellow = loot. Faint dirt path drawn under markers.
 - Right toolbar is grouped into Navigation / Settings / Actions, with one
   shared olive button style and color reserved for state / call-to-action.
+- The `+1 Level` cheat button is visible in the normal right-side Actions
+  stack by request. `+10 Levels` and `-1 Level` remain debug-only.
 - Floating damage numbers: white (to player), red (to enemy), yellow
   bigger+`!` (crit), grey (`MISS`).
 - Player HP bar above sprite, hidden at full HP.
+- Monster nameplates are larger bold world-space labels with high-resolution
+  text, thick black outline, and a dark backing plate. Boss nameplates use a
+  slightly larger font.
 
 ### Day/night
 - Cosine-driven darkness overlay, 2-minute loop, max alpha 0.45.
@@ -200,9 +207,11 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ## 3. What we did in session 28 (latest, in order)
 
-Cache now at **`?v=105`**. Continued from Sonny's UI/HUD polish queue, then
+Cache now at **`?v=107`**. Continued from Sonny's UI/HUD polish queue, then
 responded to direct feedback that the game needed true fullscreen and the text
-was too small / hard to read. Pre-existing sprite asset changes were left
+was too small / hard to read. Follow-up feedback specifically called out
+monster names as too blurry/small, then requested a sharper screen-space HUD
+and the cheat button restored. Pre-existing sprite asset changes were left
 untouched.
 
 1. **Right-side toolbar unified.** Replaced the one-off stack of differently
@@ -228,14 +237,28 @@ untouched.
 6. **Toolbar readability pass.** Toolbar labels and buttons were enlarged,
    section headers got stronger stroke, and hidden debug buttons no longer
    reserve empty vertical space for normal players.
-7. **Cache bump.** `project-grasslands/index.html` now loads
-   `game.js?v=105`.
-8. **Verification:**
+7. **Monster nameplate readability.** Monster labels were 12px world-space
+   text, which effectively shrank under the 0.65 camera zoom. They now render
+   as larger bold high-resolution text with a thick outline plus a dark
+   backing rectangle; boss labels use a slightly larger font. The backing and
+   label are depth-synced above the monster so names stay readable while
+   moving.
+8. **Crisper screen-space HUD.** Phaser now renders the canvas at device-pixel
+   resolution (capped at 2), and HUD text objects are explicitly set to
+   high-resolution rendering. Quest, gear, boss ticker, streak, discovery, and
+   chat panels were widened and their text enlarged so they read as browser
+   edge UI instead of tiny scaled game labels.
+9. **Cheat button restored.** `⇧ +1 Level` is visible in the normal Actions
+   stack. The heavier `+10 Levels` and `-1 Level` controls still require
+   `debug=1` or `grasslands_debug_v1`.
+10. **Cache bump.** `project-grasslands/index.html` now loads
+   `game.js?v=107`.
+11. **Verification:**
    - `node -c project-grasslands/game.js` exited 0.
-   - `rg` confirmed `index.html` references `game.js?v=105`.
+   - `rg` confirmed `index.html` references `game.js?v=107`.
    - Browser preview was intentionally skipped after the user said not to
      spend more time/tokens on preview reloads.
-9. **Dirty asset caveat.** Before this session began, the working tree already
+12. **Dirty asset caveat.** Before this session began, the working tree already
    had eight modified `knight_*.png` files and ten untracked
    `wizard_*.png` files. This session left those asset changes untouched.
 
@@ -1308,7 +1331,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=105`**. Next change should use `?v=106`.
+  change. Current: **`?v=107`**. Next change should use `?v=108`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1431,7 +1454,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=105`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=107`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.

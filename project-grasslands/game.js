@@ -3,6 +3,7 @@
 
 const GAME_W = Math.max(1, Math.floor(window.innerWidth || 1280));
 const GAME_H = Math.max(1, Math.floor(window.innerHeight || 720));
+const UI_TEXT_RESOLUTION = Math.max(2, Math.min(3, window.devicePixelRatio || 2));
 const WORLD_W = 6400;
 const WORLD_H = 6400;
 const TILE_SIZE = 128;
@@ -232,6 +233,7 @@ const config = {
   height: GAME_H,
   backgroundColor: '#3a6b35',
   pixelArt: false,
+  resolution: Math.max(1, Math.min(2, window.devicePixelRatio || 1)),
   scale: {
     // RESIZE makes the canvas match the browser viewport instead of scaling a
     // fixed 16:9 frame into letterbox bars. Camera zoom stays independent.
@@ -2250,12 +2252,19 @@ class MonsterController {
       0.22
     ).setOrigin(0.5);
 
+    const nameFontSize = isBossCfg(cfg) ? '21px' : '19px';
+    this.nameBg = scene.add.rectangle(x, y, 10, isBossCfg(cfg) ? 30 : 27, 0x10180f, 0.72)
+      .setOrigin(0.5, 1)
+      .setStrokeStyle(2, colorValue(cfg.nameColor, 0xffffff), 0.72);
     this.nameTag = scene.add.text(x, y, `${cfg.name} Lv.${this.level}`, {
-      fontSize: '12px',
+      fontSize: nameFontSize,
+      fontStyle: 'bold',
       color: cfg.nameColor,
       stroke: '#000000',
-      strokeThickness: 3,
+      strokeThickness: 5,
+      resolution: 2,
     }).setOrigin(0.5, 1);
+    this.nameBg.width = this.nameTag.width + 22;
 
     this.hpBarBg = scene.add.rectangle(x, y, 40, 5, 0x000000).setOrigin(0.5);
     this.hpBar = scene.add.rectangle(x, y, 40, 5, 0xff3333).setOrigin(0, 0.5);
@@ -2326,9 +2335,16 @@ class MonsterController {
 
     this._syncShadow();
     const topY = this.sprite.y - this.sprite.displayHeight / 2;
-    this.nameTag.setPosition(this.sprite.x, topY - 6);
-    this.hpBarBg.setPosition(this.sprite.x, topY + 2);
-    this.hpBar.setPosition(this.sprite.x - 20, topY + 2);
+    const nameY = topY - 10;
+    const labelDepth = this.sprite.y + 90;
+    this.nameBg.setPosition(this.sprite.x, nameY + 3);
+    this.nameTag.setPosition(this.sprite.x, nameY);
+    this.nameBg.setDepth(labelDepth - 1);
+    this.nameTag.setDepth(labelDepth);
+    this.hpBarBg.setPosition(this.sprite.x, topY + 7);
+    this.hpBar.setPosition(this.sprite.x - 20, topY + 7);
+    this.hpBarBg.setDepth(labelDepth - 2);
+    this.hpBar.setDepth(labelDepth - 1);
     this.hpBar.width = 40 * Math.max(0, this.hp / this.maxHP);
   }
 
@@ -2354,6 +2370,7 @@ class MonsterController {
     this._syncShadow();
     this.hpBar.setVisible(false);
     this.hpBarBg.setVisible(false);
+    this.nameBg.setVisible(false);
     this.nameTag.setVisible(false);
     spawnDeathBurst(this.scene, this.sprite.x, this.sprite.y + 8, colorValue(this.cfg.tint || this.cfg.nameColor, 0xffffff));
     // Rare variant: grant N levels worth of EXP in one shot + huge fanfare.
@@ -2419,6 +2436,7 @@ class MonsterController {
       this.sprite.destroy();
       this.shadow.destroy();
       this.nameTag.destroy();
+      this.nameBg.destroy();
       this.hpBar.destroy();
       this.hpBarBg.destroy();
       const idx = bloblings.indexOf(this);
@@ -3544,6 +3562,10 @@ class UIManager {
   constructor(scene) {
     this.scene = scene;
     this.messages = [];
+    const crisp = (text) => {
+      if (text && text.setResolution) text.setResolution(UI_TEXT_RESOLUTION);
+      return text;
+    };
 
     // Bottom status band
     this.bottomH = 74;
@@ -3598,8 +3620,8 @@ class UIManager {
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10008).setAlpha(0.32);
 
     // Mini-map top-right.
-    this.miniW = 160;
-    this.miniH = 160;
+    this.miniW = Math.max(160, Math.min(190, Math.floor(GAME_W * 0.18)));
+    this.miniH = this.miniW;
     this.miniX = GAME_W - this.miniW - 10;
     this.miniY = 10;
     this.miniBg = scene.add.rectangle(this.miniX, this.miniY, this.miniW, this.miniH, 0x000000, 0.55)
@@ -3650,10 +3672,10 @@ class UIManager {
     const TOOLBAR_GOLD = '#ffe066';
     const TOOLBAR_RED = '#ff9999';
     const addSection = (label) => {
-      scene.add.text(btnX, toolbarY, label, {
+      crisp(scene.add.text(btnX, toolbarY, label, {
         fontSize: '11px', fontStyle: 'bold', color: '#d8e7bd',
         stroke: '#000', strokeThickness: 3,
-      }).setOrigin(0, 0).setScrollFactor(0).setDepth(10011);
+      }).setOrigin(0, 0).setScrollFactor(0).setDepth(10011));
       toolbarY += 17;
     };
     const addToolbarButton = (label, role = 'passive') => {
@@ -3664,12 +3686,12 @@ class UIManager {
         .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
         .setStrokeStyle(2, isAction ? 0xffe066 : isWarning ? 0xff7777 : TOOLBAR_STROKE, isAction ? 1 : 0.82)
         .setInteractive({ useHandCursor: true });
-      const text = scene.add.text(btnX + btnW / 2, y + btnH / 2, label, {
+      const text = crisp(scene.add.text(btnX + btnW / 2, y + btnH / 2, label, {
         fontSize: '14px',
         color: isAction ? TOOLBAR_GOLD : isWarning ? TOOLBAR_RED : role === 'toggle' ? TOOLBAR_MUTED : TOOLBAR_TEXT,
         stroke: '#000',
         strokeThickness: 3,
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(10011);
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(10011));
       toolbarY += btnH + 6;
       return { bg, text, y };
     };
@@ -3843,18 +3865,18 @@ class UIManager {
         localStorage.getItem('grasslands_debug_v1') === '1';
     } catch (e) { debugUi = false; }
 
-    if (debugUi) {
-      // Cheat button — manually bump level by 1. Triggers normal levelUp() so
-      // tier upgrades + class select prompt fire as if earned organically.
-      row = addToolbarButton('⇧ +1 Level', 'warning');
-      this.lvBg = row.bg;
-      this.lvText = row.text;
-      this.lvBg.on('pointerdown', () => {
-        if (!player || player.dead) return;
-        player.levelUp();
-      });
-      addTip(this.lvBg, 'Debug: gain 1 level', btnX, row.y + btnH / 2);
+    // Cheat button — visible by request. It manually bumps level by 1 and
+    // triggers normal levelUp() so tier upgrades + class select prompts fire.
+    row = addToolbarButton('⇧ +1 Level', 'warning');
+    this.lvBg = row.bg;
+    this.lvText = row.text;
+    this.lvBg.on('pointerdown', () => {
+      if (!player || player.dead) return;
+      player.levelUp();
+    });
+    addTip(this.lvBg, 'Cheat: gain 1 level', btnX, row.y + btnH / 2);
 
+    if (debugUi) {
       // +10 Levels cheat — bulk up for testing tier thresholds.
       row = addToolbarButton('⇧ +10 Levels', 'warning');
       this.lv10Bg = row.bg;
@@ -3910,16 +3932,17 @@ class UIManager {
     addTip(this.compactBg, 'Hide extra HUD chips + shrink chat', btnX, row.y + btnH / 2);
 
     // Quest tracker — top-left badge.
-    this.questBg = scene.add.rectangle(12, 12, 330, 58, 0x10180f, 0.78)
+    this.panelW = Math.max(360, Math.min(430, Math.floor(GAME_W * 0.42)));
+    this.questBg = scene.add.rectangle(12, 12, this.panelW, 64, 0x10180f, 0.78)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
       .setStrokeStyle(2, 0xb8d29b, 0.72);
     this.questText = scene.add.text(24, 22, '', {
-      fontSize: '15px', color: '#ffffff', stroke: '#000', strokeThickness: 4,
-      lineSpacing: 2,
+      fontSize: '16px', color: '#ffffff', stroke: '#000', strokeThickness: 4,
+      lineSpacing: 3, wordWrap: { width: this.panelW - 24 },
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
     this.questBg.setVisible(false);
     this.questText.setVisible(false);
-    this.gearBg = scene.add.rectangle(12, 78, 330, 40, 0x10180f, 0.74)
+    this.gearBg = scene.add.rectangle(12, 84, this.panelW, 44, 0x10180f, 0.74)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
       .setStrokeStyle(2, 0xb8d29b, 0.58)
       .setInteractive({ useHandCursor: true });
@@ -3935,38 +3958,38 @@ class UIManager {
       ui.message(`Weapon: ${wDesc}.  Armor: ${aDesc}.  Trophies: ${trophies}.`);
       showTrophyInspector(scene);
     });
-    this.gearText = scene.add.text(24, 87, '', {
-      fontSize: '14px', color: '#d8f7ff', stroke: '#000', strokeThickness: 3,
-      lineSpacing: 2,
+    this.gearText = scene.add.text(24, 94, '', {
+      fontSize: '15px', color: '#d8f7ff', stroke: '#000', strokeThickness: 3,
+      lineSpacing: 2, wordWrap: { width: this.panelW - 24 },
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
 
     // Boss ticker — small persistent line under the gear bar showing the
     // current biome's boss state (roaming / respawning in MM:SS).
-    this.bossTickerBg = scene.add.rectangle(12, 126, 330, 26, 0x10180f, 0.74)
+    this.bossTickerBg = scene.add.rectangle(12, 138, this.panelW, 30, 0x10180f, 0.74)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
       .setStrokeStyle(2, 0xff8866, 0.62);
-    this.bossTickerText = scene.add.text(24, 132, '', {
-      fontSize: '14px', color: '#ffcc99', stroke: '#000', strokeThickness: 3,
+    this.bossTickerText = scene.add.text(24, 145, '', {
+      fontSize: '15px', color: '#ffcc99', stroke: '#000', strokeThickness: 3,
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
     this.bossTickerBg.setVisible(false);
     this.bossTickerText.setVisible(false);
 
     // Discovery progress badge — show "Biomes: N/5" so player has a clear
     // completionist hook for visiting every landmark plaza.
-    this.discoveryBg = scene.add.rectangle(12, 190, 210, 26, 0x10180f, 0.74)
+    this.discoveryBg = scene.add.rectangle(12, 208, 240, 30, 0x10180f, 0.74)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
       .setStrokeStyle(2, 0xb8d29b, 0.58);
-    this.discoveryText = scene.add.text(24, 196, '', {
-      fontSize: '14px', fontStyle: 'bold', color: '#aaffcc',
+    this.discoveryText = scene.add.text(24, 215, '', {
+      fontSize: '15px', fontStyle: 'bold', color: '#aaffcc',
       stroke: '#000', strokeThickness: 3,
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
 
     // Hot-streak indicator — only visible when streak > 0.
-    this.streakBg = scene.add.rectangle(12, 158, 210, 26, 0x10180f, 0.74)
+    this.streakBg = scene.add.rectangle(12, 174, 240, 30, 0x10180f, 0.74)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
       .setStrokeStyle(2, 0xffaa33, 0.62);
-    this.streakText = scene.add.text(24, 164, '', {
-      fontSize: '14px', fontStyle: 'bold', color: '#ffcc66',
+    this.streakText = scene.add.text(24, 181, '', {
+      fontSize: '15px', fontStyle: 'bold', color: '#ffcc66',
       stroke: '#000', strokeThickness: 3,
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
     this.streakBg.setVisible(false);
@@ -3993,14 +4016,22 @@ class UIManager {
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10007).setVisible(false);
 
     // Chat box
-    this.chatW = 348;
+    this.chatW = Math.max(380, Math.min(460, Math.floor(GAME_W * 0.44)));
     this.chatBg = scene.add.rectangle(12, GAME_H - 232, this.chatW, 150, 0x10180f, 0.76)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10000)
       .setStrokeStyle(2, 0xb8d29b, 0.46);
     this.chatText = scene.add.text(24, GAME_H - 220, '', {
-      fontSize: '14px', color: '#ffffff', stroke: '#000', strokeThickness: 3,
-      lineSpacing: 2, wordWrap: { width: this.chatW - 24 },
+      fontSize: '16px', color: '#ffffff', stroke: '#000', strokeThickness: 4,
+      lineSpacing: 3, wordWrap: { width: this.chatW - 24 },
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10001);
+    for (const text of [
+      this.hpText, this.expText, this.lvlText, this.zenyText, this.saveGlyph,
+      this.miniHpText, this.tipText, this.mapZoomText, this.rsText,
+      this.tvText, this.muteText, this.apText, this.hmText, this.clText,
+      this.lvText, this.lv10Text, this.lvMText, this.shText, this.compactText,
+      this.questText, this.gearText, this.bossTickerText, this.discoveryText,
+      this.streakText, this.bossText, this.bossTimerText, this.chatText,
+    ]) crisp(text);
     this.applyCompactHud();
   }
 
