@@ -1459,7 +1459,26 @@ function buildMap(scene) {
       }
       // Zone tint only when we're still drawing the grass tileset for a
       // non-grasslands biome. Real biome tiles are already the right palette.
-      if (tilesetKey === 'grass_tileset') {
+      // Per-tile micro RGB jitter (±8) + small alpha jitter breaks the
+      // visible 128 px grid by giving neighbors slightly different
+      // brightness/hue, so the eye stops reading the sharp square pattern.
+      const jitterTint = (base) => {
+        const r = (base >> 16) & 0xff, g = (base >> 8) & 0xff, b = base & 0xff;
+        const j = () => Phaser.Math.Between(-8, 8);
+        const cl = (v) => Math.max(0, Math.min(255, v + j()));
+        return (cl(r) << 16) | (cl(g) << 8) | cl(b);
+      };
+      if (type === 'grass') {
+        if (tilesetKey === 'grass_tileset') {
+          const tint = ZONE_TINTS[zone] || 0xffffff;
+          img.setTint(jitterTint(tint));
+        } else {
+          // Biome tileset already correct palette — jitter from white
+          // shifts each tile imperceptibly, breaking grid recognition.
+          img.setTint(jitterTint(0xffffff));
+        }
+        img.setAlpha(0.95 + Math.random() * 0.05);
+      } else if (tilesetKey === 'grass_tileset') {
         const tint = ZONE_TINTS[zone];
         if (tint && tint !== 0xffffff) img.setTint(tint);
       }
@@ -1891,6 +1910,34 @@ function buildDecorations(scene) {
       if (getCellType(r, c) === 'grass') continue;
       protect(c * TILE_SIZE + TILE_SIZE / 2, r * TILE_SIZE + TILE_SIZE / 2);
     }
+  }
+
+  // Soft-blob overlay pass — breaks the 128 px tile grid visually by
+  // scattering large translucent decoration sprites at sub-tile offsets.
+  // Depth -800 sits between map tiles (-1000) and props (-500/-620) so
+  // these blur the grid but don't obscure objects on the ground plane.
+  // Skip dry biomes (desert/ruins) — those should read crisp and barren.
+  const softKeys = [...flowerKeys, ...grassKeys];
+  const softCount = 480;
+  for (let i = 0; i < softCount; i++) {
+    const x = Phaser.Math.Between(0, WORLD_W);
+    const y = Phaser.Math.Between(0, WORLD_H);
+    const tile_r = Math.floor(y / TILE_SIZE), tile_c = Math.floor(x / TILE_SIZE);
+    const z = getZone(tile_r, tile_c);
+    if (z === 'desert' || z === 'ruins') continue;
+    if (getCellType(tile_r, tile_c) !== 'grass') continue;
+    const key = Phaser.Utils.Array.GetRandom(softKeys);
+    if (!scene.textures.exists(key)) continue;
+    const img = scene.add.image(x, y, key);
+    const baseH = Phaser.Math.Between(160, 240);
+    img.setScale(baseH / img.height);
+    img.setAlpha(Phaser.Math.FloatBetween(0.12, 0.20));
+    img.setAngle(Phaser.Math.Between(0, 359));
+    img.setDepth(-800);
+    // Subtle biome wash so overlays don't look like raw flowers floating.
+    if (z === 'forest') img.setTint(0xb8d8a0);
+    else if (z === 'riverside') img.setTint(0xc8e8d8);
+    else img.setTint(0xd8e8c0);
   }
 }
 
