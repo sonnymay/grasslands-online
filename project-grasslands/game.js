@@ -127,7 +127,7 @@ const MONSTER_TYPES = {
     idleKey: 'bigfoot_idle', hitKey: 'bigfoot_hit', deadKey: 'bigfoot_dead',
     aggroKey: 'bigfoot_aggro', chaseKey: 'bigfoot_chase', attackKey: 'bigfoot_attack',
     maxHP: 900, atk: 220, expReward: 500, speed: 45,
-    nameColor: '#ff4444', count: BIGFOOT_COUNT, scaleMult: 2.2,
+    nameColor: '#ff4444', count: BIGFOOT_COUNT, scaleMult: 6.6,
     fixedLevel: 50, noLevelScaling: true, aggressive: true, aggroRange: 520, oneShotBelowLevel: 50,
     zones: ['forest'],
     minSpawnDistance: 2400, // keep him in far forest so new players don't walk into a one-shot

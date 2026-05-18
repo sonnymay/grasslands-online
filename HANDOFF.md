@@ -283,6 +283,9 @@ wheel-zoom feature. All HUD work landed; gameplay logic untouched.
    from `-14` to `-18` so the two lines don't kiss with the bigger type.
    Reads cleanly on grass, sand, and ruins backdrops.
 12. **Cache bump.** `?v=112` → `?v=113`.
+13. **Bigfoot 3× bigger.** `MONSTER_TYPES.bigfoot.scaleMult` 2.2 → 6.6 to
+    match Sonny's "make him 3× bigger" feedback. Lore/stats untouched.
+14. **Cache bump.** `?v=113` → `?v=114`.
 7. **Verification.** `node -c project-grasslands/game.js` exited 0 after
    every edit. Browser preview was intentionally skipped — Sonny asked us
    to save tokens once the live wedge from rapid `location.reload()` cycles
@@ -1416,7 +1419,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=113`**. Next change should use `?v=114`.
+  change. Current: **`?v=114`**. Next change should use `?v=115`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1539,7 +1542,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=113`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=114`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.
