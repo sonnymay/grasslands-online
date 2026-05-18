@@ -1766,6 +1766,26 @@ class PlayerController {
     spawnFootstepDust(this.scene, this.stepFromX, this.stepFromY, this.cellCol, this.cellRow);
   }
 
+  _hasDirectionalTexture(dir, frame) {
+    const info = DIR_TEXTURE[dir] || DIR_TEXTURE.south;
+    const frameSeg =
+        (frame === 'walk')  ? 'walk_'
+      : (frame === 'walk2') ? 'walk2_'
+      : (frame === 'walk3') ? 'walk3_'
+      : (frame === 'walk4') ? 'walk4_'
+      : 'idle_';
+    const classDef = (this.classId && CLASS_DEFS[this.classId]) ? CLASS_DEFS[this.classId] : null;
+    const exists = (k) => this.scene.textures.exists(k);
+    if (classDef) {
+      const tierPrefix = classDef.tierSpritePrefixes
+        ? classDef.tierSpritePrefixes[this.classTier]
+        : null;
+      const prefixes = tierPrefix ? [tierPrefix, classDef.spritePrefix] : [classDef.spritePrefix];
+      return prefixes.some(prefix => exists(prefix + frameSeg + info.base));
+    }
+    return exists('rookie_' + frameSeg + info.base);
+  }
+
   // Pick which walk frame to show for the current step progress t∈[0,1].
   // The generated frame sets are inconsistent by direction, so choose only the
   // two frames that face the correct way for each direction.
@@ -1784,7 +1804,10 @@ class PlayerController {
     // RO-like sprites use a timer-driven animation state. Keep animation timing
     // independent of the 32px path cell, with idle as a pass pose between feet.
     const idx = Math.floor(time / WALK_FRAME_MS) % cycle.length;
-    return cycle[idx];
+    const frame = cycle[idx];
+    if (this._hasDirectionalTexture(dir, frame)) return frame;
+    if (frame !== 'idle' && this._hasDirectionalTexture(dir, 'walk')) return 'walk';
+    return 'idle';
   }
 
   _syncShadow() {

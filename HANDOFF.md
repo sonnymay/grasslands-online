@@ -1,9 +1,9 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 33,
-> per-biome weighted terrain tile rolls so each zone has stronger ground
-> personality without new art. Code-only, bright/readable world preserved).
+> coding sessions. Last refresh: 2026-05-18 (post session 34,
+> player walk animation no longer spins through south-facing fallback frames.
+> Code-only, RO-style directional walking readability fix).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -208,7 +208,29 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 33 (latest)
+## 3. What we did in session 34 (latest)
+
+Cache now at **`?v=126`**. Sonny reported that the character body kept
+spinning while walking; goal was Ragnarok Online-style directional walking.
+
+1. **Root cause.** Class sprites only have `walk_<dir>` and `idle_<dir>`
+   frames, while `_pickWalkFrame()` was asking for `walk2` / `walk3`
+   variants. `pickPlayerTextureKey()` then fell back to `walk_south`, so a
+   north/east/diagonal step briefly showed a south-facing body. That read as
+   spinning.
+2. **Directional frame guard.** `PlayerController._hasDirectionalTexture()`
+   now checks whether the chosen walk frame exists for the active direction
+   and class/tier prefix. If `walk2` / `walk3` is missing but `walk_<dir>`
+   exists, the animation uses that directional walk frame instead of the
+   south fallback. If no directional walk exists, it falls back to directional
+   idle.
+3. **Rookie 4-frame animation preserved.** Rookie sprites still use their
+   existing `walk2` / `walk3` / `walk4` directional frames because they
+   exist on disk.
+4. **Verification.** `node -c project-grasslands/game.js` exited 0.
+5. **Cache bump.** `?v=125` → `?v=126`.
+
+## 3.1. What we did in session 33
 
 Cache now at **`?v=125`**. Continued Sonny's "beautiful like Ragnarok
 Online" map pass with no new art and no atmospheric darkening.
@@ -231,7 +253,7 @@ Online" map pass with no new art and no atmospheric darkening.
 4. **Verification.** `node -c project-grasslands/game.js` exited 0.
 5. **Cache bump.** `?v=124` → `?v=125`.
 
-## 3.1. What we did in session 32
+## 3.2. What we did in session 32
 
 Cache now at **`?v=124`**. Sonny: "make it beautiful like Ragnarok
 Online." No new art yet — push the existing decoration set as far as it
@@ -256,7 +278,7 @@ goes via density + cluster patches.
 4. **Verification.** `node -c project-grasslands/game.js` exited 0.
 5. **Cache bump.** `?v=124` → `?v=124`.
 
-## 3.2. What we did in session 31
+## 3.3. What we did in session 31
 
 Cache now at **`?v=124`**. Pure-code map polish ahead of new art landing.
 
