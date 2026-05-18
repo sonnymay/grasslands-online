@@ -1,7 +1,7 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 6:55pm CDT (post session 25,
+> coding sessions. Last refresh: 2026-05-17 8:40pm CDT (post session 26,
 > Tier-2 Knight browser verification).
 
 ---
@@ -186,7 +186,31 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 25 (latest, in order)
+## 3. What we did in session 26 (latest, in order)
+
+Cache now at **`?v=97`**. Picked two items from §4 queue.
+
+1. **Class-switch zeny cost** (item #3) — `classSwitchCost()` returns 0 for
+   the first class pick and `min(80000, 5000 * 2^n)` for swaps (5k → 10k →
+   20k → 40k → 80k cap). `selectClass` deducts zeny on every swap and bumps
+   `player.classSwitches`. Both the Change Class click handler and the card
+   `pointerdown` re-check affordability so the player can't bypass by spending
+   between the menu open and the card click.
+2. **Change Class HUD readout** — button label now reads
+   `✦ Change Class (10,000z)` once a class is set, and the text turns red
+   (`#ff9999`) when the player can't cover the next swap.
+3. **Hot-streak label clarity** (bug from §17) — `🔥 ×N   next +M` →
+   `🔥 ×N   next in M`. M is kills until the next bonus tier, so the prior
+   wording read like a flat bonus amount. Cosmetic only.
+4. **Save schema** — added `classSwitches` to `saveGame()` / `applySave()`.
+5. **Browser verify attempt** — Phaser loader wedged at 32/111 across
+   reloads (audio decoder hang from rapid back-to-back `location.reload`).
+   Logic-only change passed `node -c`; the wedge is independent of these
+   edits. Cleanly close + reopen the preview tab to verify next session.
+
+Commit: `f072fb7` (pushed to main; Vercel auto-deploy).
+
+### (legacy) session 25
 
 Verification-only follow-up for the Tier-2 Knight work. No cache bump or code
 change.
@@ -503,9 +527,8 @@ The user is paused while context recharges. Pick freely.
 2. **Cosmetic title above name** — picked from milestones (e.g.
    "Plaza Wanderer" after all 5 landmarks, "Boss Hunter" after
    5 trophies). Visible above the level/title nameTag.
-3. **Class switch cost** — first class pick is free; subsequent
-   switches via the chooser cost an increasing amount of zeny.
-   Currently free + risk-free.
+3. ~~**Class switch cost**~~ — DONE in session 26. First pick free;
+   swap cost 5k → 10k → 20k → 40k → 80k zeny (cap).
 4. **Quest pity timer** — if the player hasn't completed the same
     quest in N minutes, increase its reward each tick so unwanted
     quest mobs eventually pay out.
@@ -523,8 +546,8 @@ The user is paused while context recharges. Pick freely.
     spawn with AI clones of each class to fight for practice.
 
 **Known small bugs / nits noticed in this session:**
-- The hot-streak `next +M` label uses modulo math; the very first
-  bonus tier (×5) shows `next +5` instead of `next +0`. Cosmetic.
+- ~~Hot-streak `next +M` label~~ — fixed in session 26 by relabeling
+  to `next in M` (kills-until-next, not bonus amount).
 - `nearLandmark`/`landmarkTiles` use tile coords; the
   panic-heal landmark check converts via
   `TILE_SIZE / CELL_SIZE = 4`. If that ratio ever changes the
@@ -1110,7 +1133,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=96`**. Next change should use `?v=97`.
+  change. Current: **`?v=97`**. Next change should use `?v=98`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1233,7 +1256,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=96`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=97`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.
