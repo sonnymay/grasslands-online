@@ -4777,7 +4777,7 @@ class UIManager {
       else if (m.typeId === 'moodeng') color = 0xff9fcf;
       else if (m.typeId === 'cactling') color = 0xbce86a;
       else if (m.typeId === 'rare_mooham') { color = 0xffe066; r = 4; outline = 0xffffff; }
-      else if (m.typeId === 'bigfoot') { color = 0xff2222; r = 5; outline = 0x000000; }
+      else if (['bigfoot', 'trex', 'kaiju_titan'].includes(m.typeId)) { color = 0xff2222; r = 5; outline = 0x000000; }
       else if (m.typeId === 'rare_moowaan') { color = 0x7cffb0; r = 4; outline = 0xffffff; }
       else if (isBossCfg(m.cfg)) { color = m.cfg.tint || 0xffff44; r = 4; outline = 0x000000; }
       const pos = toMini(m.sprite.x, m.sprite.y);

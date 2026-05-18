@@ -1,9 +1,9 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 39,
-> Tier 0 map art wired: forest/ruins/riverside tilesets, landmark hero props,
-> and first biome decoration pack. Cache `?v=130`).
+> coding sessions. Last refresh: 2026-05-18 (post session 40,
+> T-Rex and Kaiju Titan minimap markers changed to red boss markers. Cache
+> `?v=131`).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -208,7 +208,17 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 39 (latest)
+## 3. What we did in session 40 (latest)
+
+Cache now at **`?v=131`**.
+
+1. **T-Rex and Kaiju Titan minimap markers are red.** `drawMinimap()` now
+   treats `bigfoot`, `trex`, and `kaiju_titan` as the same large red boss
+   marker with black outline.
+2. **Verification.** `node -c project-grasslands/game.js` exited 0.
+3. **Cache bump.** `?v=130` → `?v=131`.
+
+## 3.1. What we did in session 39
 
 Cache now at **`?v=130`**. Wired the imported Tier 0 map-art assets so the
 world actually uses the generated tilesets, landmark props, and first deco
@@ -232,7 +242,7 @@ pack.
 5. **Verification.** `node -c project-grasslands/game.js` exited 0.
 6. **Cache bump.** `?v=129` → `?v=130`.
 
-## 3.1. What we did in session 38
+## 3.2. What we did in session 38
 
 Cache now at **`?v=129`**. Sonny generated three MooDeng images and asked
 to move + wire them as a normal monster.
@@ -250,7 +260,7 @@ to move + wire them as a normal monster.
 5. **Verification.** `node -c project-grasslands/game.js` exited 0.
 6. **Cache bump.** `?v=128` → `?v=129`.
 
-## 3.2. What we did in session 37
+## 3.3. What we did in session 37
 
 Cache now at **`?v=128`**. Sonny generated boss-style T-Rex and original
 kaiju sprite sets and asked for both to behave like Bigfoot: one monster
@@ -271,7 +281,7 @@ each, giant scale, aggressive chase, different zones.
 5. **Verification.** `node -c project-grasslands/game.js` exited 0.
 6. **Cache bump.** `?v=127` → `?v=128`.
 
-## 3.3. What we did in session 36
+## 3.4. What we did in session 36
 
 Cache stays at **`?v=127`** — asset import only, no `game.js` or
 `index.html` change.
@@ -293,7 +303,7 @@ Cache stays at **`?v=127`** — asset import only, no `game.js` or
 3. **Not wired yet.** Next code pass should load/slice one biome tileset or
    attach one landmark prop set at a time, with cache bump and `node -c`.
 
-## 3.4. What we did in session 35
+## 3.5. What we did in session 35
 
 Cache now at **`?v=127`**. Continued the Ragnarok Online-style beauty pass
 with two code-only map readability upgrades: destinations and grounding.
@@ -317,7 +327,7 @@ with two code-only map readability upgrades: destinations and grounding.
 5. **Verification.** `node -c project-grasslands/game.js` exited 0.
 6. **Cache bump.** `?v=126` → `?v=127`.
 
-## 3.5. What we did in session 34
+## 3.6. What we did in session 34
 
 Cache now at **`?v=126`**. Sonny reported that the character body kept
 spinning while walking; goal was Ragnarok Online-style directional walking.
@@ -339,7 +349,7 @@ spinning while walking; goal was Ragnarok Online-style directional walking.
 4. **Verification.** `node -c project-grasslands/game.js` exited 0.
 5. **Cache bump.** `?v=125` → `?v=126`.
 
-## 3.6. What we did in session 33
+## 3.7. What we did in session 33
 
 Cache now at **`?v=125`**. Continued Sonny's "beautiful like Ragnarok
 Online" map pass with no new art and no atmospheric darkening.
@@ -362,7 +372,7 @@ Online" map pass with no new art and no atmospheric darkening.
 4. **Verification.** `node -c project-grasslands/game.js` exited 0.
 5. **Cache bump.** `?v=124` → `?v=125`.
 
-## 3.7. What we did in session 32
+## 3.8. What we did in session 32
 
 Cache now at **`?v=124`**. Sonny: "make it beautiful like Ragnarok
 Online." No new art yet — push the existing decoration set as far as it
@@ -387,7 +397,7 @@ goes via density + cluster patches.
 4. **Verification.** `node -c project-grasslands/game.js` exited 0.
 5. **Cache bump.** `?v=124` → `?v=124`.
 
-## 3.8. What we did in session 31
+## 3.9. What we did in session 31
 
 Cache now at **`?v=124`**. Pure-code map polish ahead of new art landing.
 
