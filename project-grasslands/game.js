@@ -809,6 +809,62 @@ function create() {
   // RO camera reveals ~12-15 tiles wide — zoom out a touch.
   scene.cameras.main.setZoom(0.65);
 
+  // ------- Mouse-wheel zoom -------
+  // Wheel up zooms in, wheel down zooms out. The main camera follows the
+  // player (set above with startFollow), so the world stays centered on the
+  // player as zoom changes. The UI camera (created below) has its own zoom
+  // and is unaffected, so the HUD stays crisp at its authored size.
+  const ZOOM_MIN = 0.4;
+  const ZOOM_MAX = 1.6;
+  const ZOOM_STEP = 1.12;
+  scene.input.on('wheel', (_pointer, _objs, _dx, dy) => {
+    const cam = scene.cameras.main;
+    const factor = dy < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+    cam.zoom = Phaser.Math.Clamp(cam.zoom * factor, ZOOM_MIN, ZOOM_MAX);
+  });
+
+  // ------- Screen-space UI camera -------
+  // The main world camera has zoom 0.65, which silently shrinks every
+  // setScrollFactor(0) HUD object to 65% of its authored size and softens
+  // the antialiased text. To keep the HUD crisp and at its real size, we
+  // render it on a second camera that never zooms. The main camera ignores
+  // every UI Game Object; the UI camera ignores everything else.
+  //
+  // Sorting is automatic via the ADDED_TO_SCENE event. Because the scroll
+  // factor isn't set yet at the moment the event fires (chained `.setScrollFactor(0)`
+  // runs after), we queue new objects and classify them on POSTUPDATE.
+  const uiCam = scene.cameras.add(0, 0, scene.scale.width, scene.scale.height);
+  uiCam.setName('ui').setScroll(0, 0);
+  scene.__uiCam = uiCam;
+  const newlyAdded = [];
+  scene.events.on(Phaser.Scenes.Events.ADDED_TO_SCENE, (obj) => {
+    newlyAdded.push(obj);
+  });
+  const classify = (obj) => {
+    if (!obj || !obj.scene) return;
+    // Some objects (graphics, containers) report undefined scrollFactor;
+    // treat anything explicitly zeroed as UI.
+    const isUI = obj.scrollFactorX === 0 && obj.scrollFactorY === 0;
+    if (isUI) {
+      scene.cameras.main.ignore(obj);
+    } else {
+      uiCam.ignore(obj);
+    }
+  };
+  scene.events.on(Phaser.Scenes.Events.POSTUPDATE, () => {
+    if (!newlyAdded.length) return;
+    while (newlyAdded.length) classify(newlyAdded.shift());
+  });
+  // First-pass sort of everything already in the scene before UIManager runs.
+  scene.events.once(Phaser.Scenes.Events.UPDATE, () => {
+    for (const obj of scene.children.list) classify(obj);
+  });
+  // Keep the UI camera matching the browser viewport on resize.
+  scene.scale.on('resize', (gameSize) => {
+    uiCam.setSize(gameSize.width, gameSize.height);
+    if (ui && typeof ui.relayout === 'function') ui.relayout(gameSize.width, gameSize.height);
+  });
+
   // Tab cycles to the nearest live monster as the new attack target.
   scene.input.keyboard.on('keydown-TAB', (e) => {
     if (e.preventDefault) e.preventDefault();
@@ -3559,52 +3615,53 @@ class UIManager {
       return text;
     };
 
-    // Bottom status band
-    this.bottomH = 74;
-    this.bar = scene.add.rectangle(0, GAME_H - this.bottomH, GAME_W, this.bottomH, 0x162316, 0.88)
+    // Bottom status band — slim full-width player HUD bar.
+    this.bottomH = 56;
+    this.bar = scene.add.rectangle(0, GAME_H - this.bottomH, GAME_W, this.bottomH, 0x10180f, 0.88)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10000)
       .setStrokeStyle(2, 0x3f5732, 0.9);
-    this.hpBarW = Math.max(220, Math.min(340, GAME_W * 0.28));
+    this.hpBarW = Math.max(220, Math.min(320, GAME_W * 0.22));
     const bottomY = GAME_H - this.bottomH;
-    const hpX = 24;
-    const hpY = bottomY + 27;
+    const hpX = 20;
+    const hpY = bottomY + this.bottomH / 2;
     const statusW = 170;
-    const statusX = GAME_W - statusW - 24;
-    const expX = hpX + this.hpBarW + 36;
-    this.expBarW = Math.max(260, statusX - expX - 36);
-    const expY = bottomY + 27;
-    const panelH = 34;
+    const statusX = GAME_W - statusW - 20;
+    const expX = hpX + this.hpBarW + 28;
+    this.expBarW = Math.max(220, statusX - expX - 28);
+    const expY = hpY;
+    const panelH = 30;
+    const barH = 16;
 
-    this.hpPanel = scene.add.rectangle(hpX - 10, hpY - panelH / 2, this.hpBarW + 20, panelH, 0x0d150d, 0.62)
+    this.hpPanel = scene.add.rectangle(hpX - 8, hpY - panelH / 2, this.hpBarW + 16, panelH, 0x0d150d, 0.6)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10001)
-      .setStrokeStyle(1, 0xb8d29b, 0.45);
-    this.hpBg = scene.add.rectangle(hpX, hpY, this.hpBarW, 16, 0x2c302a)
+      .setStrokeStyle(1, 0xb8d29b, 0.4);
+    this.hpBg = scene.add.rectangle(hpX, hpY, this.hpBarW, barH, 0x2c302a)
       .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10002);
-    this.hpFill = scene.add.rectangle(hpX, hpY, this.hpBarW, 16, 0xcc3333)
+    this.hpFill = scene.add.rectangle(hpX, hpY, this.hpBarW, barH, 0xcc3333)
       .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10003);
     this.hpText = scene.add.text(hpX + this.hpBarW / 2, hpY, '', {
-      fontSize: '16px', color: '#fff7ef', stroke: '#000', strokeThickness: 4,
+      fontSize: '15px', fontStyle: 'bold', color: '#fff7ef', stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
 
-    this.expPanel = scene.add.rectangle(expX - 10, expY - panelH / 2, this.expBarW + 20, panelH, 0x0d150d, 0.62)
+    this.expPanel = scene.add.rectangle(expX - 8, expY - panelH / 2, this.expBarW + 16, panelH, 0x0d150d, 0.6)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10001)
-      .setStrokeStyle(1, 0xb8d29b, 0.45);
-    this.expBg = scene.add.rectangle(expX, expY, this.expBarW, 16, 0x2c302a)
+      .setStrokeStyle(1, 0xb8d29b, 0.4);
+    this.expBg = scene.add.rectangle(expX, expY, this.expBarW, barH, 0x2c302a)
       .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10002);
-    this.expFill = scene.add.rectangle(expX, expY, this.expBarW, 16, 0x8e50d6)
+    this.expFill = scene.add.rectangle(expX, expY, this.expBarW, barH, 0x8e50d6)
       .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10003);
     this.expText = scene.add.text(expX + this.expBarW / 2, expY, '', {
-      fontSize: '16px', color: '#fff7ef', stroke: '#000', strokeThickness: 4,
+      fontSize: '15px', fontStyle: 'bold', color: '#fff7ef', stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
 
-    this.statusPanel = scene.add.rectangle(statusX, bottomY + 14, statusW, 46, 0x0d150d, 0.68)
+    this.statusPanel = scene.add.rectangle(statusX, bottomY + (this.bottomH - 40) / 2, statusW, 40, 0x0d150d, 0.66)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10001)
       .setStrokeStyle(1, 0xffe066, 0.5);
-    this.lvlText = scene.add.text(statusX + statusW / 2, bottomY + 27, 'Lv.1', {
-      fontSize: '20px', color: '#ffff88', stroke: '#000', strokeThickness: 4,
+    this.lvlText = scene.add.text(statusX + statusW * 0.32, hpY, 'Lv.1', {
+      fontSize: '18px', fontStyle: 'bold', color: '#ffff88', stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
-    this.zenyText = scene.add.text(statusX + statusW / 2, bottomY + 48, 'Zeny: 0', {
-      fontSize: '15px', color: '#ffd24a', stroke: '#000', strokeThickness: 4,
+    this.zenyText = scene.add.text(statusX + statusW * 0.72, hpY, '0z', {
+      fontSize: '15px', fontStyle: 'bold', color: '#ffd24a', stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
 
     // Auto-save indicator — dim idle glyph that pulses whenever saveGame()
@@ -3613,26 +3670,20 @@ class UIManager {
       fontSize: '18px', color: '#d8f7ff', stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10008).setAlpha(0.32);
 
-    // Mini-map top-right.
-    this.miniW = Math.max(160, Math.min(190, Math.floor(GAME_W * 0.18)));
+    // Mini-map top-right — anchored to viewport right edge.
+    this.miniW = Math.max(150, Math.min(180, Math.floor(GAME_W * 0.14)));
     this.miniH = this.miniW;
-    this.miniX = GAME_W - this.miniW - 10;
-    this.miniY = 10;
+    this.miniX = GAME_W - this.miniW - 12;
+    this.miniY = 12;
     this.miniBg = scene.add.rectangle(this.miniX, this.miniY, this.miniW, this.miniH, 0x000000, 0.55)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10010);
     this.miniBorder = scene.add.rectangle(this.miniX, this.miniY, this.miniW, this.miniH)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10012)
       .setStrokeStyle(2, 0xffffff, 0.9).setFillStyle();
     this.miniGfx = scene.add.graphics().setScrollFactor(0).setDepth(10011);
-    const miniHpY = this.miniY + this.miniH + 6;
-    this.miniHpBg = scene.add.rectangle(this.miniX, miniHpY, this.miniW, 16, 0x1b1b1b, 0.85)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
-      .setStrokeStyle(1, 0xffffff, 0.7);
-    this.miniHpFill = scene.add.rectangle(this.miniX + 2, miniHpY + 2, this.miniW - 4, 12, 0xcc2222, 0.95)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10011);
-    this.miniHpText = scene.add.text(this.miniX + this.miniW / 2, miniHpY + 8, '', {
-      fontSize: '12px', color: '#ffffff', stroke: '#000', strokeThickness: 3,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10012);
+    // Duplicate HP bar under the minimap was removed — the player HUD at the
+    // bottom of the screen is the single source of truth for HP.
+    const miniHpY = this.miniY + this.miniH;
 
     this.tipBg = scene.add.rectangle(0, 0, 10, 22, 0x000000, 0.86)
       .setOrigin(1, 0.5).setScrollFactor(0).setDepth(12000)
@@ -3656,9 +3707,9 @@ class UIManager {
       });
     };
 
-    const btnW = 128, btnH = 30;
-    const btnX = this.miniX + 16;
-    let toolbarY = miniHpY + 22;
+    const btnW = this.miniW - 8, btnH = 26;
+    const btnX = this.miniX + 4;
+    let toolbarY = miniHpY + 12;
     const TOOLBAR_FILL = 0x142018;
     const TOOLBAR_STROKE = 0xb8d29b;
     const TOOLBAR_TEXT = '#f2f7df';
@@ -3667,54 +3718,35 @@ class UIManager {
     const TOOLBAR_RED = '#ff9999';
     const addSection = (label) => {
       crisp(scene.add.text(btnX, toolbarY, label, {
-        fontSize: '11px', fontStyle: 'bold', color: '#d8e7bd',
-        stroke: '#000', strokeThickness: 3,
+        fontSize: '10px', fontStyle: 'bold', color: '#d8e7bd',
+        stroke: '#000', strokeThickness: 2,
       }).setOrigin(0, 0).setScrollFactor(0).setDepth(10011));
-      toolbarY += 17;
+      toolbarY += 14;
     };
     const addToolbarButton = (label, role = 'passive') => {
       const y = toolbarY;
       const isAction = role === 'action';
       const isWarning = role === 'warning';
-      const bg = scene.add.rectangle(btnX, y, btnW, btnH, isWarning ? 0x2f1a18 : TOOLBAR_FILL, 0.88)
+      const bg = scene.add.rectangle(btnX, y, btnW, btnH, isWarning ? 0x2f1a18 : TOOLBAR_FILL, 0.86)
         .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
-        .setStrokeStyle(2, isAction ? 0xffe066 : isWarning ? 0xff7777 : TOOLBAR_STROKE, isAction ? 1 : 0.82)
+        .setStrokeStyle(1, isAction ? 0xffe066 : isWarning ? 0xff7777 : TOOLBAR_STROKE, isAction ? 1 : 0.78)
         .setInteractive({ useHandCursor: true });
       const text = crisp(scene.add.text(btnX + btnW / 2, y + btnH / 2, label, {
-        fontSize: '14px',
+        fontSize: '12px', fontStyle: 'bold',
         color: isAction ? TOOLBAR_GOLD : isWarning ? TOOLBAR_RED : role === 'toggle' ? TOOLBAR_MUTED : TOOLBAR_TEXT,
         stroke: '#000',
-        strokeThickness: 3,
+        strokeThickness: 2,
       }).setOrigin(0.5).setScrollFactor(0).setDepth(10011));
-      toolbarY += btnH + 6;
+      toolbarY += btnH + 4;
       return { bg, text, y };
     };
 
     addSection('NAVIGATION');
-    // Mini-map zoom toggle — cycle from whole-world view to local detail.
-    const MAP_ZOOM_KEY = 'grasslands_minimap_zoom_v1';
-    const MAP_ZOOMS = [1, 2, 3];
-    let mapZoomIdx = 0;
-    try {
-      const saved = parseInt(localStorage.getItem(MAP_ZOOM_KEY), 10);
-      const idx = MAP_ZOOMS.indexOf(saved);
-      if (idx >= 0) mapZoomIdx = idx;
-    } catch (e) { mapZoomIdx = 0; }
-    minimapZoom = MAP_ZOOMS[mapZoomIdx];
-    let row = addToolbarButton(`Map ${minimapZoom}x`, 'toggle');
-    this.mapZoomBg = row.bg;
-    this.mapZoomText = row.text;
-    this.mapZoomBg.on('pointerdown', () => {
-      mapZoomIdx = (mapZoomIdx + 1) % MAP_ZOOMS.length;
-      minimapZoom = MAP_ZOOMS[mapZoomIdx];
-      this.mapZoomText.setText(`Map ${minimapZoom}x`);
-      try { localStorage.setItem(MAP_ZOOM_KEY, String(minimapZoom)); } catch (e) { /* ignore */ }
-      ui.message(`Mini-map zoom: ${minimapZoom}x.`);
-    });
-    addTip(this.mapZoomBg, 'Cycle mini-map zoom (1x/2x/3x)', btnX, row.y + btnH / 2);
+    // Mini-map zoom button was removed from the HUD. minimapZoom stays at its
+    // default (1) so the mini-map renders the whole world.
 
     // Return-to-spawn (Kafra warp). Instant teleport, no cost yet.
-    row = addToolbarButton('⌂ Return Home', 'passive');
+    let row = addToolbarButton('⌂ Return Home', 'passive');
     this.rsBg = row.bg;
     this.rsText = row.text;
     this.rsBg.on('pointerdown', () => {
@@ -3806,28 +3838,8 @@ class UIManager {
     });
     addTip(this.apBg, 'Auto-target safe quest monsters', btnX, row.y + btnH / 2);
 
-    // Hard Mode toggle — doubles monster damage, EXP, and zeny.
-    const HARD_KEY = 'grasslands_hardmode_v1';
-    try { hardMode = localStorage.getItem(HARD_KEY) === '1'; } catch (e) { hardMode = false; }
-    row = addToolbarButton(hardMode ? '⚔ Hard: ON' : '⚔ Hard: OFF', 'warning');
-    this.hmBg = row.bg;
-    this.hmText = row.text;
-    if (!hardMode) {
-      this.hmBg.setFillStyle(TOOLBAR_FILL, 0.88);
-      this.hmBg.setStrokeStyle(2, TOOLBAR_STROKE, 0.82);
-      this.hmText.setColor(TOOLBAR_MUTED);
-    }
-    this.hmBg.on('pointerdown', () => {
-      hardMode = !hardMode;
-      this.hmText.setText(hardMode ? '⚔ Hard: ON' : '⚔ Hard: OFF');
-      this.hmText.setColor(hardMode ? TOOLBAR_RED : TOOLBAR_MUTED);
-      this.hmBg.setFillStyle(hardMode ? 0x2f1a18 : TOOLBAR_FILL, 0.88);
-      this.hmBg.setStrokeStyle(2, hardMode ? 0xff7777 : TOOLBAR_STROKE, hardMode ? 0.95 : 0.82);
-      try { localStorage.setItem(HARD_KEY, hardMode ? '1' : '0'); } catch (e) { /* ignore */ }
-      ui.message(hardMode ? '⚔ Hard mode ON — ×2 damage, ×2 EXP, ×2 zeny.' : '⚔ Hard mode OFF.');
-      sfxMiss();
-    });
-    addTip(this.hmBg, 'Hard mode: ×2 damage / EXP / zeny', btnX, row.y + btnH / 2);
+    // Hard Mode toggle was removed from the HUD. hardMode stays at its
+    // default (false) so the rest of the codebase still reads it safely.
 
     toolbarY += 4;
     addSection('ACTIONS');
@@ -3911,34 +3923,29 @@ class UIManager {
     });
     addTip(this.shBg, 'Spend zeny on upgrades', btnX, row.y + btnH / 2);
 
-    // Compact HUD toggle — hides secondary progress chips and shortens chat.
-    const HUD_KEY = 'grasslands_hud_compact_v1';
-    try { hudCompact = localStorage.getItem(HUD_KEY) === '1'; } catch (e) { hudCompact = false; }
-    row = addToolbarButton(hudCompact ? 'HUD: Compact' : 'HUD: Full', 'toggle');
-    this.compactBg = row.bg;
-    this.compactText = row.text;
-    this.compactBg.on('pointerdown', () => {
-      hudCompact = !hudCompact;
-      this.applyCompactHud();
-      try { localStorage.setItem(HUD_KEY, hudCompact ? '1' : '0'); } catch (e) { /* ignore */ }
-      ui.message(hudCompact ? 'HUD compact mode ON.' : 'HUD compact mode OFF.');
-    });
-    addTip(this.compactBg, 'Hide extra HUD chips + shrink chat', btnX, row.y + btnH / 2);
+    // Compact-HUD button was removed. hudCompact stays false so the HUD
+    // always renders in its single "clean" layout.
 
-    // Quest tracker — top-left badge.
-    this.panelW = Math.max(360, Math.min(430, Math.floor(GAME_W * 0.42)));
-    this.questBg = scene.add.rectangle(12, 12, this.panelW, 64, 0x10180f, 0.78)
+    // Quest tracker — top-left badge anchored to viewport left edge.
+    // Stack: quest (12,12) → gear (+pad) → boss ticker → streak → discovery.
+    // Margins/pads are consistent so the column reads as one unit.
+    const UL_X = 12;
+    const UL_PAD = 6;
+    this.panelW = Math.max(300, Math.min(380, Math.floor(GAME_W * 0.24)));
+    let ulY = 12;
+    this.questBg = scene.add.rectangle(UL_X, ulY, this.panelW, 56, 0x10180f, 0.78)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
-      .setStrokeStyle(2, 0xb8d29b, 0.72);
-    this.questText = scene.add.text(24, 22, '', {
-      fontSize: '16px', color: '#ffffff', stroke: '#000', strokeThickness: 4,
-      lineSpacing: 3, wordWrap: { width: this.panelW - 24 },
+      .setStrokeStyle(1, 0xb8d29b, 0.7);
+    this.questText = scene.add.text(UL_X + 12, ulY + 9, '', {
+      fontSize: '14px', fontStyle: 'bold', color: '#ffffff', stroke: '#000', strokeThickness: 3,
+      lineSpacing: 2, wordWrap: { width: this.panelW - 24 },
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
     this.questBg.setVisible(false);
     this.questText.setVisible(false);
-    this.gearBg = scene.add.rectangle(12, 84, this.panelW, 44, 0x10180f, 0.74)
+    ulY += 56 + UL_PAD;
+    this.gearBg = scene.add.rectangle(UL_X, ulY, this.panelW, 40, 0x10180f, 0.74)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
-      .setStrokeStyle(2, 0xb8d29b, 0.58)
+      .setStrokeStyle(1, 0xb8d29b, 0.58)
       .setInteractive({ useHandCursor: true });
     this.gearBg.on('pointerdown', () => {
       const w = player.equipment.weapon;
@@ -3952,47 +3959,45 @@ class UIManager {
       ui.message(`Weapon: ${wDesc}.  Armor: ${aDesc}.  Trophies: ${trophies}.`);
       showTrophyInspector(scene);
     });
-    this.gearText = scene.add.text(24, 94, '', {
-      fontSize: '15px', color: '#d8f7ff', stroke: '#000', strokeThickness: 3,
+    this.gearText = scene.add.text(UL_X + 12, ulY + 8, '', {
+      fontSize: '13px', color: '#d8f7ff', stroke: '#000', strokeThickness: 2,
       lineSpacing: 2, wordWrap: { width: this.panelW - 24 },
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
-
-    // Boss ticker — small persistent line under the gear bar showing the
-    // current biome's boss state (roaming / respawning in MM:SS).
-    this.bossTickerBg = scene.add.rectangle(12, 138, this.panelW, 30, 0x10180f, 0.74)
+    ulY += 40 + UL_PAD;
+    // Boss ticker.
+    this.bossTickerBg = scene.add.rectangle(UL_X, ulY, this.panelW, 26, 0x10180f, 0.74)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
-      .setStrokeStyle(2, 0xff8866, 0.62);
-    this.bossTickerText = scene.add.text(24, 145, '', {
-      fontSize: '15px', color: '#ffcc99', stroke: '#000', strokeThickness: 3,
+      .setStrokeStyle(1, 0xff8866, 0.62);
+    this.bossTickerText = scene.add.text(UL_X + 12, ulY + 5, '', {
+      fontSize: '13px', color: '#ffcc99', stroke: '#000', strokeThickness: 2,
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
     this.bossTickerBg.setVisible(false);
     this.bossTickerText.setVisible(false);
-
-    // Discovery progress badge — show "Biomes: N/5" so player has a clear
-    // completionist hook for visiting every landmark plaza.
-    this.discoveryBg = scene.add.rectangle(12, 208, 240, 30, 0x10180f, 0.74)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
-      .setStrokeStyle(2, 0xb8d29b, 0.58);
-    this.discoveryText = scene.add.text(24, 215, '', {
-      fontSize: '15px', fontStyle: 'bold', color: '#aaffcc',
-      stroke: '#000', strokeThickness: 3,
-    }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
-
+    ulY += 26 + UL_PAD;
     // Hot-streak indicator — only visible when streak > 0.
-    this.streakBg = scene.add.rectangle(12, 174, 240, 30, 0x10180f, 0.74)
+    this.streakBg = scene.add.rectangle(UL_X, ulY, this.panelW, 26, 0x10180f, 0.74)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
-      .setStrokeStyle(2, 0xffaa33, 0.62);
-    this.streakText = scene.add.text(24, 181, '', {
-      fontSize: '15px', fontStyle: 'bold', color: '#ffcc66',
-      stroke: '#000', strokeThickness: 3,
+      .setStrokeStyle(1, 0xffaa33, 0.62);
+    this.streakText = scene.add.text(UL_X + 12, ulY + 5, '', {
+      fontSize: '13px', color: '#ffcc66',
+      stroke: '#000', strokeThickness: 2,
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
     this.streakBg.setVisible(false);
     this.streakText.setVisible(false);
+    ulY += 26 + UL_PAD;
+    // Discovery progress — least important, smallest type.
+    this.discoveryBg = scene.add.rectangle(UL_X, ulY, this.panelW, 24, 0x10180f, 0.7)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
+      .setStrokeStyle(1, 0xb8d29b, 0.5);
+    this.discoveryText = scene.add.text(UL_X + 12, ulY + 4, '', {
+      fontSize: '12px', color: '#aaffcc', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
 
-    // Boss HP bar (top of screen, hidden until a boss is engaged).
-    const bbW = 520, bbH = 22;
+    // Boss HP bar — top center, primary hierarchy.
+    const bbW = Math.max(360, Math.min(480, Math.floor(GAME_W * 0.34)));
+    const bbH = 18;
     const bbX = (GAME_W - bbW) / 2;
-    const bbY = 14;
+    const bbY = 12;
     this.bossBg = scene.add.rectangle(bbX, bbY, bbW, bbH, 0x110000, 0.85)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
       .setStrokeStyle(2, 0xff5555, 1);
@@ -4005,34 +4010,29 @@ class UIManager {
     this.bossBg.setVisible(false);
     this.bossFill.setVisible(false);
     this.bossText.setVisible(false);
-    this.bossTimerText = scene.add.text(GAME_W / 2, bbY + bbH + 18, '', {
-      fontSize: '13px', color: '#ffe066', stroke: '#000', strokeThickness: 3,
+    this.bossTimerText = scene.add.text(GAME_W / 2, bbY + bbH + 14, '', {
+      fontSize: '12px', color: '#ffe066', stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10007).setVisible(false);
 
-    // Chat box
-    this.chatW = Math.max(380, Math.min(460, Math.floor(GAME_W * 0.44)));
-    this.chatBg = scene.add.rectangle(12, GAME_H - 232, this.chatW, 150, 0x10180f, 0.76)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(10000)
-      .setStrokeStyle(2, 0xb8d29b, 0.46);
-    this.chatText = scene.add.text(24, GAME_H - 220, '', {
-      fontSize: '16px', color: '#ffffff', stroke: '#000', strokeThickness: 4,
-      lineSpacing: 3, wordWrap: { width: this.chatW - 24 },
-    }).setOrigin(0, 0).setScrollFactor(0).setDepth(10001);
+    // Chat/combat log panel was removed at user request. The internal
+    // `messages` array still exists so calls like `ui.message(...)` are
+    // harmless no-ops on the screen.
+
     for (const text of [
       this.hpText, this.expText, this.lvlText, this.zenyText, this.saveGlyph,
-      this.miniHpText, this.tipText, this.mapZoomText, this.rsText,
-      this.tvText, this.muteText, this.apText, this.hmText, this.clText,
-      this.lvText, this.lv10Text, this.lvMText, this.shText, this.compactText,
+      this.tipText, this.rsText,
+      this.tvText, this.muteText, this.apText, this.clText,
+      this.lvText, this.lv10Text, this.lvMText, this.shText,
       this.questText, this.gearText, this.bossTickerText, this.discoveryText,
-      this.streakText, this.bossText, this.bossTimerText, this.chatText,
-    ]) crisp(text);
-    this.applyCompactHud();
+      this.streakText, this.bossText, this.bossTimerText,
+    ]) { if (text) crisp(text); }
   }
 
   message(msg) {
     this.messages.push(msg);
     if (this.messages.length > 10) this.messages.shift();
-    this.chatText.setText(this.visibleMessages().join('\n'));
+    // Chat panel was removed; nothing to render to. We keep the buffer in
+    // case future features want to surface recent events again.
   }
 
   visibleMessages() {
@@ -4052,37 +4052,83 @@ class UIManager {
     });
   }
 
-  applyCompactHud() {
-    const compact = !!hudCompact;
-    const chatH = compact ? 92 : 150;
-    const chatY = GAME_H - this.bottomH - 12 - chatH;
-    this.chatBg.y = chatY;
-    this.chatBg.height = chatH;
-    this.chatBg.displayHeight = chatH;
-    this.chatText.y = chatY + 12;
-    this.chatText.setText(this.visibleMessages().join('\n'));
-    this.compactText.setText(compact ? 'HUD: Compact' : 'HUD: Full');
-    this.compactText.setColor(compact ? '#ddffdd' : '#dddddd');
-    this.compactBg.setFillStyle(compact ? 0x264c2d : 0x142018, 0.88);
-    this.compactBg.setStrokeStyle(2, compact ? 0x8ee894 : 0xb8d29b, compact ? 0.95 : 0.82);
-    for (const obj of [this.bossTickerBg, this.bossTickerText, this.streakBg, this.streakText, this.discoveryBg, this.discoveryText]) {
-      obj.setVisible(false);
+  // Reposition edge-anchored HUD when the browser viewport changes size.
+  // Toolbar buttons stay where they were authored (right side, near minimap)
+  // and shift by the delta in viewport width; everything else is recomputed.
+  relayout(w, h) {
+    if (!w || !h) return;
+    const prevMiniX = this.miniX;
+    // Bottom band — spans full width, sits flush against viewport bottom.
+    const bottomY = h - this.bottomH;
+    this.bar.setSize(w, this.bottomH);
+    this.bar.x = 0;
+    this.bar.y = bottomY;
+    // Bottom-bar items.
+    const hpX = 20;
+    const statusW = 170;
+    const statusX = w - statusW - 20;
+    const expX = hpX + this.hpBarW + 28;
+    this.expBarW = Math.max(220, statusX - expX - 28);
+    const barH = 16;
+    const panelH = 30;
+    const midY = bottomY + this.bottomH / 2;
+    this.hpPanel.x = hpX - 8; this.hpPanel.y = midY - panelH / 2;
+    this.hpBg.x = hpX; this.hpBg.y = midY;
+    this.hpFill.x = hpX; this.hpFill.y = midY;
+    this.hpText.x = hpX + this.hpBarW / 2; this.hpText.y = midY;
+    this.expPanel.x = expX - 8; this.expPanel.y = midY - panelH / 2;
+    this.expPanel.width = this.expBarW + 16; this.expPanel.displayWidth = this.expBarW + 16;
+    this.expBg.x = expX; this.expBg.y = midY;
+    this.expBg.width = this.expBarW; this.expBg.displayWidth = this.expBarW;
+    this.expFill.x = expX; this.expFill.y = midY;
+    this.expText.x = expX + this.expBarW / 2; this.expText.y = midY;
+    this.statusPanel.x = statusX; this.statusPanel.y = bottomY + (this.bottomH - 40) / 2;
+    this.lvlText.x = statusX + statusW * 0.32; this.lvlText.y = midY;
+    this.zenyText.x = statusX + statusW * 0.72; this.zenyText.y = midY;
+    // Minimap — anchor to right edge.
+    this.miniX = w - this.miniW - 12;
+    this.miniBg.x = this.miniX;
+    this.miniBorder.x = this.miniX;
+    // Toolbar — every button under the minimap shifts by the same delta so
+    // the whole stack stays glued to the viewport's right side.
+    const dx = this.miniX - prevMiniX;
+    if (dx !== 0) {
+      for (const obj of this.scene.children.list) {
+        if (!obj || obj.scrollFactorX !== 0) continue;
+        if (obj === this.bar || obj === this.miniBg || obj === this.miniBorder) continue;
+        if (obj === this.miniGfx) continue;
+        // Heuristic: any HUD object whose x lands within the old toolbar
+        // column (roughly minimap area or to its right) gets shifted with it.
+        if (obj.x >= prevMiniX - 4) obj.x += dx;
+      }
     }
+    // Boss bar — recenter horizontally.
+    if (this.bossBg) {
+      const bbW = this.bossBg.width;
+      this.bossBg.x = (w - bbW) / 2;
+      this.bossFill.x = (w - bbW) / 2;
+      this.bossText.x = w / 2;
+      this.bossTimerText.x = w / 2;
+    }
+  }
+
+  applyCompactHud() {
+    // Compact-HUD toggle was removed. The single layout is the only one,
+    // so this method intentionally does nothing. Kept as a no-op so the
+    // ~10 sites that still call it don't need touching.
   }
 
   update() {
     const hpPct = Math.max(0, player.hp / player.maxHP);
     this.hpFill.width = this.hpBarW * hpPct;
     this.hpText.setText(`HP ${player.hp}/${player.maxHP}`);
-    this.miniHpFill.width = (this.miniW - 4) * hpPct;
-    this.miniHpText.setText(`HP ${player.hp}/${player.maxHP}`);
 
     const expPct = Math.max(0, Math.min(1, player.exp / player.expNeeded()));
     this.expFill.width = this.expBarW * expPct;
     this.expText.setText(`EXP ${player.exp}/${player.expNeeded()}`);
 
     this.lvlText.setText(`Lv.${player.level}`);
-    this.zenyText.setText(`Zeny: ${fmt(player.zeny)}`);
+    this.zenyText.setText(`${fmt(player.zeny)}z`);
 
     // Label flips between Choose / Change based on whether a class is set.
     // Show escalating swap cost so the player can plan zeny spend.
@@ -4098,7 +4144,7 @@ class UIManager {
     const swapCost = player.classId ? classSwitchCost() : 0;
     const canAfford = player.zeny >= swapCost;
     this.clText.setColor(canAfford ? '#ffe066' : '#ff9999');
-    this.clText.setFontSize(this.clText.width > 118 ? 12 : 14);
+    this.clText.setFontSize(this.clText.width > (this.miniW - 18) ? 10 : 12);
 
     // Quest tracker badge — color-coded per kind via tint hint in label.
     tickQuestPity();

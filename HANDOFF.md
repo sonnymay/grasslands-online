@@ -1,8 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 1:16am CDT (post session 28,
-> HUD edge anchoring + no monster name boxes).
+> coding sessions. Last refresh: 2026-05-18 1:30am CDT (post session 29,
+> dedicated UI camera + HUD cleanup + wheel zoom).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -207,11 +207,63 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 28 (latest, in order)
+## 3. What we did in session 29 (latest, in order)
 
-Cache now at **`?v=108`**. Continued from Sonny's UI/HUD polish queue, then
-responded to direct feedback that the game needed true fullscreen and the text
-was too small / hard to read. Follow-up feedback specifically called out
+Cache now at **`?v=112`**. Sonny opened with "HUD text is small and blurry —
+make it crisp, screen-space, edge-anchored, responsive." Several rounds of
+iterative feedback followed: first an overcorrection (HUD too big and noisy),
+then a cleanup pass (remove specific buttons, chat, duplicate HP bar), then a
+wheel-zoom feature. All HUD work landed; gameplay logic untouched.
+
+1. **Root cause of "blurry HUD" — found and fixed.** The main camera's
+   `setZoom(0.65)` (sessions 27) silently shrank every `setScrollFactor(0)` UI
+   object to 65 % of its authored size and softened its antialiased text. We
+   added a dedicated UI camera at zoom 1 in `create()`. New objects are auto-
+   sorted: anything with `scrollFactorX === 0` is `mainCam.ignore`'d, otherwise
+   `uiCam.ignore`'d. Sorting runs on the `POSTUPDATE` event so chained
+   `.setScrollFactor(0)` calls have a chance to execute first. `scene.scale.on
+   ('resize')` keeps the UI camera's viewport pinned to the browser size.
+2. **HUD pass 1 — bigger panels.** Bottom HP/EXP/Lv/Zeny bar grew to 96 px,
+   fonts to 18–26 px; quest/gear/streak/discovery widened and bolded; chat
+   widened; minimap and toolbar buttons enlarged. Crisp again but visually
+   loud — Sonny called it "messy and intrusive, covers too much of the world."
+3. **HUD pass 2 — clean redesign.** Bottom bar shrunk to 56 px with slim
+   16 px HP/EXP bars and a compact Lv/Zeny chip on the right. Upper-left
+   stack uses `UL_X=12`, `UL_PAD=6`, and one shared `panelW` so quest (56h)
+   → gear (40h) → boss ticker (26h) → streak (26h) → discovery (24h) line
+   up as a single column. Boss bar shrank to 360–480 px wide × 18 px tall,
+   centered. Toolbar buttons shrank to `miniW - 8` × 26 px with 12 px bold
+   text. `relayout(w, h)` now recomputes every edge-anchored element on
+   browser resize, and shifts the toolbar column by the delta when the
+   right edge moves.
+4. **HUD pass 3 — surgical removals.** Sonny asked us to delete three
+   toolbar buttons (`Map 1x`, `⚔ Hard: ON/OFF`, `HUD: Full/Compact`), the
+   entire chat / combat-log panel, and the duplicate HP bar that lived
+   under the minimap. Creation blocks were removed; `hardMode` and
+   `hudCompact` still default to `false` so the rest of the codebase that
+   reads them keeps working. `ui.message(...)` is now a no-op on screen
+   (still buffers internally in `this.messages`) and `applyCompactHud()`
+   collapsed to an empty method. The mini HP under the minimap is gone;
+   `toolbarY` now starts `miniHpY + 12` instead of `+22` so the toolbar
+   tucks straight under the map.
+5. **Mouse-wheel zoom.** Added a `scene.input.on('wheel', ...)` listener
+   right after `setZoom(0.65)`. Wheel up multiplies camera zoom by 1.12;
+   wheel down divides by 1.12. Clamped to `[0.4, 1.6]`. Only the main
+   camera is touched, so the UI camera stays at zoom 1 and the HUD remains
+   crisp at its authored size. `startFollow(player.sprite)` keeps the
+   world centered on the player while zooming.
+6. **Cache bumps.** `?v=109` → `?v=110` → `?v=111` → `?v=112` as the four
+   passes shipped.
+7. **Verification.** `node -c project-grasslands/game.js` exited 0 after
+   every edit. Browser preview was intentionally skipped — Sonny asked us
+   to save tokens once the live wedge from rapid `location.reload()` cycles
+   showed up again (audio decoder hang documented in session 26).
+
+### (legacy) session 28
+
+Cache previously at **`?v=108`**. Continued from Sonny's UI/HUD polish queue,
+then responded to direct feedback that the game needed true fullscreen and the
+text was too small / hard to read. Follow-up feedback specifically called out
 monster names as too blurry/small, then requested a sharper screen-space HUD,
 the cheat button restored, no monster-name boxes, and HUD anchored to the
 browser edges. Pre-existing sprite asset changes were left untouched.
@@ -1335,7 +1387,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=108`**. Next change should use `?v=109`.
+  change. Current: **`?v=112`**. Next change should use `?v=113`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1458,7 +1510,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=108`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=112`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.
