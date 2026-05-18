@@ -359,6 +359,15 @@ wheel-zoom feature. All HUD work landed; gameplay logic untouched.
     a subtle alpha dip so the water catches light. ~1300 sway tweens +
     22 shimmer tweens, well within Phaser's tween manager budget.
 34. **Cache bump.** `?v=120` → `?v=121`.
+35. **Reverted the atmospheric lighting pass.** User flagged the
+    vignette corners as "giant rectangular dark areas," the player halo
+    as "a bright vertical strip / spotlight," and the world overall as
+    too dark and harder to see. All three overlays (corner vignette,
+    warm player halo, drifting cloud shadows) are removed. Day/night
+    overlay alpha capped at 0.18 (was 0.50) so nights tint without
+    dimming. Future atmosphere work must stay subtle and start *after*
+    the actual map art (tilesets / props / landmarks) is upgraded.
+36. **Cache bump.** `?v=121` → `?v=122`.
 7. **Verification.** `node -c project-grasslands/game.js` exited 0 after
    every edit. Browser preview was intentionally skipped — Sonny asked us
    to save tokens once the live wedge from rapid `location.reload()` cycles
@@ -1492,7 +1501,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=121`**. Next change should use `?v=122`.
+  change. Current: **`?v=122`**. Next change should use `?v=123`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1615,7 +1624,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=121`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=122`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.

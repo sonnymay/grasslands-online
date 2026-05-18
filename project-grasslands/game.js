@@ -963,61 +963,10 @@ function create() {
   dayNightOverlay = scene.add.rectangle(0, 0, GAME_W, GAME_H, 0x0a1a44, 0)
     .setOrigin(0, 0).setScrollFactor(0).setDepth(9000);
 
-  // ------- Cinematic vignette -------
-  // Soft dark corners that frame the viewport without dimming the action
-  // in the centre. Four big radial-feel quads at the corners using a
-  // MULTIPLY blend mode read as a clean RPG vignette.
-  const vignetteCorners = [];
-  const vSize = 520;
-  const vAlpha = 0.55;
-  const cornerSpecs = [
-    { ox: 0,        oy: 0,        cx: 0, cy: 0 }, // top-left
-    { ox: 1,        oy: 0,        cx: 1, cy: 0 }, // top-right
-    { ox: 0,        oy: 1,        cx: 0, cy: 1 }, // bottom-left
-    { ox: 1,        oy: 1,        cx: 1, cy: 1 }, // bottom-right
-  ];
-  for (const s of cornerSpecs) {
-    const q = scene.add.rectangle(
-      s.cx * scene.scale.width,
-      s.cy * scene.scale.height,
-      vSize, vSize, 0x000000, vAlpha,
-    ).setOrigin(s.ox, s.oy).setScrollFactor(0).setDepth(9500);
-    q.setBlendMode(Phaser.BlendModes.MULTIPLY);
-    vignetteCorners.push(q);
-  }
-  scene.__vignette = vignetteCorners;
-  // Keep the corners glued to the viewport edges through resize events.
-  scene.scale.on('resize', (size) => {
-    if (!scene.__vignette) return;
-    const [tl, tr, bl, br] = scene.__vignette;
-    tl.setPosition(0, 0);
-    tr.setPosition(size.width, 0);
-    bl.setPosition(0, size.height);
-    br.setPosition(size.width, size.height);
-  });
-
-  // ------- Warm player halo -------
-  // Soft warm light circle underneath the player. Reads as a focal lantern
-  // and pulls the eye toward the protagonist on busy biome backgrounds.
-  scene.__playerHalo = scene.add.circle(0, 0, 110, 0xffe9b0, 0.13)
-    .setDepth(-50)
-    .setBlendMode(Phaser.BlendModes.ADD);
-
-  // ------- Drifting cloud shadows -------
-  // Large translucent ellipses scroll slowly across the world, painting
-  // soft shadows on the ground. Cheap, no asset, big atmospheric win.
-  scene.__clouds = [];
-  for (let i = 0; i < 8; i++) {
-    const cw = Phaser.Math.Between(640, 1080);
-    const ch = Phaser.Math.Between(220, 360);
-    const cx = Phaser.Math.Between(0, WORLD_W);
-    const cy = Phaser.Math.Between(0, WORLD_H);
-    const cloud = scene.add.ellipse(cx, cy, cw, ch, 0x000000, 0.10)
-      .setDepth(8500);
-    cloud.__vx = Phaser.Math.FloatBetween(8, 18);  // px/sec
-    cloud.__vy = Phaser.Math.FloatBetween(-3, 3);
-    scene.__clouds.push(cloud);
-  }
+  // Vignette / player halo / cloud-shadow overlays were removed at user
+  // request — they read as broken-lighting rectangles + a spotlight
+  // around the player instead of subtle atmosphere. Keep the world
+  // bright and readable; revisit only as a very subtle pass later.
 
   // UI
   ui = new UIManager(scene);
@@ -1066,28 +1015,6 @@ function update(time, delta) {
 
   // Road sparkles + biome ambience particles. Pure feel, no rules.
   if (player && !player.dead) {
-    // Warm halo sticks under the player. Gentle alpha pulse so it
-    // breathes without distracting.
-    if (player.scene.__playerHalo) {
-      const halo = player.scene.__playerHalo;
-      halo.setPosition(player.sprite.x, player.sprite.y + 6);
-      halo.alpha = 0.11 + Math.sin(time / 720) * 0.025;
-    }
-    // Drift cloud shadows. Wrap horizontally + vertically so the sky
-    // feels alive without leaking edges.
-    if (player.scene.__clouds) {
-      const dt = (delta || 16) / 1000;
-      for (const cl of player.scene.__clouds) {
-        cl.x += cl.__vx * dt;
-        cl.y += cl.__vy * dt;
-        const halfW = cl.displayWidth / 2;
-        const halfH = cl.displayHeight / 2;
-        if (cl.x - halfW > WORLD_W) cl.x = -halfW;
-        if (cl.x + halfW < 0)        cl.x = WORLD_W + halfW;
-        if (cl.y - halfH > WORLD_H) cl.y = -halfH;
-        if (cl.y + halfH < 0)        cl.y = WORLD_H + halfH;
-      }
-    }
     tickRoadSparkles(player.scene, time);
     tickAmbience(player.scene, time, delta);
   }
@@ -1159,38 +1086,14 @@ function update(time, delta) {
     }
   }
 
-  // Day/night: cosine-driven darkness peaking at midnight, with the
-  // overlay colour shifting through dusk-orange → midnight-blue →
-  // dawn-pink so the sky reads as actual time of day.
+  // Day/night: cosine-driven darkness peaking at midnight. Kept very
+  // subtle (max 0.18 alpha) so nights still read as a tint, not a dim
+  // overlay — user wants the world bright and readable.
   if (dayNightOverlay) {
     const t = (time % DAY_NIGHT_CYCLE_MS) / DAY_NIGHT_CYCLE_MS;
     const darkness = (1 - Math.cos(t * Math.PI * 2)) / 2; // 0..1..0
     worldDarkness = darkness;
-    const lerpColor = (a, b, k) => {
-      const ca = Phaser.Display.Color.IntegerToColor(a);
-      const cb = Phaser.Display.Color.IntegerToColor(b);
-      const r = Math.round(ca.red   + (cb.red   - ca.red)   * k);
-      const g = Math.round(ca.green + (cb.green - ca.green) * k);
-      const bl = Math.round(ca.blue + (cb.blue  - ca.blue)  * k);
-      return Phaser.Display.Color.GetColor(r, g, bl);
-    };
-    const SKY_DUSK     = 0xd24a2e; // warm sunset orange
-    const SKY_MIDNIGHT = 0x0a1944; // deep blue
-    const SKY_DAWN     = 0xff9fb4; // soft pink
-    let skyColor;
-    if (t < 0.25)      skyColor = SKY_DUSK;                                 // noon → dusk
-    else if (t < 0.5)  skyColor = lerpColor(SKY_DUSK, SKY_MIDNIGHT, (t - 0.25) / 0.25);
-    else if (t < 0.75) skyColor = lerpColor(SKY_MIDNIGHT, SKY_DAWN, (t - 0.5) / 0.25);
-    else               skyColor = SKY_DAWN;                                 // dawn → noon
-    dayNightOverlay.setFillStyle(skyColor, darkness * 0.5);
-    dayNightOverlay.alpha = darkness * 0.5;
-    // Halo tightens + cools as night falls so midnight reads as a
-    // narrow lantern instead of an even daytime glow.
-    if (player && player.scene && player.scene.__playerHalo) {
-      const halo = player.scene.__playerHalo;
-      const haloScale = 1 - darkness * 0.45;
-      halo.setScale(haloScale);
-    }
+    dayNightOverlay.alpha = darkness * 0.18;
     // Once-per-cycle chat callouts at the dusk + dawn thresholds.
     if (!_nightAnnounced && darkness > 0.65) {
       _nightAnnounced = true;
