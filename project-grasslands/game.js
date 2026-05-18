@@ -1,8 +1,8 @@
 // Grasslands Online — Phase 1 (single-player MVP)
 // Phaser 3.70 — no build tools.
 
-const GAME_W = 1024;
-const GAME_H = 768;
+const GAME_W = 1280;
+const GAME_H = 720;
 const WORLD_W = 6400;
 const WORLD_H = 6400;
 const TILE_SIZE = 128;
@@ -233,6 +233,9 @@ const config = {
   backgroundColor: '#3a6b35',
   pixelArt: false,
   scale: {
+    // FIT preserves the 4:3 aspect so the HUD (anchored to canvas corners)
+    // stays in view on every viewport. Body bg matches the game's earthy
+    // green so any letterbox bars blend visually with the world.
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },

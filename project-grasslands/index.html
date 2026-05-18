@@ -16,8 +16,11 @@
       display: flex;
       justify-content: center;
       align-items: center;
+      width: 100vw;
       height: 100vh;
     }
+    /* Hide letterbox bars behind game-toned bg. */
+    body { background: #3a6b35; }
     /* Loading overlay shown until Phaser preload finishes. */
     #loader {
       position: fixed;
@@ -74,6 +77,6 @@
   </div>
   <div id="game"></div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
-  <script src="game.js?v=100"></script>
+  <script src="game.js?v=101"></script>
 </body>
 </html>
