@@ -1,10 +1,9 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 10:50am CDT (post session 32,
-> decoration density 2.5× + new cluster spawner so ground cover reads as
-> RO-style thickets / flower patches / mushroom rings / cactus oases
-> instead of even scatter. Code-only, no asset work).
+> coding sessions. Last refresh: 2026-05-18 (post session 33,
+> per-biome weighted terrain tile rolls so each zone has stronger ground
+> personality without new art. Code-only, bright/readable world preserved).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -209,7 +208,30 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 32 (latest)
+## 3. What we did in session 33 (latest)
+
+Cache now at **`?v=125`**. Continued Sonny's "beautiful like Ragnarok
+Online" map pass with no new art and no atmospheric darkening.
+
+1. **Per-biome weighted terrain tile rolls.** `buildMap()` now uses distinct
+   non-path ground probabilities by zone:
+   - Forest favors `THICK_GRASS`, `TALL_GRASS`, and flowers for lush floor.
+   - Desert favors `ROCKS_SPARSE`, `DIRT_PATCH`, `DIRT_HEAVY`, and
+     `ROCKS_DENSE` so sand areas read rockier and drier.
+   - Ruins favors `DIRT_PATCH`, `ROCKS_DENSE`, `ROCKS_SPARSE`, and
+     `DIRT_HEAVY` for broken-stone personality.
+   - Riverside favors grass, tall grass, flowers, and colored flowers for a
+     wetter meadow feel.
+   - Grasslands keeps the session-31 balanced baseline.
+2. **Boundary rolls are biome-aware too.** Zone-edge cells still get richer
+   transition texture, but now use the destination biome's visual vocabulary
+   instead of one shared flower/dirt recipe.
+3. **Bright-world rule preserved.** No overlays, no halos, no spotlights, no
+   lighting changes. Day/night cap untouched.
+4. **Verification.** `node -c project-grasslands/game.js` exited 0.
+5. **Cache bump.** `?v=124` → `?v=125`.
+
+## 3.1. What we did in session 32
 
 Cache now at **`?v=124`**. Sonny: "make it beautiful like Ragnarok
 Online." No new art yet — push the existing decoration set as far as it
@@ -234,7 +256,7 @@ goes via density + cluster patches.
 4. **Verification.** `node -c project-grasslands/game.js` exited 0.
 5. **Cache bump.** `?v=124` → `?v=124`.
 
-## 3.1. What we did in session 31
+## 3.2. What we did in session 31
 
 Cache now at **`?v=124`**. Pure-code map polish ahead of new art landing.
 

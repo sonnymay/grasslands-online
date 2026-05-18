@@ -1218,18 +1218,67 @@ function buildMap(scene) {
       else if (type === 'path_loop') idx = Math.random() < 0.5 ? TILE.DIRT_WIDE : TILE.DIRT_PATCH;
       else if (type === 'path_diag') idx = Math.random() < 0.5 ? TILE.DIRT_CORNER : TILE.DIRT_HEAVY;
       else {
-        // Grass base: weighted pick over every variant in the sheet so a
-        // 100×100 grid no longer reads as the same two frames repeated.
-        // Rare frames (rocks, colored flowers, tall grass) appear at low
-        // probability to break visual rhythm without flooding the map.
-        if (nearZoneBoundary(r, c) && Math.random() < 0.42) {
-          const roll = Math.random();
-          if      (roll < 0.34) idx = TILE.FLOWER;
-          else if (roll < 0.58) idx = TILE.FLOWERS_COLOR;
-          else if (roll < 0.78) idx = TILE.DIRT_PATCH;
-          else                  idx = TILE.TALL_GRASS;
+        // Biome-weighted ground rolls give each zone its own texture rhythm
+        // while reusing the same sheet: forest lush, desert rocky, ruins
+        // broken, riverside flowery.
+        const boundary = nearZoneBoundary(r, c) && Math.random() < 0.42;
+        const roll = Math.random();
+        if (boundary) {
+          if (zone === 'desert') {
+            if      (roll < 0.34) idx = TILE.DIRT_PATCH;
+            else if (roll < 0.60) idx = TILE.ROCKS_SPARSE;
+            else if (roll < 0.82) idx = TILE.DIRT_HEAVY;
+            else                  idx = TILE.ROCKS_DENSE;
+          } else if (zone === 'ruins') {
+            if      (roll < 0.38) idx = TILE.DIRT_PATCH;
+            else if (roll < 0.64) idx = TILE.ROCKS_DENSE;
+            else if (roll < 0.84) idx = TILE.ROCKS_SPARSE;
+            else                  idx = TILE.TALL_GRASS;
+          } else if (zone === 'riverside') {
+            if      (roll < 0.34) idx = TILE.FLOWER;
+            else if (roll < 0.62) idx = TILE.FLOWERS_COLOR;
+            else if (roll < 0.84) idx = TILE.TALL_GRASS;
+            else                  idx = TILE.THICK_GRASS;
+          } else if (zone === 'forest') {
+            if      (roll < 0.36) idx = TILE.THICK_GRASS;
+            else if (roll < 0.62) idx = TILE.TALL_GRASS;
+            else if (roll < 0.82) idx = TILE.FLOWER;
+            else                  idx = TILE.DIRT_PATCH;
+          } else {
+            if      (roll < 0.34) idx = TILE.FLOWER;
+            else if (roll < 0.58) idx = TILE.FLOWERS_COLOR;
+            else if (roll < 0.78) idx = TILE.DIRT_PATCH;
+            else                  idx = TILE.TALL_GRASS;
+          }
+        } else if (zone === 'desert') {
+          if      (roll < 0.38) idx = TILE.ROCKS_SPARSE;
+          else if (roll < 0.62) idx = TILE.DIRT_PATCH;
+          else if (roll < 0.76) idx = TILE.DIRT_HEAVY;
+          else if (roll < 0.88) idx = TILE.ROCKS_DENSE;
+          else if (roll < 0.96) idx = TILE.GRASS;
+          else                  idx = TILE.THICK_GRASS;
+        } else if (zone === 'ruins') {
+          if      (roll < 0.30) idx = TILE.DIRT_PATCH;
+          else if (roll < 0.52) idx = TILE.ROCKS_DENSE;
+          else if (roll < 0.70) idx = TILE.ROCKS_SPARSE;
+          else if (roll < 0.84) idx = TILE.DIRT_HEAVY;
+          else if (roll < 0.94) idx = TILE.TALL_GRASS;
+          else                  idx = TILE.THICK_GRASS;
+        } else if (zone === 'forest') {
+          if      (roll < 0.34) idx = TILE.THICK_GRASS;
+          else if (roll < 0.58) idx = TILE.TALL_GRASS;
+          else if (roll < 0.74) idx = TILE.GRASS;
+          else if (roll < 0.86) idx = TILE.FLOWER;
+          else if (roll < 0.94) idx = TILE.FLOWERS_COLOR;
+          else                  idx = TILE.DIRT_PATCH;
+        } else if (zone === 'riverside') {
+          if      (roll < 0.28) idx = TILE.GRASS;
+          else if (roll < 0.50) idx = TILE.THICK_GRASS;
+          else if (roll < 0.68) idx = TILE.TALL_GRASS;
+          else if (roll < 0.82) idx = TILE.FLOWER;
+          else if (roll < 0.94) idx = TILE.FLOWERS_COLOR;
+          else                  idx = TILE.DIRT_PATCH;
         } else {
-          const roll = Math.random();
           if      (roll < 0.32) idx = TILE.GRASS;
           else if (roll < 0.58) idx = TILE.THICK_GRASS;
           else if (roll < 0.72) idx = TILE.TALL_GRASS;
