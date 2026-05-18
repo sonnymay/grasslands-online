@@ -1,9 +1,9 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 41,
-> minimap perf fix — throttle to 10 Hz + cache road tiles. Cache
-> `?v=132`).
+> coding sessions. Last refresh: 2026-05-18 (post session 42,
+> sit-to-regen + spawn plaza lanterns + clickable signpost. Cache
+> `?v=133`).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -208,7 +208,32 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 41 (latest)
+## 3. What we did in session 42 (latest)
+
+Cache now at **`?v=133`**. Three RO-feel additions: tactile rest, town
+hub beauty, world-prop utility. All preserve the simple click-to-play
+design.
+
+1. **Sit-to-regen (RO classic).** New `player.idleSince` tracks how long
+   the player has been fully idle (no path, no attack target, not
+   stunned, finished step). After ≥1500 ms idle, regen rate jumps from
+   `2% / 3000 ms` to `5% / 1500 ms` — ~3.75× faster. A small floating
+   "💤" glyph appears above the head while resting, tween-pulsing on
+   yoyo. Idle resets on any movement, attack target, stun, or death.
+2. **Spawn plaza warm lanterns.** Three pulsing gold ellipses around
+   the spawn signpost (offsets `(-150, +10)`, `(+150, +10)`,
+   `(0, +150)`). Each lantern has a wide soft 0.32-alpha disc beneath
+   feet depth and a bright 0.95-alpha core at the lantern y, both
+   yoyo-pulsing 1.1–1.4 s. Six total tweens, fits in tween budget.
+3. **Clickable spawn signpost → Travel panel.** Pointerdown handler
+   checks distance from world click to spawn signpost coords
+   (`mapCenter() → mid tile + TILE_SIZE/2`); within 80 px opens
+   `showTravel(scene)`. Signpost is finally a world hub object.
+4. **Verification.** `node -c project-grasslands/game.js` exited 0.
+   Preview reload boots clean, loader gone, no console errors.
+5. **Cache bump.** `?v=132` → `?v=133`.
+
+## 3.0. What we did in session 41
 
 Cache now at **`?v=132`**. User reported the game was lagging. Found the
 top per-frame hotspot and applied two surgical fixes.
@@ -1753,7 +1778,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=132`**. Next change should use `?v=133`.
+  change. Current: **`?v=133`**. Next change should use `?v=134`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
