@@ -41,10 +41,14 @@ const LOOT_MAGNET_SPEED  = 700; // px/s pull velocity
 const BLOBLING_ATTACK_COOLDOWN = 1500;
 const BLOBLING_AGGRO_RANGE = 200;
 const BLOBLING_ATTACK_RANGE = 80;
-const BLOBLING_COUNT = 30;
-const MOOHAM_COUNT = 20;
-const MOOWAAN_COUNT = 15;
-const DUNE_BLOB_COUNT = 12;
+// Monster population scales with world area. Original counts were tuned
+// for a 6400×6400 map; the world is now 19200×19200 (9× area), so the
+// per-type populations are scaled ~5× to keep encounter density similar
+// without rebuilding the world every frame. Bosses stay rare (count 1).
+const BLOBLING_COUNT = 150;
+const MOOHAM_COUNT = 100;
+const MOOWAAN_COUNT = 75;
+const DUNE_BLOB_COUNT = 60;
 const BIGFOOT_COUNT = 1;
 const BIOME_BOSS_COUNT = 1;
 
@@ -4383,11 +4387,14 @@ class UIManager {
       const pos = toMini(l.x, l.y);
       if (inMini(pos, 2)) g.fillCircle(pos.x, pos.y, 2);
     }
-    // Player on top.
+    // Player on top. A second outer ring + larger dot makes the player
+    // easy to spot now that the minimap covers a 9× larger world.
     const playerPos = toMini(player.sprite.x, player.sprite.y);
+    g.lineStyle(2, 0xffff66, 0.9);
+    g.strokeCircle(playerPos.x, playerPos.y, 9);
     g.lineStyle(2, 0x000000, 1);
     g.fillStyle(0xffffff, 1);
-    g.fillCircle(playerPos.x, playerPos.y, 4);
-    g.strokeCircle(playerPos.x, playerPos.y, 4);
+    g.fillCircle(playerPos.x, playerPos.y, 5);
+    g.strokeCircle(playerPos.x, playerPos.y, 5);
   }
 }

@@ -322,6 +322,13 @@ wheel-zoom feature. All HUD work landed; gameplay logic untouched.
     images. Beyond this the first-load cost gets noticeable and GPU
     memory tightens on low-end devices.
 21. **Cache bump.** `?v=116` → `?v=117`.
+22. **Monster density rescale.** Per-type counts ×5 to match the 9× world
+    area (Blobling 30 → 150, Mooham 20 → 100, Moowaan 15 → 75, Dune
+    Blob 12 → 60). Bosses still rare (count 1).
+23. **Minimap player marker.** Outer yellow ring + larger white dot so
+    the player stays visible on the bigger world (`r 4` → `r 5` plus an
+    `r 9` outline ring).
+24. **Cache bump.** `?v=117` → `?v=118`.
 7. **Verification.** `node -c project-grasslands/game.js` exited 0 after
    every edit. Browser preview was intentionally skipped — Sonny asked us
    to save tokens once the live wedge from rapid `location.reload()` cycles
@@ -1455,7 +1462,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=117`**. Next change should use `?v=118`.
+  change. Current: **`?v=118`**. Next change should use `?v=119`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1578,7 +1585,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=117`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=118`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.
