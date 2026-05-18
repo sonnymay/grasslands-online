@@ -2253,18 +2253,14 @@ class MonsterController {
     ).setOrigin(0.5);
 
     const nameFontSize = isBossCfg(cfg) ? '21px' : '19px';
-    this.nameBg = scene.add.rectangle(x, y, 10, isBossCfg(cfg) ? 30 : 27, 0x10180f, 0.72)
-      .setOrigin(0.5, 1)
-      .setStrokeStyle(2, colorValue(cfg.nameColor, 0xffffff), 0.72);
     this.nameTag = scene.add.text(x, y, `${cfg.name} Lv.${this.level}`, {
       fontSize: nameFontSize,
       fontStyle: 'bold',
       color: cfg.nameColor,
       stroke: '#000000',
-      strokeThickness: 5,
+      strokeThickness: 6,
       resolution: 2,
     }).setOrigin(0.5, 1);
-    this.nameBg.width = this.nameTag.width + 22;
 
     this.hpBarBg = scene.add.rectangle(x, y, 40, 5, 0x000000).setOrigin(0.5);
     this.hpBar = scene.add.rectangle(x, y, 40, 5, 0xff3333).setOrigin(0, 0.5);
@@ -2337,9 +2333,7 @@ class MonsterController {
     const topY = this.sprite.y - this.sprite.displayHeight / 2;
     const nameY = topY - 10;
     const labelDepth = this.sprite.y + 90;
-    this.nameBg.setPosition(this.sprite.x, nameY + 3);
     this.nameTag.setPosition(this.sprite.x, nameY);
-    this.nameBg.setDepth(labelDepth - 1);
     this.nameTag.setDepth(labelDepth);
     this.hpBarBg.setPosition(this.sprite.x, topY + 7);
     this.hpBar.setPosition(this.sprite.x - 20, topY + 7);
@@ -2370,7 +2364,6 @@ class MonsterController {
     this._syncShadow();
     this.hpBar.setVisible(false);
     this.hpBarBg.setVisible(false);
-    this.nameBg.setVisible(false);
     this.nameTag.setVisible(false);
     spawnDeathBurst(this.scene, this.sprite.x, this.sprite.y + 8, colorValue(this.cfg.tint || this.cfg.nameColor, 0xffffff));
     // Rare variant: grant N levels worth of EXP in one shot + huge fanfare.
@@ -2436,7 +2429,6 @@ class MonsterController {
       this.sprite.destroy();
       this.shadow.destroy();
       this.nameTag.destroy();
-      this.nameBg.destroy();
       this.hpBar.destroy();
       this.hpBarBg.destroy();
       const idx = bloblings.indexOf(this);
@@ -3572,12 +3564,14 @@ class UIManager {
     this.bar = scene.add.rectangle(0, GAME_H - this.bottomH, GAME_W, this.bottomH, 0x162316, 0.88)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10000)
       .setStrokeStyle(2, 0x3f5732, 0.9);
-    this.hpBarW = Math.max(180, Math.min(320, GAME_W * 0.25));
-    this.expBarW = Math.max(260, Math.min(460, GAME_W * 0.36));
+    this.hpBarW = Math.max(220, Math.min(340, GAME_W * 0.28));
     const bottomY = GAME_H - this.bottomH;
     const hpX = 24;
     const hpY = bottomY + 27;
-    const expX = (GAME_W - this.expBarW) / 2;
+    const statusW = 170;
+    const statusX = GAME_W - statusW - 24;
+    const expX = hpX + this.hpBarW + 36;
+    this.expBarW = Math.max(260, statusX - expX - 36);
     const expY = bottomY + 27;
     const panelH = 34;
 
@@ -3603,13 +3597,13 @@ class UIManager {
       fontSize: '16px', color: '#fff7ef', stroke: '#000', strokeThickness: 4,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
 
-    this.statusPanel = scene.add.rectangle(GAME_W - 178, bottomY + 14, 154, 46, 0x0d150d, 0.68)
+    this.statusPanel = scene.add.rectangle(statusX, bottomY + 14, statusW, 46, 0x0d150d, 0.68)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10001)
       .setStrokeStyle(1, 0xffe066, 0.5);
-    this.lvlText = scene.add.text(GAME_W - 101, bottomY + 27, 'Lv.1', {
+    this.lvlText = scene.add.text(statusX + statusW / 2, bottomY + 27, 'Lv.1', {
       fontSize: '20px', color: '#ffff88', stroke: '#000', strokeThickness: 4,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
-    this.zenyText = scene.add.text(GAME_W - 101, bottomY + 48, 'Zeny: 0', {
+    this.zenyText = scene.add.text(statusX + statusW / 2, bottomY + 48, 'Zeny: 0', {
       fontSize: '15px', color: '#ffd24a', stroke: '#000', strokeThickness: 4,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
 

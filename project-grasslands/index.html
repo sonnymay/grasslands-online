@@ -13,11 +13,16 @@
       overflow: hidden;
     }
     #game {
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      position: fixed;
+      inset: 0;
+      display: block;
       width: 100vw;
       height: 100vh;
+    }
+    #game canvas {
+      display: block;
+      width: 100vw !important;
+      height: 100vh !important;
     }
     /* Hide letterbox bars behind game-toned bg. */
     body { background: #3a6b35; }
@@ -77,6 +82,6 @@
   </div>
   <div id="game"></div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
-  <script src="game.js?v=107"></script>
+  <script src="game.js?v=108"></script>
 </body>
 </html>
