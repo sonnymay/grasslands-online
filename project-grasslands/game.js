@@ -709,8 +709,19 @@ function preload() {
   this.load.image('cactling_hit', 'assets/sprites/cactling_hit.png');
   this.load.image('cactling_dead', 'assets/sprites/cactling_dead.png');
   this.load.image('sand_tileset', 'assets/tiles/sand_tileset.png');
+  this.load.image('forest_tileset', 'assets/tiles/forest_tileset.png');
+  this.load.image('ruins_tileset', 'assets/tiles/ruins_tileset.png');
+  this.load.image('riverside_tileset', 'assets/tiles/riverside_tileset.png');
   this.load.image('cactus_set', 'assets/decorations/cactus_set.png');
   this.load.image('deco_sand_dune', 'assets/decorations/deco_sand_dune.png');
+  this.load.image('forest_fern_01', 'assets/decorations/forest_fern_01.png');
+  this.load.image('ruins_pillar_broken_01', 'assets/decorations/ruins_pillar_broken_01.png');
+  this.load.image('riverside_cattail_01', 'assets/decorations/riverside_cattail_01.png');
+  this.load.image('landmark_spawn_signpost', 'assets/decorations/landmark_spawn_signpost.png');
+  this.load.image('landmark_forest_shrine', 'assets/decorations/landmark_forest_shrine.png');
+  this.load.image('landmark_desert_obelisk', 'assets/decorations/landmark_desert_obelisk.png');
+  this.load.image('landmark_ruins_well', 'assets/decorations/landmark_ruins_well.png');
+  this.load.image('landmark_riverside_bridge', 'assets/decorations/landmark_riverside_bridge.png');
   // Decorations
   for (let i = 1; i <= 4; i++) this.load.image(`deco_flower_cluster_0${i}`, `assets/decorations/deco_flower_cluster_0${i}.png`);
   for (let i = 1; i <= 3; i++) this.load.image(`deco_rock_0${i}`, `assets/decorations/deco_rock_0${i}.png`);
@@ -778,6 +789,9 @@ function create() {
     'kaiju_titan_idle','kaiju_titan_aggro','kaiju_titan_chase','kaiju_titan_attack','kaiju_titan_hit','kaiju_titan_dead',
     'cactling_idle','cactling_hit','cactling_dead',
     'cactus_set','deco_sand_dune',
+    'forest_fern_01','ruins_pillar_broken_01','riverside_cattail_01',
+    'landmark_spawn_signpost','landmark_forest_shrine','landmark_desert_obelisk',
+    'landmark_ruins_well','landmark_riverside_bridge',
     'swordsman_idle_south','swordsman_walk_south',
     'swordsman_idle_north','swordsman_walk_north',
     'swordsman_idle_east','swordsman_walk_east',
@@ -810,24 +824,51 @@ function create() {
 
   // Slice every 4x4 tileset into 16 frames named `tile_0`..`tile_15` on that
   // texture key. buildMap picks which tileset key to draw from per zone.
-  // Grass tileset has a baked white separator → 4% inset crops it. Sand
-  // tileset is flush, so inset=0 to avoid revealing the canvas behind.
-  const TILESET_INSET_PCT = { grass_tileset: 0.04, sand_tileset: 0 };
+  // Grass tileset has a baked white separator → 4% inset crops it. Generated
+  // biome tilesets are 3×3 sheets, so we map their 9 cells onto our 16 tile
+  // frame names below.
+  const TILESET_INSET_PCT = {
+    grass_tileset: 0.04,
+    sand_tileset: 0,
+    forest_tileset: 0,
+    ruins_tileset: 0,
+    riverside_tileset: 0,
+  };
+  const TILESET_GRID = { forest_tileset: 3, ruins_tileset: 3, riverside_tileset: 3 };
+  const TILESET_TILE_MAP_3X3 = {
+    [TILE.GRASS]: 0,
+    [TILE.THICK_GRASS]: 1,
+    [TILE.FLOWER]: 4,
+    [TILE.FLOWERS_COLOR]: 2,
+    [TILE.ROCKS_SPARSE]: 6,
+    [TILE.ROCKS_DENSE]: 8,
+    [TILE.DIRT_PATCH]: 3,
+    [TILE.DIRT_HEAVY]: 7,
+    [TILE.DIRT_H]: 3,
+    [TILE.DIRT_H2]: 7,
+    [TILE.DIRT_V]: 3,
+    [TILE.DIRT_V2]: 7,
+    [TILE.DIRT_CORNER]: 3,
+    [TILE.DIRT_WIDE]: 7,
+    [TILE.DIRT_OPEN]: 3,
+    [TILE.TALL_GRASS]: 5,
+  };
   const sliceTileset = (texKey) => {
     if (!scene.textures.exists(texKey)) return;
     const img = scene.textures.get(texKey).getSourceImage();
-    const sw = Math.floor(img.width / 4);
-    const sh = Math.floor(img.height / 4);
+    const grid = TILESET_GRID[texKey] || 4;
+    const sw = Math.floor(img.width / grid);
+    const sh = Math.floor(img.height / grid);
     const inset = Math.floor(sw * (TILESET_INSET_PCT[texKey] ?? 0.04));
-    for (let r = 0; r < 4; r++) {
-      for (let c = 0; c < 4; c++) {
-        const idx = r * 4 + c;
-        scene.textures.get(texKey).add(
-          `tile_${idx}`, 0,
-          c * sw + inset, r * sh + inset,
-          sw - inset * 2, sh - inset * 2
-        );
-      }
+    for (let idx = 0; idx < 16; idx++) {
+      const srcIdx = grid === 3 ? TILESET_TILE_MAP_3X3[idx] : idx;
+      const r = Math.floor(srcIdx / grid);
+      const c = srcIdx % grid;
+      scene.textures.get(texKey).add(
+        `tile_${idx}`, 0,
+        c * sw + inset, r * sh + inset,
+        sw - inset * 2, sh - inset * 2
+      );
     }
     // Cache slice dims off the first tileset for any legacy reads.
     tileSliceW = sw;
@@ -835,6 +876,9 @@ function create() {
   };
   sliceTileset('grass_tileset');
   sliceTileset('sand_tileset');
+  sliceTileset('forest_tileset');
+  sliceTileset('ruins_tileset');
+  sliceTileset('riverside_tileset');
 
   // World bounds + camera
   scene.physics.world.setBounds(0, 0, WORLD_W, WORLD_H);
@@ -1331,10 +1375,14 @@ function buildMap(scene) {
         }
       }
 
-      // Pick tileset key by zone. Desert uses real sand tiles; other biomes
-      // still tint grass until per-biome tilesets ship.
-      const tilesetKey = (zone === 'desert' && scene.textures.exists('sand_tileset'))
-        ? 'sand_tileset' : 'grass_tileset';
+      const zoneTileset = {
+        desert: 'sand_tileset',
+        forest: 'forest_tileset',
+        ruins: 'ruins_tileset',
+        riverside: 'riverside_tileset',
+      }[zone];
+      const tilesetKey = (zoneTileset && scene.textures.exists(zoneTileset))
+        ? zoneTileset : 'grass_tileset';
 
       const img = scene.add.image(
         c * TILE_SIZE + TILE_SIZE / 2,
@@ -1348,7 +1396,7 @@ function buildMap(scene) {
         if (Math.random() < 0.5) img.setFlipY(true);
       }
       // Zone tint only when we're still drawing the grass tileset for a
-      // non-grasslands biome. Real desert tiles are already the right palette.
+      // non-grasslands biome. Real biome tiles are already the right palette.
       if (tilesetKey === 'grass_tileset') {
         const tint = ZONE_TINTS[zone];
         if (tint && tint !== 0xffffff) img.setTint(tint);
@@ -1365,6 +1413,9 @@ function buildDecorations(scene) {
   const bushKeys   = ['bush_01','bush_02'];
   const mushroomKeys = ['mushroom_red_01','mushroom_brown_02'];
   const treeKeys   = ['tree_oak_01','tree_pine_02','tree_round_03'];
+  const forestFernKeys = scene.textures.exists('forest_fern_01') ? ['forest_fern_01'] : grassKeys;
+  const ruinsPillarKeys = scene.textures.exists('ruins_pillar_broken_01') ? ['ruins_pillar_broken_01'] : [];
+  const riversideCattailKeys = scene.textures.exists('riverside_cattail_01') ? ['riverside_cattail_01'] : grassKeys;
 
   // Block a disk of cells around (worldX, worldY) so A* routes around it.
   const blockCells = (worldX, worldY, cellRadius) => {
@@ -1636,8 +1687,23 @@ function buildDecorations(scene) {
     }
   };
 
+  const addLandmarkHero = (tile_r, tile_c, zone) => {
+    const x = tile_c * TILE_SIZE + TILE_SIZE / 2;
+    const y = tile_r * TILE_SIZE + TILE_SIZE / 2 + 8;
+    const hero = {
+      grasslands: { key: 'landmark_spawn_signpost', h: 112, opts: { alignBottom: true, shadow: true, maxAngle: 2 } },
+      forest: { key: 'landmark_forest_shrine', h: 128, opts: { alignBottom: true, shadow: true, maxAngle: 2, tint: 0xf0ffe0 } },
+      desert: { key: 'landmark_desert_obelisk', h: 154, opts: { alignBottom: true, shadow: true, maxAngle: 1 } },
+      ruins: { key: 'landmark_ruins_well', h: 128, opts: { alignBottom: true, shadow: true, maxAngle: 2 } },
+      riverside: { key: 'landmark_riverside_bridge', h: 130, opts: { alignBottom: true, shadow: true, maxAngle: 0, allowFlip: false } },
+    }[zone];
+    if (!hero) return;
+    placeLandmarkDeco(hero.key, x, y, hero.h, hero.opts);
+  };
+
   for (const p of landmarkTiles()) {
     addLandmarkRing(p.r, p.c, getZone(p.r, p.c));
+    addLandmarkHero(p.r, p.c, getZone(p.r, p.c));
   }
 
   // Grasslands (center) — dense ground cover + scattered focal trees.
@@ -1657,6 +1723,7 @@ function buildDecorations(scene) {
   for (let i = 0; i < 620; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     200, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'forest', tint: forestTint, shadow: true });
   for (let i = 0; i < 340; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      78, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'forest', tint: forestTint, shadow: true });
   for (let i = 0; i < 420; i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  48, { maxAngle: 10, zoneFilter: 'forest' });
+  for (let i = 0; i < 260; i++) place(Phaser.Utils.Array.GetRandom(forestFernKeys), 52, { alpha: 0.95, maxAngle: 16, zoneFilter: 'forest', shadow: true });
   for (let i = 0; i < 380; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     54, { alpha: 0.9, maxAngle: 18, zoneFilter: 'forest', tint: forestTint, sway: true, swayAmp: 2.5 });
   // Forest mushroom rings — classic RO-y woodland touch.
   for (let i = 0; i <  60; i++) placeCluster(Phaser.Utils.Array.GetRandom(mushroomKeys), 46, Phaser.Math.Between(4, 8), { maxAngle: 10, zoneFilter: 'forest', spread: TILE_SIZE });
@@ -1672,6 +1739,7 @@ function buildDecorations(scene) {
   // Ruins (west) — heavy rocks, occasional dead bush. Greyish.
   for (let i = 0; i < 600; i++) place(Phaser.Utils.Array.GetRandom(rockKeys),      58, { maxAngle: 14, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: ruinTint, shadow: true });
   for (let i = 0; i < 160; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      66, { maxAngle:  6, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: 0xa89878, shadow: true });
+  for (let i = 0; i <  90; i++) place(Phaser.Utils.Array.GetRandom(ruinsPillarKeys), 118, { maxAngle:  6, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', shadow: true });
   for (let i = 0; i < 240; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     46, { alpha: 0.7, maxAngle: 18, zoneFilter: 'ruins', tint: ruinTint, sway: true, swayAmp: 2 });
   // Rock piles — broken architecture feeling without new art.
   for (let i = 0; i <  50; i++) placeCluster(Phaser.Utils.Array.GetRandom(rockKeys), 56, Phaser.Math.Between(4, 7), { maxAngle: 14, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: ruinTint, spread: TILE_SIZE * 0.9, shadow: true });
@@ -1680,6 +1748,7 @@ function buildDecorations(scene) {
   for (let i = 0; i <  40; i++) place('pond_01',                                  240, { maxAngle:  0, alignBottom: true, blockRadius: 7, allowFlip: false, zoneFilter: 'riverside', shimmer: true });
   for (let i = 0; i < 560; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     56, { alpha: 0.95, maxAngle: 18, zoneFilter: 'riverside', sway: true, swayAmp: 3 });
   for (let i = 0; i < 400; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),    60, { maxAngle: 15, zoneFilter: 'riverside', sway: true, swayAmp: 2 });
+  for (let i = 0; i < 260; i++) place(Phaser.Utils.Array.GetRandom(riversideCattailKeys), 68, { maxAngle: 10, alignBottom: true, zoneFilter: 'riverside', shadow: true, sway: true, swayAmp: 1.5 });
   for (let i = 0; i < 140; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'riverside', shadow: true });
   // Riverside flower patches by the water.
   for (let i = 0; i <  80; i++) placeCluster(Phaser.Utils.Array.GetRandom(flowerKeys), 58, Phaser.Math.Between(5, 9), { maxAngle: 14, zoneFilter: 'riverside', sway: true, swayAmp: 2 });
