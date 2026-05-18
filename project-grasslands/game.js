@@ -215,6 +215,7 @@ const CLASS_DEFS = {
     role: 'Ranged DPS — arrow + triple shot',
     cardImage: 'archer_card',
     spritePrefix: 'archer_',
+    tierSpritePrefixes: { 2: 'hunter_' },
     tint: 0x88ee88,
     nameColor: '#99ee99',
     tierNames: ['Archer', 'Hunter', 'Ranger', 'Phantom Striker'],
@@ -705,6 +706,11 @@ function preload() {
     this.load.image(`archer_idle_${d}`, `assets/sprites/archer_idle_${d}.png`);
     this.load.image(`archer_walk_${d}`, `assets/sprites/archer_walk_${d}.png`);
   }
+  // Tier-2 Hunter art: south/north landed first; other directions fall back to Archer.
+  for (const d of ['south','north']) {
+    this.load.image(`hunter_idle_${d}`, `assets/sprites/hunter_idle_${d}.png`);
+    this.load.image(`hunter_walk_${d}`, `assets/sprites/hunter_walk_${d}.png`);
+  }
   // Desert biome — Cactling monster + sand tileset + cactus / dune deco.
   this.load.image('cactling_idle', 'assets/sprites/cactling_idle.png');
   this.load.image('cactling_hit', 'assets/sprites/cactling_hit.png');
@@ -813,6 +819,8 @@ function create() {
     'archer_idle_northeast','archer_walk_northeast',
     'mage_idle_south','mage_walk_south',
     'archer_idle_south','archer_walk_south',
+    'hunter_idle_south','hunter_walk_south',
+    'hunter_idle_north','hunter_walk_north',
     'deco_flower_cluster_01','deco_flower_cluster_02','deco_flower_cluster_03','deco_flower_cluster_04',
     'deco_rock_01','deco_rock_02','deco_rock_03',
     'deco_tallgrass_01','deco_tallgrass_02','deco_tallgrass_03',

@@ -1,9 +1,84 @@
 # HANDOFF.md — Grasslands Online
 
+---
+
+## 🤖 PICK-UP FOR CODEX (start here)
+
+**State as of 2026-05-18 5:43 PM CDT — post Hunter tier-2 art import.**
+
+- **Branch:** `main`.
+- **Latest completed work:** session 48 imports the first Hunter sprites for
+  Archer tier 2.
+- **Cache version live in `project-grasslands/index.html`:** `?v=139`.
+- **Next change must use:** `?v=140`.
+- **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
+  untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
+  stage, commit, or revert these.
+
+**Where we left off (session 48):**
+- `deco_grass_blob_soft_01.png` was not present in Downloads when Codex
+  resumed Claude Code's handoff.
+- Four generated Hunter sprites were present instead:
+  `hunter_idle_south`, `hunter_walk_south`, `hunter_idle_north`,
+  `hunter_walk_north`.
+- Those files are now in `project-grasslands/assets/sprites/`, resized to
+  512 px max, preloaded, alpha-keyed, and wired as Archer tier-2 art through
+  `CLASS_DEFS.archer.tierSpritePrefixes = { 2: 'hunter_' }`.
+- Missing Hunter east / southeast / northeast directions intentionally fall
+  back to the existing Archer art until Sonny generates those images.
+
+**Grass-polish state from session 47:**
+- `grass_tileset.png` is now backed by `grass_tileset_v2.png` (3×3 grid,
+  wired through the existing biome tileset slicer).
+- Code-only mitigations to soften the 128 px tile grid maxed out:
+  random 90° rotation × flipX/Y per tile (16 variants), per-tile alpha
+  jitter 0.85–1.00, RGB jitter ±8, mid-overlay 900 soft sprites, macro-
+  overlay 220 large sprites. See §3 "session 47" for details.
+- Remaining faint square seams are intrinsic to v2 art at tile edges.
+
+**3-step plan for the next session:**
+
+1. **Wait for `deco_grass_blob_soft_01.png` (256×256)** from Sonny in
+   `~/Downloads/` (transparent PNG, feathered radial alpha gradient,
+   no hard outline). When it lands:
+   - `mv ~/Downloads/deco_grass_blob_soft_01.png project-grasslands/assets/decorations/`
+   - `sips --resampleHeightWidthMax 256 ...` if oversized.
+   - `git add` the new asset.
+2. **Wire it.** In `game.js`:
+   - Add `this.load.image('deco_grass_blob_soft_01', '...')` in `preload()`.
+   - Add the key to `keyOutWhite()` strip list if needed.
+   - In `buildDecorations()` macro-overlay loop (search
+     `// Macro-blob layer`), replace the random `softKeys` pick with
+     the new key (or 70 % weight toward it) so blob soft masks the
+     remaining grid seams.
+   - Bump `?v=139` → `?v=140` in `index.html`.
+3. **Verify + ship.** `node -c project-grasslands/game.js`, reload
+   preview, screenshot before/after, commit (`asset:` + `feat:` in
+   two commits), push. Update HANDOFF.md §3 with the session entry.
+
+**If Sonny supplies a different asset first**, the same workflow
+applies — move, resize, wire, bump, verify, ship, document.
+
+**Suggested-but-deferred work (don't pick up until grass is signed off):**
+- Card drops (RO collection hook).
+- Spawn-plaza BGM dip (60 % volume within 600 px of spawn).
+- Equipment refinement +N at shop.
+- Footstep SFX variety per biome.
+
+**Do NOT re-add (Sonny has explicitly cut these):** WASD, skill
+hotkeys, SP bar, HealerNPC, camera shake, atmospheric vignette /
+player halo / cloud shadows / dim overlays.
+
+**Required reading:** all of this file, plus
+`project-grasslands/CLAUDE.md` (think before code, simplicity first,
+surgical changes, goal-driven execution).
+
+---
+
+
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 47, 90° tile
-> rotation + dual soft-overlay layer to further soften v2 grass grid.
-> Cache `?v=138`).
+> coding sessions. Last refresh: 2026-05-18 (post session 48, first Hunter
+> tier-2 Archer sprites wired. Cache `?v=139`).
 >
 > (Pre-session-47 header line:) Last refresh: 2026-05-18 (post session 46,
 > `grass_tileset_v2.png` wired as the base grass tileset. Cache `?v=137`).
@@ -211,7 +286,44 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 47 (latest)
+## 3. What we did in session 48 (latest)
+
+Cache now at **`?v=139`**. Claude Code's handoff asked for
+`deco_grass_blob_soft_01.png`, but that file was not in Downloads. The
+new files present were Hunter player sprites, so this session imported and
+wired the first Archer tier-2 art without changing gameplay rules.
+
+1. **Imported first Hunter sprites.** Moved
+   `hunter_idle_south.png`, `hunter_walk_south.png`,
+   `hunter_idle_north.png`, and `hunter_walk_north.png` from Downloads into
+   `project-grasslands/assets/sprites/`.
+2. **Normalized size.** Resized all four Hunter PNGs to 512 px max with
+   `sips`, matching the existing class-sprite asset cap.
+3. **Wired Hunter as Archer tier 2.** `CLASS_DEFS.archer` now has
+   `tierSpritePrefixes: { 2: 'hunter_' }`, matching the existing Knight
+   pattern for Swordsman tier 2.
+4. **Loaded only available Hunter directions.** `preload()` registers
+   south and north idle/walk Hunter textures. East / southeast / northeast
+   are not requested yet, avoiding asset 404s.
+5. **Fallback stays safe.** Existing texture picker falls back from
+   `hunter_` to `archer_`, so missing Hunter directions still display the
+   current Archer art instead of spinning, disappearing, or reverting to
+   Rookie.
+6. **Alpha-key pass.** The four Hunter sprites are included in
+   `keyOutWhite()`'s `spriteKeys` list.
+7. **Verification.** `node -c project-grasslands/game.js` exited 0. `sips`
+   confirmed all four Hunter sprites are 512×512. Local preview server
+   started under escalation, but sandbox curl could not connect back to it.
+8. **Cache bump.** `?v=138` → `?v=139`.
+
+### Next asset still needed for grass
+
+`deco_grass_blob_soft_01.png` is still the highest-impact grass-grid asset.
+When Sonny drops it into Downloads, move it to
+`project-grasslands/assets/decorations/`, resize to 256 px max, preload it,
+and weight the `// Macro-blob layer` toward that key.
+
+## 3.1. What we did in session 47
 
 Cache now at **`?v=138`**. Sonny inspected v2 tileset wired in session
 46 and reported the 128 px square grid was still visible because v2
@@ -254,7 +366,7 @@ intrinsic to v2's tile-edge art. Highest-impact next image:
   original art."* Drop into `Downloads`, say the word, will move /
   resize / wire in `preload()` and the macro pass.
 
-## 3.1. What we did in session 46
+## 3.2. What we did in session 46
 
 Cache now at **`?v=137`**. Wired the generated grass replacement image
 from Downloads.
@@ -1978,7 +2090,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=138`**. Next change should use `?v=139`.
+  change. Current: **`?v=139`**. Next change should use `?v=140`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
