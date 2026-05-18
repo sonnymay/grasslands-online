@@ -1,8 +1,9 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 1:30am CDT (post session 29,
-> dedicated UI camera + HUD cleanup + wheel zoom).
+> coding sessions. Last refresh: 2026-05-18 1:55am CDT (post session 29 v2,
+> bottom-right separator + Change Class flicker + Music ON/OFF + UL
+> consolidation + crisper nameplate).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -254,6 +255,34 @@ wheel-zoom feature. All HUD work landed; gameplay logic untouched.
    world centered on the player while zooming.
 6. **Cache bumps.** `?v=109` → `?v=110` → `?v=111` → `?v=112` as the four
    passes shipped.
+7. **Bottom-right Lv/Zeny separator.** Lv and Zeny were colliding because
+   both shared the same center-anchored origin inside a 170 px panel. The
+   panel grew to 210 px, the Lv now anchors at the left edge (`origin (0,
+   0.5)`) and Zeny at the right edge (`origin (1, 0.5)`), with a thin
+   gold vertical divider at 42 % of the panel width. Relayout updated to
+   match.
+8. **Change Class button stopped flickering.** `update()` was calling
+   `setColor` + `setFontSize` every single frame, and the dynamic font
+   size flipped between 10 px and 12 px each frame when the label width
+   straddled the threshold — both forced re-renders. Color is now cached
+   in `_clLastColor` and only re-applied when it changes; font size is
+   fixed at 12 px.
+9. **Music: ON/OFF.** The 5-step volume cycle (0/25/50/75/100 %) was
+   replaced with a clean binary toggle at a fixed 50 % BGM volume. Label
+   reads `♪ Music: ON` / `♪ Music: OFF`. New storage key
+   `grasslands_music_v3` (`'0'` / `'1'`), default ON. Tooltip updated.
+10. **Upper-left consolidation.** The boss-ticker, hot-streak, and
+   discovery panels are now permanently hidden — they were redundant
+   (boss bar at top center already reports boss state, streak fires as
+   float text over the player, discovery now lives inline on the gear
+   line as `★ N/5`). The UL column is just quest (when active) + gear,
+   matching Sonny's "fewer, cleaner boxes."
+11. **Player nameplate readability.** `nameTag` grew from 14 px regular
+   to 17 px bold, stroke 3 → 5, with a 2 px drop shadow + resolution 2.
+   `titleTag` went 11 → 13 bold with matching shadow. Title offset moved
+   from `-14` to `-18` so the two lines don't kiss with the bigger type.
+   Reads cleanly on grass, sand, and ruins backdrops.
+12. **Cache bump.** `?v=112` → `?v=113`.
 7. **Verification.** `node -c project-grasslands/game.js` exited 0 after
    every edit. Browser preview was intentionally skipped — Sonny asked us
    to save tokens once the live wedge from rapid `location.reload()` cycles
@@ -1387,7 +1416,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=112`**. Next change should use `?v=113`.
+  change. Current: **`?v=113`**. Next change should use `?v=114`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1510,7 +1539,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=112`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=113`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.

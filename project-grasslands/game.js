@@ -1430,20 +1430,29 @@ class PlayerController {
       0.24
     ).setOrigin(0.5);
 
+    // Player name/level — slightly larger with a heavier outline and a
+    // subtle drop shadow so it reads cleanly against any biome backdrop
+    // (grass green, desert sand, ruins grey).
     this.nameTag = scene.add.text(x, y, `Rookie Lv.${this.level}`, {
-      fontSize: '14px',
+      fontSize: '17px',
+      fontStyle: 'bold',
       color: '#ffffff',
       stroke: '#000000',
-      strokeThickness: 3,
+      strokeThickness: 5,
     }).setOrigin(0.5, 1);
+    this.nameTag.setShadow(0, 2, '#000000', 3, false, true);
+    if (this.nameTag.setResolution) this.nameTag.setResolution(2);
     // Cosmetic milestone title (e.g. "« Boss Hunter »"). Sits above the
     // class/level tag. Hidden until the player earns at least one title.
     this.titleTag = scene.add.text(x, y, '', {
-      fontSize: '11px',
+      fontSize: '13px',
+      fontStyle: 'bold',
       color: '#ffe066',
       stroke: '#000',
-      strokeThickness: 3,
+      strokeThickness: 4,
     }).setOrigin(0.5, 1).setVisible(false);
+    this.titleTag.setShadow(0, 2, '#000000', 3, false, true);
+    if (this.titleTag.setResolution) this.titleTag.setResolution(2);
     this._refreshNameTag = () => {
       let title = 'Rookie';
       let color = '#ffffff';
@@ -1582,7 +1591,7 @@ class PlayerController {
       this._syncShadow();
       const deadTop = this.sprite.y - this.sprite.displayHeight / 2;
       this.nameTag.setPosition(this.sprite.x, deadTop);
-      if (this.titleTag.visible) this.titleTag.setPosition(this.sprite.x, deadTop - 14);
+      if (this.titleTag.visible) this.titleTag.setPosition(this.sprite.x, deadTop - 18);
       return;
     }
 
@@ -1754,7 +1763,7 @@ class PlayerController {
       this._refreshNameTag();
       this._titleCheckAt = time + 1000;
     }
-    if (this.titleTag.visible) this.titleTag.setPosition(this.sprite.x, topY - 14);
+    if (this.titleTag.visible) this.titleTag.setPosition(this.sprite.x, topY - 18);
     // HP bar above player, only when not full.
     const wounded = this.hp < this.maxHP;
     this.hpBarBg.setVisible(wounded);
@@ -3624,7 +3633,7 @@ class UIManager {
     const bottomY = GAME_H - this.bottomH;
     const hpX = 20;
     const hpY = bottomY + this.bottomH / 2;
-    const statusW = 170;
+    const statusW = 210;
     const statusX = GAME_W - statusW - 20;
     const expX = hpX + this.hpBarW + 28;
     this.expBarW = Math.max(220, statusX - expX - 28);
@@ -3654,15 +3663,20 @@ class UIManager {
       fontSize: '15px', fontStyle: 'bold', color: '#fff7ef', stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
 
-    this.statusPanel = scene.add.rectangle(statusX, bottomY + (this.bottomH - 40) / 2, statusW, 40, 0x0d150d, 0.66)
+    // Bottom-right status panel: Lv on the left edge, Zeny on the right
+    // edge, with a thin vertical divider so the two values can never run
+    // into each other regardless of width.
+    this.statusPanel = scene.add.rectangle(statusX, bottomY + (this.bottomH - 36) / 2, statusW, 36, 0x0d150d, 0.7)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10001)
-      .setStrokeStyle(1, 0xffe066, 0.5);
-    this.lvlText = scene.add.text(statusX + statusW * 0.32, hpY, 'Lv.1', {
-      fontSize: '18px', fontStyle: 'bold', color: '#ffff88', stroke: '#000', strokeThickness: 3,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
-    this.zenyText = scene.add.text(statusX + statusW * 0.72, hpY, '0z', {
+      .setStrokeStyle(1, 0xffe066, 0.55);
+    this.statusDivider = scene.add.rectangle(statusX + Math.floor(statusW * 0.42), bottomY + (this.bottomH - 22) / 2, 1, 22, 0xffe066, 0.45)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10002);
+    this.lvlText = scene.add.text(statusX + 14, hpY, 'Lv.1', {
+      fontSize: '17px', fontStyle: 'bold', color: '#ffff88', stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(10004);
+    this.zenyText = scene.add.text(statusX + statusW - 14, hpY, '0z', {
       fontSize: '15px', fontStyle: 'bold', color: '#ffd24a', stroke: '#000', strokeThickness: 3,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
+    }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10004);
 
     // Auto-save indicator — dim idle glyph that pulses whenever saveGame()
     // writes successfully.
@@ -3780,30 +3794,29 @@ class UIManager {
     toolbarY += 4;
     addSection('SETTINGS');
 
-    // Music mute toggle — small button under the minimap.
-    // Cycle 5 volume steps instead of binary mute (0 / 0.25 / 0.5 / 0.75 / 1.0
-    // of the BGM's natural volume = 0.35). Persisted as an index.
-    const VOL_KEY = 'grasslands_volume_v2';
-    const VOL_LEVELS = [0, 0.25, 0.5, 0.75, 1.0];
-    let volIdx = 2; // default 50%
-    try { const s = localStorage.getItem(VOL_KEY); if (s !== null) volIdx = Math.max(0, Math.min(VOL_LEVELS.length - 1, parseInt(s, 10))); } catch (e) { /* ignore */ }
+    // Music ON/OFF — binary toggle at a fixed 50% volume. Per user
+    // request the 5-step volume cycle was replaced with a clean ON/OFF.
+    // Persisted as 0 (off) / 1 (on); default ON.
+    const MUSIC_KEY = 'grasslands_music_v3';
+    const MUSIC_VOLUME = 0.5; // 50% of the BGM's natural volume (0.35).
+    let musicOn = true;
+    try { const s = localStorage.getItem(MUSIC_KEY); if (s !== null) musicOn = s !== '0'; } catch (e) { /* ignore */ }
     const applyVol = () => {
       const bgm = scene.bgm; if (!bgm) return;
-      const mult = VOL_LEVELS[volIdx];
-      bgm.setVolume(0.35 * mult);
-      bgm.setMute(mult === 0);
+      bgm.setVolume(musicOn ? 0.35 * MUSIC_VOLUME : 0);
+      bgm.setMute(!musicOn);
     };
     applyVol();
-    const volLabel = () => `♪ Music ${Math.round(VOL_LEVELS[volIdx] * 100)}%`;
+    const volLabel = () => musicOn ? '♪ Music: ON' : '♪ Music: OFF';
     row = addToolbarButton(volLabel(), 'toggle');
     this.muteBg = row.bg;
     this.muteText = row.text;
     this.muteBg.on('pointerdown', () => {
       const bgm = scene.bgm; if (!bgm) return;
-      volIdx = (volIdx + 1) % VOL_LEVELS.length;
+      musicOn = !musicOn;
       applyVol();
       // If we just unmuted and BGM never started (autoplay block), kick it off.
-      if (VOL_LEVELS[volIdx] > 0 && !bgm.isPlaying) {
+      if (musicOn && !bgm.isPlaying) {
         try {
           if (scene.sound.context && scene.sound.context.state === 'suspended') {
             scene.sound.context.resume();
@@ -3812,9 +3825,9 @@ class UIManager {
         } catch (e) { /* ignore */ }
       }
       this.muteText.setText(volLabel());
-      try { localStorage.setItem(VOL_KEY, String(volIdx)); } catch (e) { /* ignore */ }
+      try { localStorage.setItem(MUSIC_KEY, musicOn ? '1' : '0'); } catch (e) { /* ignore */ }
     });
-    addTip(this.muteBg, 'Cycle music volume (0/25/50/75/100%)', btnX, row.y + btnH / 2);
+    addTip(this.muteBg, 'Toggle music on/off', btnX, row.y + btnH / 2);
 
     // Autopilot toggle — auto-targets nearest safe monster, avoids bosses
     // and overleveled enemies. Sits right below the mute button.
@@ -4065,7 +4078,7 @@ class UIManager {
     this.bar.y = bottomY;
     // Bottom-bar items.
     const hpX = 20;
-    const statusW = 170;
+    const statusW = 210;
     const statusX = w - statusW - 20;
     const expX = hpX + this.hpBarW + 28;
     this.expBarW = Math.max(220, statusX - expX - 28);
@@ -4082,9 +4095,13 @@ class UIManager {
     this.expBg.width = this.expBarW; this.expBg.displayWidth = this.expBarW;
     this.expFill.x = expX; this.expFill.y = midY;
     this.expText.x = expX + this.expBarW / 2; this.expText.y = midY;
-    this.statusPanel.x = statusX; this.statusPanel.y = bottomY + (this.bottomH - 40) / 2;
-    this.lvlText.x = statusX + statusW * 0.32; this.lvlText.y = midY;
-    this.zenyText.x = statusX + statusW * 0.72; this.zenyText.y = midY;
+    this.statusPanel.x = statusX; this.statusPanel.y = bottomY + (this.bottomH - 36) / 2;
+    if (this.statusDivider) {
+      this.statusDivider.x = statusX + Math.floor(statusW * 0.42);
+      this.statusDivider.y = bottomY + (this.bottomH - 22) / 2;
+    }
+    this.lvlText.x = statusX + 14; this.lvlText.y = midY;
+    this.zenyText.x = statusX + statusW - 14; this.zenyText.y = midY;
     // Minimap — anchor to right edge.
     this.miniX = w - this.miniW - 12;
     this.miniBg.x = this.miniX;
@@ -4140,11 +4157,18 @@ class UIManager {
       wantedLbl = `✦ Change Class (${fmt(cost)}z)`;
     }
     if (this.clText.text !== wantedLbl) this.clText.setText(wantedLbl);
-    // Dim button red when player can't afford the next swap.
+    // Dim button red when player can't afford the next swap. Cache the
+    // color and skip setColor on no-change frames — every setColor call
+    // forces a re-render, which earlier ran every frame and read as a
+    // visible flicker. Font size is fixed (was dynamic, which oscillated
+    // when label width straddled the threshold).
     const swapCost = player.classId ? classSwitchCost() : 0;
     const canAfford = player.zeny >= swapCost;
-    this.clText.setColor(canAfford ? '#ffe066' : '#ff9999');
-    this.clText.setFontSize(this.clText.width > (this.miniW - 18) ? 10 : 12);
+    const wantedColor = canAfford ? '#ffe066' : '#ff9999';
+    if (this._clLastColor !== wantedColor) {
+      this.clText.setColor(wantedColor);
+      this._clLastColor = wantedColor;
+    }
 
     // Quest tracker badge — color-coded per kind via tint hint in label.
     tickQuestPity();
@@ -4170,7 +4194,11 @@ class UIManager {
       this.questBg.setVisible(false);
       this.questText.setVisible(false);
     }
-    const gearTxt = gearSummary();
+    // Fold the biome / discovery count into the gear line so the upper-left
+    // column reads as one compact "loadout + progress" panel instead of two.
+    const discN = Object.keys(player.visitedLandmarks || {}).length;
+    const discMax = (typeof landmarkTiles === 'function') ? landmarkTiles().length : 5;
+    const gearTxt = `${gearSummary()}   ★ ${discN}/${discMax}`;
     if (this.gearText.text !== gearTxt) this.gearText.setText(gearTxt);
     // Promote gear bar border to gold once both slots are filled — visible
     // sign of full kit without opening the inspector.
@@ -4181,58 +4209,16 @@ class UIManager {
       this.gearBg._lastBorder = wantBorder;
     }
 
-    // Persistent boss ticker for the current zone's resident boss.
-    let tickerLine = '';
-    const zoneKey = currentZone;
-    if (zoneKey) {
-      const bossTypeId = Object.keys(MONSTER_TYPES).find(id => {
-        const c = MONSTER_TYPES[id];
-        return isBossCfg(c) && c.zones && c.zones.includes(zoneKey);
-      });
-      if (bossTypeId) {
-        const cfg = MONSTER_TYPES[bossTypeId];
-        const alive = bloblings.some(m => m.alive && m.typeId === bossTypeId);
-        if (alive) {
-          tickerLine = `☠ ${cfg.name}: roaming`;
-        } else {
-          const rt = bossRespawns[bossTypeId];
-          if (rt) {
-            const secs = Math.max(0, Math.ceil((rt - player.scene.time.now) / 1000));
-            tickerLine = `☠ ${cfg.name}: returns in ${Math.floor(secs/60)}:${String(secs%60).padStart(2,'0')}`;
-          }
-        }
-      }
-    }
-    if (tickerLine && !hudCompact) {
-      if (this.bossTickerText.text !== tickerLine) this.bossTickerText.setText(tickerLine);
-      this.bossTickerBg.setVisible(true);
-      this.bossTickerText.setVisible(true);
-    } else {
-      this.bossTickerBg.setVisible(false);
-      this.bossTickerText.setVisible(false);
-    }
-
-    // Hot-streak counter.
-    const streak = player.hotStreak || 0;
-    if (streak > 0 && !hudCompact) {
-      const next = 5 - (streak % 5);
-      const best = player.bestStreak || streak;
-      const label = `🔥 ×${streak}   next in ${next}   best ×${best}`;
-      if (this.streakText.text !== label) this.streakText.setText(label);
-      this.streakBg.setVisible(true);
-      this.streakText.setVisible(true);
-    } else {
-      this.streakBg.setVisible(false);
-      this.streakText.setVisible(false);
-    }
-
-    // Discovery badge — count of unique landmarks visited (total = 5).
-    const discN = Object.keys(player.visitedLandmarks || {}).length;
-    const discMax = (typeof landmarkTiles === 'function') ? landmarkTiles().length : 5;
-    const discLabel = `★ Biomes ${discN}/${discMax}`;
-    if (this.discoveryText.text !== discLabel) this.discoveryText.setText(discLabel);
-    this.discoveryBg.setVisible(!hudCompact);
-    this.discoveryText.setVisible(!hudCompact);
+    // Boss ticker / streak / discovery panels were retired from the
+    // upper-left column as part of the HUD declutter. Boss state still
+    // shows in the top-center boss bar; streak feedback fires as float
+    // text over the player; discovery now lives inline on the gear line.
+    this.bossTickerBg.setVisible(false);
+    this.bossTickerText.setVisible(false);
+    this.streakBg.setVisible(false);
+    this.streakText.setVisible(false);
+    this.discoveryBg.setVisible(false);
+    this.discoveryText.setVisible(false);
 
     // Boss bar — show whenever any aggressive / boss-tier monster is alive
     // anywhere in the world. Picks the closest one when several are around.
