@@ -342,6 +342,16 @@ wheel-zoom feature. All HUD work landed; gameplay logic untouched.
     (`scene.__playerHalo`) creates a focal lantern and pulls the eye on
     busy backdrops. Alpha breathes slightly per frame.
 28. **Cache bump.** `?v=118` → `?v=119`.
+29. **Sky tint per time of day.** The day/night overlay used a fixed
+    midnight-blue. It now interpolates noon → dusk-orange → midnight-blue
+    → dawn-pink based on the cycle phase, so the screen actually reads
+    as time-of-day. Alpha still tracks `worldDarkness`.
+30. **Drifting cloud shadows.** Eight translucent ellipses scroll the
+    world at varying speeds, wrapping at the edges. Cheap, no asset,
+    instant atmospheric depth.
+31. **Halo falloff at night.** The player halo shrinks ~45 % at midnight
+    so nights feel like a tight lantern instead of an even glow.
+32. **Cache bump.** `?v=119` → `?v=120`.
 7. **Verification.** `node -c project-grasslands/game.js` exited 0 after
    every edit. Browser preview was intentionally skipped — Sonny asked us
    to save tokens once the live wedge from rapid `location.reload()` cycles
@@ -1475,7 +1485,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=119`**. Next change should use `?v=120`.
+  change. Current: **`?v=120`**. Next change should use `?v=121`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1598,7 +1608,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=119`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=120`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.
