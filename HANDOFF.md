@@ -1,9 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 45,
-> per-tile tint jitter + soft-overlay scatter pass to break grass grid.
-> Cache `?v=136`).
+> coding sessions. Last refresh: 2026-05-18 (post session 46,
+> `grass_tileset_v2.png` wired as the base grass tileset. Cache `?v=137`).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -208,7 +207,26 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 45 (latest)
+## 3. What we did in session 46 (latest)
+
+Cache now at **`?v=137`**. Wired the generated grass replacement image
+from Downloads.
+
+1. **Imported `grass_tileset_v2.png`.** Moved from Downloads to
+   `project-grasslands/assets/tiles/grass_tileset_v2.png` and resized to
+   `768×768`.
+2. **Grass base now uses v2 art.** `preload()` still registers the texture as
+   `grass_tileset`, but now loads from `assets/tiles/grass_tileset_v2.png`.
+   This keeps existing map code untouched while swapping the art.
+3. **3×3 slicer enabled for grass.** `TILESET_GRID.grass_tileset = 3` and
+   `grass_tileset` inset is now `0`, matching the new generated 3×3 soft
+   organic sheet instead of the older 4×4 sheet with baked square edges.
+4. **Existing code softening preserved.** Session 45 per-tile tint jitter and
+   soft-overlay scatter still run on top of the new art.
+5. **Verification.** `node -c project-grasslands/game.js` exited 0.
+6. **Cache bump.** `?v=136` → `?v=137`.
+
+## 3.1. What we did in session 45
 
 Cache now at **`?v=136`**. Sonny called out the visible 128 px tile
 grid: "the grass does not look good yet — it feels like obvious square
@@ -1913,7 +1931,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=136`**. Next change should use `?v=137`.
+  change. Current: **`?v=137`**. Next change should use `?v=138`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 

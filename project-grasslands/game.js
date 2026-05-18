@@ -736,7 +736,7 @@ function preload() {
   this.load.image('mushroom_red_01',   'assets/decorations/mushroom_red_01.png');
   this.load.image('mushroom_brown_02', 'assets/decorations/mushroom_brown_02.png');
   this.load.image('pond_01', 'assets/decorations/pond_01.png');
-  this.load.image('grass_tileset', 'assets/tiles/grass_tileset.png');
+  this.load.image('grass_tileset', 'assets/tiles/grass_tileset_v2.png');
 
   // Background music — optional. Loader tolerates missing file (silent if absent).
   // Try mp3 first; ogg fallback for Firefox-only setups.
@@ -829,13 +829,13 @@ function create() {
   // biome tilesets are 3×3 sheets, so we map their 9 cells onto our 16 tile
   // frame names below.
   const TILESET_INSET_PCT = {
-    grass_tileset: 0.04,
+    grass_tileset: 0,
     sand_tileset: 0,
     forest_tileset: 0,
     ruins_tileset: 0,
     riverside_tileset: 0,
   };
-  const TILESET_GRID = { forest_tileset: 3, ruins_tileset: 3, riverside_tileset: 3 };
+  const TILESET_GRID = { grass_tileset: 3, forest_tileset: 3, ruins_tileset: 3, riverside_tileset: 3 };
   const TILESET_TILE_MAP_3X3 = {
     [TILE.GRASS]: 0,
     [TILE.THICK_GRASS]: 1,
