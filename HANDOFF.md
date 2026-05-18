@@ -1,8 +1,8 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-17 9:05pm CDT (post session 26,
-> fullscreen + sprite size flicker fix).
+> coding sessions. Last refresh: 2026-05-17 10:55pm CDT (post session 27,
+> fullscreen-by-default viewport + camera zoom out + Codex handoff).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -191,9 +191,56 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 26 (latest, in order)
+## 3. What we did in session 27 (latest, in order)
 
-Cache now at **`?v=99`**. Picked five items from §4 queue.
+Cache now at **`?v=102`**. Focus shifted from feature queue to player-facing
+polish based on Sonny's feedback (`UI/HUD 5/10`, `game feels too small`,
+`character sprite size flickers`). Sonny is handing the next session off to
+Codex — read this whole file plus `project-grasslands/CLAUDE.md` first.
+
+1. **Player sprite size flicker — FIXED.** `applyRookieTexture` swapped
+   player textures without recomputing scale; source PNGs differ in pixel
+   height (rookie 96 vs knight 512 vs gap-fill substitutes), so the on-
+   screen sprite jumped each animation frame. New
+   `PlayerController._setPlayerTexture(dir, frame)` mirrors
+   `MonsterController._setTex`: after the swap it recomputes
+   `basePScale = PLAYER_DISPLAY_H / sprite.height` and preserves the
+   walk-bob squash ratio so the bob isn't wiped. All four player-side call
+   sites (dead pose, attack pose, idle/walk, class swap) route through it.
+   Commit `31ebe4f`.
+2. **Fullscreen-by-default viewport.** Base resolution bumped from
+   `1024×768` (4:3) to `1280×720` (16:9). `#game` now sets `width:100vw;
+   height:100vh` so Phaser's parent truly spans the viewport. `body`
+   background painted `#3a6b35` (game's earthy green) so any residual
+   letterbox on aspect-mismatched viewports blends with the world. Scale
+   mode stays `Phaser.Scale.FIT` — ENVELOP was tried (commit reverted) but
+   crops HUD corners on portrait / ultrawide viewports. Commit `516f6b4`.
+3. **Camera zoom out + drop the manual fullscreen button.** Sonny said the
+   1280×720 viewport felt too zoomed in and didn't want to click a button
+   to feel full-screen. `cameras.main.setZoom(0.85 → 0.65)` shows roughly
+   30% more world per frame. The right-column `⛶ Fullscreen` button and
+   its scale event listeners were removed. Commit `18eaa74`.
+4. **Memory written for cross-session continuity.** Three new memories:
+   the HANDOFF↔CLAUDE.md cross-ref rule, fullscreen preference, and the
+   prioritized UI polish list (toolbar grouping → bottom HUD bar → chat
+   padding). Codex won't see these — they live in Claude Code's memory
+   store, not the repo. Sonny's intent is captured in §4 below instead.
+5. **Player feedback recorded for next session.** Sonny scored the game:
+   Visual 7/10, UI 5/10, World 6/10, Atmosphere 6/10, Overall 6/10. The
+   biggest lift is UI (toolbar feels like debug stack, fonts plain).
+   §4 below ranks the polish work toward each axis.
+
+Commits in chronological order this session: `f072fb7` (class-switch
+zeny), `147c1b2` (handoff doc), `1f401e8` (cosmetic title), `ed5744c`
+(handoff doc), `b36e1d2` (pity timer + title pulse), `31ebe4f` (sprite
+flicker + fullscreen button — button was later removed), `516f6b4` (16:9
+viewport), `18eaa74` (zoom out + remove button).
+
+---
+
+### (legacy session-26 entries — same calendar day, kept for trail)
+
+Cache previously at **`?v=99`**. Picked five items from §4 queue.
 
 7. **Quest pity timer** (item #4) — every quest stamps `bornAt` +
    `baseReward` at roll. `tickQuestPity()` runs each frame from
@@ -555,44 +602,88 @@ Big QoL + content batch on top of Codex's session 15. Cache now at
 
 ## 4. Next steps for Codex (suggested)
 
-The user is paused while context recharges. Pick freely.
+Sonny's first-impression scoring (2026-05-17):
 
-**Gameplay (15–30 min):**
-1. **Pet companion** — small sprite (reuse blobling tinted with
-   class color) that trails behind the player by 1 cell. No
-   combat, pure cosmetic. Toggle in shop or as a one-time 5000z
-   buy.
-2. ~~**Cosmetic title above name**~~ — DONE in session 26. Six titles
-   (Veteran/Boss Hunter/Streak Master/Tycoon/Plaza Wanderer/Wayfarer).
-3. ~~**Class switch cost**~~ — DONE in session 26. First pick free;
-   swap cost 5k → 10k → 20k → 40k → 80k zeny (cap).
-4. ~~**Quest pity timer**~~ — DONE in session 26. +25/+50/+75% at
-    3/5/7 min, HUD ⌛ glyph + chat notice on each tier.
+| Axis             | Score | Notes                                             |
+|------------------|-------|---------------------------------------------------|
+| Visual / art     | 7/10  | Consistent, charming, aura is nice.              |
+| **UI / HUD**     | **5/10** | Right panel = stack of debug buttons. Plain font. |
+| World            | 6/10  | Grass reads clearly, but flat / empty.           |
+| Atmosphere       | 6/10  | Weather + day/night flavor lines punch above weight.|
+| Overall          | 6/10  | Solid bones, fixable gaps.                       |
 
-**Bigger features (1–2 hr):**
-11. **Trophy room** — a small instanced sub-zone (or a corner of
-    the spawn plaza) where defeated boss statues appear with their
-    kill counts.
-12. **NPC merchant sprite** at spawn — visual avatar that opens
-    `showShop` on click. User previously declined; check before
-    building.
-13. **Cosmetic equipment slot** — third equipment slot for
-    appearance-only drops (hat, cape) that don't affect stats.
-14. **Player vs player practice arena** — a small fenced area at
-    spawn with AI clones of each class to fight for practice.
+UI/HUD is the biggest lift. Work the polish queue below in order. Each
+item is sized to fit ~1 hour and leaves the game stable.
 
-**Known small bugs / nits noticed in this session:**
-- ~~Hot-streak `next +M` label~~ — fixed in session 26 by relabeling
-  to `next in M` (kills-until-next, not bonus amount).
-- `nearLandmark`/`landmarkTiles` use tile coords; the
-  panic-heal landmark check converts via
-  `TILE_SIZE / CELL_SIZE = 4`. If that ratio ever changes the
-  conversion breaks — the panic block uses
+### Polish queue (UI/HUD — push 5→9)
+
+1. **Unify the right-side toolbar.** Today it's nine standalone buttons
+   (Map / Music / Auto / Return Home / Travel / Hard / Change Class /
+   Shop / HUD) each with a different fill color (gold, blue, brown,
+   green). Group into three vertical sections (Navigation / Settings /
+   Actions), share one stroke style, and reserve color for state (gold
+   = interactive call-to-action, gray = passive toggle, red = warning).
+2. **Bottom HUD bar — consolidate.** HP and EXP currently sit in
+   separate strips (HP overlaps the chat log, EXP in its own dark band,
+   Lv / Zeny floating right). Merge into one cohesive bar that runs the
+   full width with consistent backing. Recolor backing to a dark
+   olive/green that matches the world, not pure black/brown.
+3. **Quest / Gear / Streak / Discovery panels** (top-left) — unify to
+   one HUD-card style: same border weight, same opacity, same 10px
+   inner padding. Today each uses different markers + borders.
+4. **Chat / combat log** — text runs to the edge. Add 10–12px inner
+   padding and bump backing opacity from 0.55 → 0.75 so it doesn't
+   visually overlap monsters behind it.
+5. **Minimap frame.** Wrap with a 4–6px pixel-art border so it feels
+   intentional, not overlaid.
+6. **Typography pass.** Bump base text from 13–14px to 15–16px on HUD
+   labels. Add a 2px text shadow / outline for contrast on grass.
+
+### Polish queue (visuals — push 7→9)
+
+7. **Per-biome tilesets.** `sand_tileset.png` is already preloaded but
+   unwired. Replace the tinted-grass desert with the real sand tileset
+   first; forest/dungeon variants can follow.
+8. **Decoration variety.** Add 2–3 more deco variants per biome
+   (broken cart, signpost, campfire, ruins).
+
+### Polish queue (world & atmosphere — push 6→9)
+
+9. **Ambient props at spawn plaza** — campfires, signposts, mailbox.
+   Anchor environmental storytelling.
+10. **Weather particles.** Petal storm currently shows only a chat
+    message. Add a Phaser particle emitter (10–20 sprites drifting
+    across screen) tied to the existing weather rotation.
+11. **Idle wildlife.** Butterflies / birds spawning + flying randomly
+    in low-density zones. Pure visual, no combat.
+12. **Ambient SFX.** Footstep tick on cell change, wind loop on outdoor
+    biomes, owl hoot at night. Tie to existing volume cycler.
+
+### Gameplay backlog (paused while polish ships)
+
+- **Pet companion** — small sprite (reuse blobling tinted with class
+  color) trailing the player by 1 cell. Cosmetic. 5000z one-time buy.
+- **Trophy room** — corner of spawn plaza with boss statues + kill counts.
+- **Cosmetic equipment slot** — hat/cape, no stats.
+- **PvP practice arena** — fenced area with AI class clones.
+- **NPC merchant sprite** at spawn (Sonny previously declined — confirm
+  before building).
+
+### Known small bugs / nits
+
+- `nearLandmark` / `landmarkTiles` use tile coords; panic-heal landmark
+  check converts via `TILE_SIZE / CELL_SIZE = 4`. If that ratio ever
+  changes the conversion breaks — block uses
   `Math.floor(TILE_SIZE / CELL_SIZE)` to stay safe.
-- Boss respawn toast suppresses on initial spawn only because
-  `ui` is undefined at that point. If `create()` order ever
-  changes to build `ui` first, the initial 5 boss spawns will
-  toast at once.
+- Boss respawn toast suppresses on initial spawn only because `ui` is
+  undefined at that point. If `create()` order ever changes to build
+  `ui` first, the initial 5 boss spawns will toast at once.
+- Asset weight still ~34 MB PNGs. `pngquant` could cut another 40–60%.
+- Knight PNG substitutes (`knight_idle_east` ← `knight_walk_east`,
+  `knight_walk_northeast` ← `knight_idle_northeast`) — replace if exact
+  art arrives.
+- Wizard sprites (untracked in `assets/sprites/wizard_*.png` × 10) are
+  on disk but not yet committed and not yet wired into CLASS_DEFS.
 
 ## 5. (legacy) What we did in session 15 (in order)
 
@@ -1169,7 +1260,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=99`**. Next change should use `?v=99`.
+  change. Current: **`?v=102`**. Next change should use `?v=103`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
@@ -1292,7 +1383,7 @@ Always include `transparent background PNG with alpha channel`. The
 - Conventional prefixes only: `feat:`, `fix:`, `refactor:`, `tweak:`,
   `docs:`, `chore:`, `asset:`.
 - Subject ≤ 72 chars, present tense, no trailing period.
-- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=99`.
+- Bump `?v=N` in `index.html` whenever `game.js` changes. Current `?v=102`.
 - Run `node -c project-grasslands/game.js` before pushing.
 - Never end a session with uncommitted changes. Final action: clean
   `git status`, HANDOFF.md refreshed, both pushed.
