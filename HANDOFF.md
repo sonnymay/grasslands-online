@@ -1,9 +1,9 @@
 # HANDOFF.md — Grasslands Online
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 44,
-> 8 new named secondary plazas — world feels bigger without growing.
-> Cache `?v=135`).
+> coding sessions. Last refresh: 2026-05-18 (post session 45,
+> per-tile tint jitter + soft-overlay scatter pass to break grass grid.
+> Cache `?v=136`).
 >
 > **ALSO READ `project-grasslands/CLAUDE.md`** — short behavioral guidelines
 > (think before coding, simplicity first, surgical changes, goal-driven
@@ -208,7 +208,87 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 44 (latest)
+## 3. What we did in session 45 (latest)
+
+Cache now at **`?v=136`**. Sonny called out the visible 128 px tile
+grid: "the grass does not look good yet — it feels like obvious square
+blocks." Diagnosed and applied code-only mitigations.
+
+1. **Diagnosis.** `grass_tileset.png` frames (GRASS / THICK_GRASS /
+   TALL_GRASS / FLOWER / FLOWERS_COLOR) have hard square edges with
+   no soft falloff. When neighbors differ in palette the boundary is
+   instantly readable. Random flipX/flipY (session 5) only changes 4
+   orientations of the same square. Fundamental fix needs new tile
+   art with soft edges; this session ships code-only blur.
+2. **Per-tile RGB + alpha jitter on grass.** In `buildMap()`, every
+   `type === 'grass'` tile now gets `setTint(jitterTint(base))`
+   where each channel shifts by `[-8, +8]` and alpha lands in
+   `[0.95, 1.00]`. Neighbors no longer match — the eye stops
+   recognizing the 128 px grid.
+3. **Soft-overlay scatter pass.** In `buildDecorations()`, after the
+   walkable-protect step, 480 large translucent decoration sprites
+   (flower clusters + tall grass keys) scatter across grasslands /
+   forest / riverside zones at:
+   - Display height **160–240 px**.
+   - Alpha **0.12–0.20**.
+   - Random **0–359°** rotation.
+   - Biome wash tint (forest `0xb8d8a0`, riverside `0xc8e8d8`,
+     grasslands `0xd8e8c0`).
+   - Depth `-800` (between tile `-1000` and prop `-500/-620`).
+   These act as soft "blur patches" that obliterate the visible
+   grid without obscuring monsters, paths, or props.
+4. **Desert + ruins skipped.** Those biomes should read crisp and
+   barren. Roads/paths skipped too so the cross stays legible.
+5. **Verification.** `node -c project-grasslands/game.js` exited 0.
+   Preview reload boots clean. Comparing v=135 vs v=136
+   screenshots, the grid is much softer; the dominant remaining
+   issue is the underlying tileset art.
+6. **Cache bump.** `?v=135` → `?v=136`.
+
+### Asset plan — what to generate next (one image at a time)
+
+Code blur helps but the visible square edges in `grass_tileset.png`
+are the real ceiling. Replace the grass tileset first, then add a
+small set of high-impact overlays. Generate them in this order, one
+per ChatGPT image-gen request, transparent PNG:
+
+1. **`grass_tileset_v2.png` (768×768, 3×3 grid).** Same 9-cell layout
+   the slicer already maps for biome tilesets. Each cell is a soft
+   organic grass patch with feathered edges that bleed slightly past
+   its 256×256 frame — no visible square boundary. Vary brightness +
+   blade density across the 9 cells (3 "dark mossy", 3 "mid", 3
+   "lush light"). Anime/RO palette: warm yellow-green to cool teal-
+   green. Path: `assets/tiles/grass_tileset_v2.png`. Wire by editing
+   the `grass_tileset` line in `preload()`.
+2. **`deco_grass_blob_soft_01.png` (256×256).** A single very soft
+   irregular dark-green grass blob with a feathered radial gradient
+   alpha edge (no hard outline). Used to mask remaining tile seams.
+3. **`deco_grass_blob_soft_02.png` (256×256).** Same idea, but a
+   *lighter* "sun patch" tone. Pair with #2 for value contrast.
+4. **`deco_dirt_patch_soft_01.png` (256×256).** Tiny soft dirt scuff
+   with feathered alpha. Drop near paths to break the cross's right-
+   angle look.
+5. **`deco_pebble_cluster_01.png` (192×192).** A few small stones
+   loosely scattered with shadows already baked in. RO has these
+   everywhere on grass fields.
+6. **`deco_clover_patch_01.png` (192×192).** Soft cluster of tiny
+   three-leaf clover sprites at low contrast.
+7. **`deco_grass_long_blade_01.png` (96×192).** A vertical wisp of
+   tall blades, taller than wide, alpha-feathered. Use sparingly
+   with sway tween for foreground motion.
+8. **`deco_flowerbed_soft_01.png` (320×200).** Wide horizontal soft
+   flowerbed sprite to layer along plaza ring edges (replaces the
+   discrete flower cluster ring effect).
+
+For each: include in prompt "transparent background PNG with alpha
+channel, soft anime / Ragnarok Online style, no hard outlines, no
+text, original art." Resize to spec via `sips`. Wire in `preload()`,
+add to `softKeys` array or use directly in cluster passes.
+
+**Smallest single change with biggest visual win:** ship #1
+(`grass_tileset_v2.png`). Everything else is incremental.
+
+## 3.0. What we did in session 44
 
 Cache now at **`?v=135`**. Make the world feel beautiful and bigger
 without bumping physical dimensions (HANDOFF flags further growth as
@@ -1833,7 +1913,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=135`**. Next change should use `?v=136`.
+  change. Current: **`?v=136`**. Next change should use `?v=137`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
