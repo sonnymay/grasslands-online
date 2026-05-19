@@ -4,17 +4,36 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 11:25 PM CDT — post alpha edge-mask transition pass.**
+**State as of 2026-05-18 11:38 PM CDT — post dirt-checkerboard cleanup.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 68 fixes the actual per-tile edge snap:
-  runtime alpha masks now overlay each differing biome edge/corner, and
-  transition-band base tiles no longer receive full teal/sand zone tint.
-- **Cache version live in `project-grasslands/index.html`:** `?v=159`.
-- **Next change must use:** `?v=160`.
+- **Latest completed work:** session 69 keeps the good alpha shoreline-style
+  blending but removes the new mud/dirt checkerboard by making transition-band
+  base tiles vegetation-first and moving sand/mud color back into soft overlays.
+- **Cache version live in `project-grasslands/index.html`:** `?v=160`.
+- **Next change must use:** `?v=161`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 69):**
+- Goal: answer Claude Browser's feedback that the teal problem improved, but
+  the transition band became a brown dirt/mud chessboard.
+- Root cause: `transitionGroundTile()` used `DIRT_PATCH` and `DIRT_HEAVY` too
+  often across the whole 3-tile biome band, so the base map rendered square
+  brown tiles before alpha masks could soften them.
+- Fix: transition-band bases now choose only grass/tall-grass/thick-grass
+  frames using smoothed noise, not per-tile dirt randomness.
+- `terrainTransitionBaseTint()` now stays green/vegetation-biased at biome
+  edges; sand/mud/stone color comes from alpha masks and soft washes instead
+  of full square base tiles.
+- Wide band washes were reduced in density and alpha so they behave like the
+  good shoreline bleed rather than a mud tile field.
+- Cache bumped to `game.js?v=160`.
+- No gameplay, combat, controls, class selection, save schema, monster logic,
+  collision, map size, or sprite assets changed.
+- Verification: `node -c project-grasslands/game.js` passed and
+  `git diff --check` passed.
 
 **Where we left off (session 68):**
 - Goal: answer Claude Browser's new feedback that warped zone shapes helped
@@ -529,7 +548,30 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 68 (latest)
+## 3. What we did in session 69 (latest)
+
+Cache now at **`?v=160`**. Claude Browser said the water/shoreline treatment
+looked good, but the transition band had become a large brown dirt
+checkerboard. This session removes that new artifact while preserving the
+alpha-mask edge blending.
+
+1. **Removed dirt bases from transition band.** `transitionGroundTile()` no
+   longer returns `DIRT_PATCH`, `DIRT_HEAVY`, or rock tiles for biome-edge
+   bands; it returns only grass, tall grass, and thick grass variants.
+2. **Smoothed tile selection.** Transition-band base choice now uses
+   `smoothTileNoise()` instead of per-tile random noise, preventing chessboard
+   alternation.
+3. **Green-biased edge tint.** `terrainTransitionBaseTint()` now keeps biome
+   edge bases closer to grass/vegetation colors; sand, mud, and stone are
+   handled by alpha masks/washes instead of square base tiles.
+4. **Softer band washes.** Wide band wash density was reduced
+   (`900 → 620`) and alpha lowered so the overlays bleed like shoreline
+   color instead of painting mud blocks.
+5. **Cache bump.** `?v=159` → `?v=160`.
+6. **Verification.** `node -c project-grasslands/game.js` passed and
+   `git diff --check` passed.
+
+## 3.1. What we did in session 68
 
 Cache now at **`?v=159`**. Claude Browser said the map shape was only
 marginally better because the actual per-tile edge rendering still snapped
@@ -553,7 +595,7 @@ targets that renderer-level issue directly.
 7. **Verification.** `node -c project-grasslands/game.js` passed and
    `git diff --check` passed.
 
-## 3.1. What we did in session 67
+## 3.2. What we did in session 67
 
 Cache now at **`?v=158`**. Claude Browser confirmed the remaining dominant
 problem was still square, harsh biome chunks — teal/cyan riverside blocks and
@@ -579,7 +621,7 @@ session changes the map logic, not just decoration.
 8. **Verification.** `node -c project-grasslands/game.js` passed and
    `git diff --check` passed.
 
-## 3.2. What we did in session 66
+## 3.3. What we did in session 66
 
 Cache now at **`?v=157`**. Sonny identified the #1 remaining visual problem:
 terrain tile transitions were still harsh, square, and blocky, especially
@@ -603,7 +645,7 @@ riverside/grass and biome edges. This session targets that problem directly.
 7. **Verification.** `node -c project-grasslands/game.js` passed and
    `git diff --check` passed.
 
-## 3.3. What we did in session 65
+## 3.4. What we did in session 65
 
 Cache now at **`?v=156`**. Sonny: "Improve the Choose Your Path
 character cards so they are easier to click and look more polished."
@@ -633,7 +675,7 @@ behavior changed.
    Open + close the preview cleanly to confirm next session.
 9. **Cache bump.** `?v=155` → `?v=156`.
 
-## 3.4. What we did in session 63
+## 3.5. What we did in session 63
 
 Cache now at **`?v=154`**. Sonny pointed out that the "Choose Your Path"
 class cards were hard to click and did not look good. This session targets
@@ -2931,7 +2973,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=159`**. Next change should use `?v=160`.
+  change. Current: **`?v=160`**. Next change should use `?v=161`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 

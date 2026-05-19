@@ -1471,16 +1471,16 @@ function terrainTransitionBaseTint(zone, zones, distance = 3) {
   const closeness = Phaser.Math.Clamp((4 - (distance || 3)) / 3, 0.2, 1);
   if (zones.has('desert')) {
     return zone === 'desert'
-      ? (closeness > 0.66 ? 0xd9c38d : 0xd6cfa4)
-      : (closeness > 0.66 ? 0xded4a4 : 0xe3e0b4);
+      ? (closeness > 0.66 ? 0xd8d5a8 : 0xe0e6bc)
+      : (closeness > 0.66 ? 0xe2eac0 : 0xe8efcc);
   }
   if (zones.has('riverside')) {
     return zone === 'riverside'
-      ? (closeness > 0.66 ? 0xd0dfc6 : 0xd8e8ca)
-      : (closeness > 0.66 ? 0xd8e5c6 : 0xe0eccf);
+      ? (closeness > 0.66 ? 0xd8e8ce : 0xe2efcf)
+      : (closeness > 0.66 ? 0xe0edcc : 0xe8f2d4);
   }
-  if (zones.has('ruins')) return closeness > 0.66 ? 0xd0c8ae : 0xd8d7b8;
-  if (zones.has('forest')) return closeness > 0.66 ? 0xccddb8 : 0xdae8c6;
+  if (zones.has('ruins')) return closeness > 0.66 ? 0xd8d7ba : 0xe2e7c8;
+  if (zones.has('forest')) return closeness > 0.66 ? 0xd8e6c4 : 0xe2efd0;
   return 0xe0e8c8;
 }
 
@@ -1541,19 +1541,18 @@ function terrainBoundaryInfo(r, c, radius = 3) {
 }
 
 function transitionGroundTile(zone, zones, r, c) {
-  const detail = tileNoise(r, c, 771);
+  const detail = smoothTileNoise(r, c, 771);
   if (zones.has('desert')) {
-    if (zone === 'desert') return detail < 0.38 ? TILE.DIRT_PATCH : (detail < 0.72 ? TILE.TALL_GRASS : TILE.DIRT_HEAVY);
-    return detail < 0.56 ? TILE.DIRT_PATCH : (detail < 0.82 ? TILE.DIRT_HEAVY : TILE.THICK_GRASS);
+    return detail < 0.42 ? TILE.GRASS : (detail < 0.76 ? TILE.TALL_GRASS : TILE.THICK_GRASS);
   }
   if (zones.has('ruins')) {
-    return detail < 0.44 ? TILE.DIRT_PATCH : (detail < 0.76 ? TILE.ROCKS_SPARSE : TILE.THICK_GRASS);
+    return detail < 0.45 ? TILE.GRASS : (detail < 0.78 ? TILE.THICK_GRASS : TILE.TALL_GRASS);
   }
   if (zones.has('riverside')) {
-    return detail < 0.38 ? TILE.THICK_GRASS : (detail < 0.70 ? TILE.TALL_GRASS : TILE.DIRT_PATCH);
+    return detail < 0.38 ? TILE.GRASS : (detail < 0.72 ? TILE.THICK_GRASS : TILE.TALL_GRASS);
   }
   if (zones.has('forest')) {
-    return detail < 0.46 ? TILE.THICK_GRASS : (detail < 0.78 ? TILE.TALL_GRASS : TILE.FLOWER);
+    return detail < 0.46 ? TILE.GRASS : (detail < 0.78 ? TILE.THICK_GRASS : TILE.TALL_GRASS);
   }
   return detail < 0.5 ? TILE.GRASS : TILE.THICK_GRASS;
 }
@@ -1761,7 +1760,7 @@ function addTerrainSeamBlends(scene) {
     const img = scene.add.image(x, y, key);
     img.setScale(Phaser.Math.Between(420, 760) / img.height);
     img.setAngle(Phaser.Math.Between(0, 359));
-    img.setAlpha(Phaser.Math.FloatBetween(0.08, 0.14) * strength);
+    img.setAlpha(Phaser.Math.FloatBetween(0.045, 0.085) * strength);
     img.setTint(terrainBlendTint(zone, neighborZone));
     img.setDepth(-950 + strength);
     bandCount++;
@@ -1781,7 +1780,7 @@ function addTerrainSeamBlends(scene) {
         if (neighborZone === zone) continue;
         if (seamCount < 1200) addSeam(r, c, zone, neighborZone, dir);
       }
-      if (bandCount < 900 && boundaryInfo.distance <= 3 && tileNoise(r, c, 751) > 0.28) {
+      if (bandCount < 620 && boundaryInfo.distance <= 3 && tileNoise(r, c, 751) > 0.48) {
         addBandWash(r, c, zone, boundaryZones, boundaryInfo.distance);
       }
       if (boundaryInfo.zones.size >= 3 && cornerCount < 220 && tileNoise(r, c, 743) > 0.12) {
