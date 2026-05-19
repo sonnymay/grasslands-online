@@ -746,6 +746,7 @@ function preload() {
   this.load.image('landmark_desert_obelisk', 'assets/decorations/landmark_desert_obelisk.png');
   this.load.image('landmark_ruins_well', 'assets/decorations/landmark_ruins_well.png');
   this.load.image('landmark_riverside_bridge', 'assets/decorations/landmark_riverside_bridge.png');
+  this.load.image('campfire_01', 'assets/decorations/campfire_01.png');
   // Decorations
   for (let i = 1; i <= 4; i++) this.load.image(`deco_flower_cluster_0${i}`, `assets/decorations/deco_flower_cluster_0${i}.png`);
   for (let i = 1; i <= 3; i++) this.load.image(`deco_rock_0${i}`, `assets/decorations/deco_rock_0${i}.png`);
@@ -3064,23 +3065,34 @@ function buildDecorations(scene) {
       });
       blockCells(x, y, 2);
     }
-    const fire = placeLandmarkDeco('camp_fire_canvas', campX - 16, campY + 38, 74, {
+    const fireKey = scene.textures.exists('campfire_01') ? 'campfire_01' : 'camp_fire_canvas';
+    const fire = placeLandmarkDeco(fireKey, campX - 16, campY + 38, fireKey === 'campfire_01' ? 92 : 74, {
       alignBottom: true,
       allowFlip: false,
       angle: 0,
       baseCluster: 0,
     });
     if (fire) {
-      scene.add.ellipse(fire.x, fire.y + 2, 92, 34, 0xffaa44, 0.10).setDepth(-618);
+      const glow = scene.add.ellipse(fire.x, fire.y + 2, 124, 44, 0xffaa44, 0.12).setDepth(-618);
       scene.tweens.add({
         targets: fire,
-        alpha: 0.84,
-        scaleX: fire.scaleX * 1.04,
-        scaleY: fire.scaleY * 1.04,
-        duration: 900,
+        alpha: 0.88,
+        scaleX: fire.scaleX * 1.055,
+        scaleY: fire.scaleY * 1.075,
+        duration: 150,
         yoyo: true,
         repeat: -1,
-        ease: 'Sine.easeInOut',
+        ease: 'Sine.inOut',
+      });
+      scene.tweens.add({
+        targets: glow,
+        alpha: 0.20,
+        scaleX: 1.10,
+        scaleY: 1.18,
+        duration: 980,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.inOut',
       });
     }
     const fences = [

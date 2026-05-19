@@ -4,19 +4,44 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 89 prompt-inspired landmark pass.**
+**State as of 2026-05-19 — post session 90 campfire asset wiring pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 89 uses Sonny's detailed reconstruction
-  prompt as the next visual target. It upgrades the spawn camp with wagon,
-  benches, cooking pot, and richer prop staging; adds a ruin/tree anchor and
-  a boulder landmark; and spawns one small low-level monster pod so the nearby
-  road has a clear encounter pocket.
-- **Cache version live in `project-grasslands/index.html`:** `?v=193`.
-- **Next change must use:** `?v=194`.
+- **Latest completed work:** session 90 starts `MAP_VISION_PLAN.md` Phase 1
+  from the real current cache state. It wires the generated
+  `campfire_01.png` asset into preload, uses it in the spawn camp when
+  available, and adds fast flame flicker plus slow glow breathing.
+- **Cache version live in `project-grasslands/index.html`:** `?v=194`.
+- **Next change must use:** `?v=195`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 90):**
+- Goal: read `MAP_VISION_PLAN.md` and continue from the first roadmap action:
+  wire `campfire_01.png`, animate flame/glow, bump cache, verify, and commit.
+- Important cache correction: the plan was written against old `?v=177`, but
+  live handoff state was already `?v=193`, so this pass uses `?v=194` and next
+  change should use `?v=195`.
+- Correct asset used: `/Users/santipapmay/Downloads/campfire_01.png` was
+  copied to `project-grasslands/assets/decorations/campfire_01.png`. It is
+  192x192 RGBA with alpha.
+- Did **not** use the untracked typo asset
+  `project-grasslands/assets/decorations/camfire_01.png`; it is 1254x1254 RGB
+  with no alpha and should remain unstaged unless Sonny explicitly asks to
+  delete/replace it.
+- `preload()` now loads `campfire_01`.
+- `addSpawnCamp()` now chooses `campfire_01` when present, falling back to the
+  old runtime `camp_fire_canvas` if missing. The campfire gets a quick
+  alpha/scale flame flicker and a slower orange glow pulse.
+- Static decoration shadows remain disabled. Player and monster shadows remain
+  separate.
+- Cache bumped to `game.js?v=194`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md`
+  passed, and Chrome preview at `http://localhost:8002/?codex=campfire-v194`
+  loaded `game.js?v=194` with no current console warnings/errors. The campfire
+  sprite was visible in the spawn camp with glow/flicker behavior.
 
 **Where we left off (session 89):**
 - Goal: respond to the new "Grasslands Online JRPG" reconstruction prompt with
@@ -752,7 +777,29 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 89 (latest)
+## 3. What we did in session 90 (latest)
+
+Cache now at **`?v=194`**. This session starts executing
+`MAP_VISION_PLAN.md` Phase 1 from the actual current state rather than the old
+plan cache number.
+
+1. **Moved the correct campfire asset.** Copied
+   `/Users/santipapmay/Downloads/campfire_01.png` into
+   `project-grasslands/assets/decorations/campfire_01.png`. It is the correct
+   192x192 alpha PNG. The misspelled untracked `camfire_01.png` in
+   decorations is not used.
+2. **Preloaded the asset.** `preload()` now loads `campfire_01`.
+3. **Wired the campfire into the camp.** `addSpawnCamp()` now uses
+   `campfire_01` when available and keeps `camp_fire_canvas` as fallback.
+4. **Added fire motion.** The campfire has a fast flame flicker via subtle
+   alpha/scale yoyo, plus a slower orange glow ellipse pulse underneath.
+5. **No shadow regression.** Static decoration shadows remain disabled.
+6. **Verification.** `node -c project-grasslands/game.js` clean.
+   `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md`
+   clean. Chrome v194 loaded with no current console warnings/errors and the
+   new campfire sprite was visible in the spawn camp.
+
+## 3. What we did in session 89
 
 Cache now at **`?v=193`**. Sonny provided a detailed visual target prompt:
 retro JRPG/RO-inspired grassland with a central camp, ruin/tree landmark,
