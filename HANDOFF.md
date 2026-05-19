@@ -4,19 +4,30 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 7:26 PM CDT — post path/biome transition pass.**
+**State as of 2026-05-18 7:35 PM CDT — post authored micro-scenes pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 53 adds a dedicated transition overlay
-  layer so roads have soft shoulders and biome borders blend with ground
-  scuffs/pebbles/tufts instead of hard tile edges.
-- **Cache version live in `project-grasslands/index.html`:** `?v=144`.
-- **Next change must use:** `?v=145`.
+- **Latest completed work:** session 54 adds authored micro-scenes near
+  landmark approaches and selected road edges so the world feels more
+  intentionally composed instead of only procedurally scattered.
+- **Cache version live in `project-grasslands/index.html`:** `?v=145`.
+- **Next change must use:** `?v=146`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
 
-**Where we left off (session 53):**
+**Where we left off (session 54):**
+- Added `placeSceneGround()`, `placeSceneItem()`, and `addMicroScene()` inside
+  `buildDecorations()`.
+- New authored micro-scene pass places small composed patches around landmark
+  approaches and selected road-adjacent grass tiles.
+- Biome-specific scene recipes:
+  grasslands flower/grass/mushroom pockets; forest fern/mushroom/tree pockets;
+  desert sand/crack/dry-grass/cactus/rock pockets; ruins stone/pebble/crack/
+  rock/pillar pockets; riverside cattail/flower/pebble/grass pockets.
+- Every micro-scene prop is non-blocking; no movement/collision rules changed.
+
+**Previous state (session 53):**
 - Added `transitionOverlayKey()`, `blendTint()`, `adjacentPathDir()`, and
   `placeGroundTransition()` inside `buildDecorations()`.
 - New road-shoulder pass places low-alpha scuffs/pebbles/tufts along grass
@@ -145,8 +156,8 @@ obvious meaning, is a yes/no/ok acknowledgement, or starts with `/`.
 
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 53, path/biome
-> transition pass. Cache `?v=144`).
+> coding sessions. Last refresh: 2026-05-18 (post session 54, authored
+> micro-scenes pass. Cache `?v=145`).
 >
 > (Pre-session-47 header line:) Last refresh: 2026-05-18 (post session 46,
 > `grass_tileset_v2.png` wired as the base grass tileset. Cache `?v=137`).
@@ -354,7 +365,41 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 53 (latest)
+## 3. What we did in session 54 (latest)
+
+Cache now at **`?v=145`**. Sonny asked to keep improving toward a
+Ragnarok Online-like authored map feel. This session adds composed
+micro-scenes instead of only random scatter.
+
+1. **Authored micro-scene helpers.** Added `placeSceneGround()`,
+   `placeSceneItem()`, and `addMicroScene()` inside `buildDecorations()`.
+2. **Landmark approach scenes.** Each landmark now gets small composed
+   decoration pockets around its approach tiles, using the zone's visual
+   vocabulary.
+3. **Roadside scene pockets.** A capped deterministic pass adds occasional
+   micro-scenes near road-adjacent grass tiles, so roads have memorable
+   little moments instead of endless scatter.
+4. **Biome recipes.**
+   - Grasslands: soft scuff + flowers + grass + mushrooms/bush.
+   - Forest: fern/mushroom/grass/tree grove pockets.
+   - Desert: sand scuff + cracked earth + dry tuft + rock/cactus.
+   - Ruins: stone dust + pebbles + cracks + rocks/pillars.
+   - Riverside: stone dust + pebbles + cattails + flowers/grass.
+5. **Scope preserved.** All micro-scene props are non-blocking. No gameplay,
+   combat, progression, controls, UI layout, monster logic, saves, map size,
+   or lighting changed.
+6. **Verification.** `node -c project-grasslands/game.js` exited 0.
+7. **Cache bump.** `?v=144` → `?v=145`.
+
+### Next best RO-beauty move
+
+Add a tiny "identity prop pack" per biome, especially ruins and desert:
+broken wall segment, mossy stone slab, statue fragment, bone pile,
+half-buried stone, dry bush, cactus flower, and riverside stepping stones.
+The composition logic now exists; better assets will make each scene read
+less like reused decoration pieces.
+
+## 3.1. What we did in session 53
 
 Cache now at **`?v=144`**. Sonny accepted the recommendation to improve
 paths and biome transitions so the world feels more like an authored

@@ -2110,6 +2110,91 @@ function buildDecorations(scene) {
     return img;
   };
 
+  const placeSceneGround = (x, y, key, h, opts = {}) => {
+    if (!key || !scene.textures.exists(key)) return null;
+    const img = scene.add.image(x, y, key);
+    img.setScale(h / img.height);
+    img.setAlpha(opts.alpha ?? 0.14);
+    img.setAngle(opts.angle ?? Phaser.Math.Between(0, 359));
+    img.setDepth(opts.depth ?? -782);
+    if (opts.tint) img.setTint(opts.tint);
+    return img;
+  };
+
+  const placeSceneItem = (cx, cy, dx, dy, key, h, opts = {}) => {
+    if (!key || !scene.textures.exists(key)) return null;
+    return placeLandmarkDeco(key, cx + dx, cy + dy, h, {
+      maxAngle: opts.maxAngle ?? 10,
+      alpha: opts.alpha ?? 1,
+      tint: opts.tint,
+      alignBottom: opts.alignBottom,
+      shadow: opts.shadow,
+      shadowAlpha: opts.shadowAlpha ?? 0.12,
+      sway: opts.sway,
+      swayAmp: opts.swayAmp,
+      allowFlip: opts.allowFlip,
+      depth: opts.depth,
+    });
+  };
+
+  const addMicroScene = (tile_r, tile_c, zone, variant = 0) => {
+    if (getCellType(tile_r, tile_c) !== 'grass') return;
+    const cx = tile_c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-18, 18);
+    const cy = tile_r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-14, 14);
+    const rot = (variant % 4) * Math.PI / 2;
+    const pt = (x, y) => ({
+      x: Math.round(x * Math.cos(rot) - y * Math.sin(rot)),
+      y: Math.round(x * Math.sin(rot) + y * Math.cos(rot)),
+    });
+    const add = (x, y, key, h, opts = {}) => {
+      const p = pt(x, y);
+      placeSceneItem(cx, cy, p.x, p.y, key, h, opts);
+    };
+    const ground = (x, y, key, h, opts = {}) => {
+      const p = pt(x, y);
+      placeSceneGround(cx + p.x, cy + p.y, key, h, opts);
+    };
+
+    if (zone === 'desert') {
+      ground(0, 0, 'deco_sand_scuff_soft_01', 190, { tint: 0xd8bf80, alpha: 0.18 });
+      ground(-22, 18, 'deco_cracked_earth_01', 82, { tint: 0xd2b26e, alpha: 0.18 });
+      add(-34, 14, Phaser.Utils.Array.GetRandom(rockKeys), 46, { tint: desertRockTint, alignBottom: true, shadow: true });
+      add(28, -18, 'deco_dry_grass_tuft_01', 58, { tint: 0xd6c178, alpha: 0.72, maxAngle: 16 });
+      if (tileNoise(tile_r, tile_c, 421) > 0.52) add(42, 28, 'cactus_set', 72, { alignBottom: true, shadow: true, maxAngle: 5 });
+      return;
+    }
+    if (zone === 'ruins') {
+      ground(0, 0, 'deco_stone_dust_soft_01', 190, { tint: 0xbfb6a2, alpha: 0.16 });
+      ground(22, -10, 'deco_pebble_cluster_01', 76, { tint: ruinTint, alpha: 0.18 });
+      add(-38, 18, Phaser.Utils.Array.GetRandom(rockKeys), 52, { tint: ruinTint, alignBottom: true, shadow: true });
+      add(34, 28, 'deco_cracked_earth_01', 66, { tint: 0xb8ad96, alpha: 0.78, maxAngle: 18 });
+      if (ruinsPillarKeys.length && tileNoise(tile_r, tile_c, 431) > 0.58) add(0, -32, Phaser.Utils.Array.GetRandom(ruinsPillarKeys), 92, { alignBottom: true, shadow: true, maxAngle: 4 });
+      return;
+    }
+    if (zone === 'forest') {
+      ground(0, 0, 'deco_stone_dust_soft_01', 150, { tint: 0xa8c898, alpha: 0.08 });
+      add(-36, 8, Phaser.Utils.Array.GetRandom(forestFernKeys), 54, { tint: forestTint, alpha: 0.92, maxAngle: 14, sway: true, swayAmp: 2 });
+      add(24, -14, Phaser.Utils.Array.GetRandom(mushroomKeys), 42, { maxAngle: 8 });
+      add(42, 24, Phaser.Utils.Array.GetRandom(grassKeys), 46, { tint: forestTint, alpha: 0.78, maxAngle: 16, sway: true, swayAmp: 2 });
+      if (tileNoise(tile_r, tile_c, 441) > 0.62) add(-8, -38, Phaser.Utils.Array.GetRandom(treeKeys), 128, { tint: forestTint, alignBottom: true, shadow: true, maxAngle: 3 });
+      return;
+    }
+    if (zone === 'riverside') {
+      ground(0, 0, 'deco_stone_dust_soft_01', 160, { tint: 0xbfd8c8, alpha: 0.10 });
+      ground(-20, 18, 'deco_pebble_cluster_01', 68, { tint: 0xb8d8c8, alpha: 0.16 });
+      add(-36, -4, Phaser.Utils.Array.GetRandom(riversideCattailKeys), 62, { alignBottom: true, shadow: true, maxAngle: 9, sway: true, swayAmp: 1.5 });
+      add(28, 18, Phaser.Utils.Array.GetRandom(flowerKeys), 48, { maxAngle: 14, sway: true, swayAmp: 2 });
+      add(42, -24, Phaser.Utils.Array.GetRandom(grassKeys), 48, { alpha: 0.86, maxAngle: 16, sway: true, swayAmp: 2 });
+      return;
+    }
+
+    ground(0, 0, 'deco_sand_scuff_soft_01', 155, { tint: 0xd8e0b8, alpha: 0.09 });
+    add(-36, 12, Phaser.Utils.Array.GetRandom(flowerKeys), 50, { maxAngle: 14, sway: true, swayAmp: 2 });
+    add(24, -18, Phaser.Utils.Array.GetRandom(grassKeys), 50, { alpha: 0.88, maxAngle: 16, sway: true, swayAmp: 2 });
+    add(42, 22, Phaser.Utils.Array.GetRandom(mushroomKeys), 38, { maxAngle: 8 });
+    if (tileNoise(tile_r, tile_c, 451) > 0.66) add(-4, -38, Phaser.Utils.Array.GetRandom(bushKeys), 58, { alignBottom: true, shadow: true, maxAngle: 6 });
+  };
+
   let roadBlendCount = 0;
   let biomeBlendCount = 0;
   for (let r = 1; r < MAP_ROWS - 1; r++) {
@@ -2153,6 +2238,36 @@ function buildDecorations(scene) {
         biomeBlendCount++;
       }
     }
+  }
+
+  // Authored micro-scenes — small composed patches near landmarks and roads.
+  // These give the world "map designer touched this" moments without changing
+  // movement or combat rules; every prop here is non-blocking.
+  const sceneTiles = [];
+  const queueScene = (r, c, zoneHint = null) => {
+    if (r <= 0 || c <= 0 || r >= MAP_ROWS - 1 || c >= MAP_COLS - 1) return;
+    if (getCellType(r, c) !== 'grass') return;
+    sceneTiles.push({ r, c, zone: zoneHint || getZone(r, c) });
+  };
+  for (const lm of landmarkTiles()) {
+    const zone = getZone(lm.r, lm.c);
+    queueScene(lm.r - 2, lm.c, zone);
+    queueScene(lm.r + 2, lm.c, zone);
+    queueScene(lm.r, lm.c - 2, zone);
+    queueScene(lm.r, lm.c + 2, zone);
+  }
+  for (let r = 2; r < MAP_ROWS - 2 && sceneTiles.length < 92; r++) {
+    for (let c = 2; c < MAP_COLS - 2 && sceneTiles.length < 92; c++) {
+      if (getCellType(r, c) !== 'grass' || !adjacentPathDir(r, c)) continue;
+      if (tileNoise(r, c, 461) > 0.982) queueScene(r, c);
+    }
+  }
+  const usedSceneTiles = new Set();
+  for (const s of sceneTiles) {
+    const key = `${s.r},${s.c}`;
+    if (usedSceneTiles.has(key)) continue;
+    usedSceneTiles.add(key);
+    addMicroScene(s.r, s.c, s.zone, Math.floor(tileNoise(s.r, s.c, 471) * 4));
   }
 
   // Soft ground overlay pass — breaks the 128 px tile grid visually by
