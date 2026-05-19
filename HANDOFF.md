@@ -4,18 +4,33 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 8:10 PM CDT — post visual performance trim.**
+**State as of 2026-05-18 8:25 PM CDT — post biome identity set-piece pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 56 trims the recent decoration/overlay
-  budget to reduce lag while keeping the new RO-style terrain beauty layers.
-- **Cache version live in `project-grasslands/index.html`:** `?v=147`.
-- **Next change must use:** `?v=148`.
+- **Latest completed work:** session 57 reduces broad random scatter and adds
+  stronger biome identity set pieces with existing assets.
+- **Cache version live in `project-grasslands/index.html`:** `?v=148`.
+- **Next change must use:** `?v=149`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
 
-**Where we left off (session 56):**
+**Where we left off (session 57):**
+- Goal: make the world prettier and less laggy by relying on fewer, stronger
+  composed details instead of many tiny random scatter objects.
+- Broad scatter counts were reduced across grasslands, forest, desert, ruins,
+  and riverside decoration passes.
+- Added `addIdentitySetPiece()` inside `buildDecorations()` and capped biome
+  identity set pieces around primary landmarks plus rare road-adjacent tiles.
+- Existing-art recipes now give each biome stronger identity:
+  desert cactus/rock/crack/sand pockets; ruins pillar/stone/pebble/crack
+  pockets; forest grove/fern/mushroom/tree pockets; riverside cattail/pebble/
+  flower/grass pockets; grasslands flower/bush/mushroom/grass pockets.
+- All new set pieces are cosmetic and non-blocking. No gameplay, combat,
+  progression, controls, UI layout, map dimensions, saves, or monster logic
+  changed.
+
+**Previous state (session 56):**
 - Root cause for lag: recent beauty passes added many always-present display
   objects and extra sway tweens, especially road/biome blend overlays,
   soft/macro overlays, accents, and authored micro-scenes.
@@ -383,7 +398,42 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 56 (latest)
+## 3. What we did in session 57 (latest)
+
+Cache now at **`?v=148`**. Sonny approved the next two visual/performance
+ideas: use fewer, stronger assets/details and give each biome clearer identity.
+This session does that with existing art first, before asking for more PNGs.
+
+1. **Reduced random scatter density.** Lowered broad decoration counts across
+   grasslands, forest, desert, ruins, and riverside so the map depends less on
+   hundreds of small always-present objects.
+2. **Added biome identity set pieces.** Added `addIdentitySetPiece()` inside
+   `buildDecorations()` to compose stronger local scenes from existing assets.
+3. **Placed them with caps.** Identity set pieces appear near primary
+   landmarks and rare road-adjacent tiles, with a per-zone cap of 5 so the
+   map gets memorable pockets without returning to heavy scatter spam.
+4. **Biome recipes.**
+   - Desert: sand scuffs, cracked earth, cactus, dry grass, and rocks.
+   - Ruins: stone dust, pebble clusters, cracked earth, rocks, and pillars.
+   - Forest: tree/fern/mushroom/grass grove pockets.
+   - Riverside: cattails, pebbles, flowers, and grasses.
+   - Grasslands: flower, bush, mushroom, and grass pockets.
+5. **Scope preserved.** No gameplay, combat, progression, controls, UI
+   layout, monster logic, saves, map size, or lighting changed.
+6. **Verification.** `node -c project-grasslands/game.js` exited 0.
+7. **Cache bump.** `?v=147` -> `?v=148`.
+
+### Next beauty suggestions
+
+1. **Generate true biome hero props.** Highest impact now: ruined wall,
+   desert bone pile, dry bush, cactus flower, riverside stepping stones, and
+   shoreline mud/stone overlays.
+2. **Dedicated shoreline pass.** Make riversides feel hand-authored with wet
+   dirt bands, reed clusters, bridge approach details, and stones along water.
+3. **Prop style harmonization.** Normalize generated prop scale, tint, shadow,
+   and alpha-keying so new art reads as one cohesive RO-like tileset.
+
+## 3.1. What we did in session 56
 
 Cache now at **`?v=147`**. Sonny reported the game felt a little laggy after
 the recent beauty passes. This session focused on trimming render/update
