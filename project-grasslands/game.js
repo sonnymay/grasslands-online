@@ -1388,8 +1388,10 @@ function getZone(r, c) {
   const dr = r - midRow;
   const dc = c - midCol;
   if (Math.abs(dr) <= coreHalf && Math.abs(dc) <= coreHalf) return 'grasslands';
-  // Outside the core: pick biome by dominant axis.
-  if (Math.abs(dr) >= Math.abs(dc)) {
+  // Outside the core: pick biome by dominant axis, but warp the diagonal
+  // boundary so biomes stop meeting in perfect rectangular/diamond cuts.
+  const boundaryWarp = Math.round((smoothTileNoise(Math.floor(r / 3), Math.floor(c / 3), 701) - 0.5) * 8);
+  if (Math.abs(dr) + boundaryWarp >= Math.abs(dc)) {
     return dr < 0 ? 'forest' : 'desert';
   } else {
     return dc < 0 ? 'ruins' : 'riverside';
@@ -1452,6 +1454,41 @@ function terrainBlendTint(zone, neighborZone = zone) {
   if (zone === 'riverside' || neighborZone === 'riverside') return 0xbfd8c8;
   if (zone === 'forest' || neighborZone === 'forest') return 0xb8d8a0;
   return 0xd8e0b8;
+}
+
+function terrainBoundaryInfo(r, c, radius = 3) {
+  const zone = getZone(r, c);
+  const zones = new Set([zone]);
+  let distance = Infinity;
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const nr = Phaser.Math.Clamp(r + dy, 0, MAP_ROWS - 1);
+      const nc = Phaser.Math.Clamp(c + dx, 0, MAP_COLS - 1);
+      const neighborZone = getZone(nr, nc);
+      zones.add(neighborZone);
+      if (neighborZone !== zone) distance = Math.min(distance, Math.abs(dx) + Math.abs(dy));
+    }
+  }
+  return { zone, zones, distance: Number.isFinite(distance) ? distance : null };
+}
+
+function transitionGroundTile(zone, zones, r, c) {
+  const detail = tileNoise(r, c, 771);
+  if (zones.has('desert')) {
+    if (zone === 'desert') return detail < 0.38 ? TILE.DIRT_PATCH : (detail < 0.72 ? TILE.TALL_GRASS : TILE.DIRT_HEAVY);
+    return detail < 0.56 ? TILE.DIRT_PATCH : (detail < 0.82 ? TILE.DIRT_HEAVY : TILE.THICK_GRASS);
+  }
+  if (zones.has('ruins')) {
+    return detail < 0.44 ? TILE.DIRT_PATCH : (detail < 0.76 ? TILE.ROCKS_SPARSE : TILE.THICK_GRASS);
+  }
+  if (zones.has('riverside')) {
+    return detail < 0.38 ? TILE.THICK_GRASS : (detail < 0.70 ? TILE.TALL_GRASS : TILE.DIRT_PATCH);
+  }
+  if (zones.has('forest')) {
+    return detail < 0.46 ? TILE.THICK_GRASS : (detail < 0.78 ? TILE.TALL_GRASS : TILE.FLOWER);
+  }
+  return detail < 0.5 ? TILE.GRASS : TILE.THICK_GRASS;
 }
 
 function pickNaturalGroundTile(zone, r, c, type) {
@@ -1517,7 +1554,11 @@ function buildMap(scene) {
     for (let c = 0; c < MAP_COLS; c++) {
       const type = getCellType(r, c);
       const zone = getZone(r, c);
-      const idx = pickNaturalGroundTile(zone, r, c, type);
+      const boundaryInfo = type === 'grass' ? terrainBoundaryInfo(r, c, 3) : null;
+      const inTransitionBand = !!boundaryInfo && boundaryInfo.distance !== null && boundaryInfo.distance <= 3;
+      const idx = inTransitionBand
+        ? transitionGroundTile(zone, boundaryInfo.zones, r, c)
+        : pickNaturalGroundTile(zone, r, c, type);
 
       const zoneTileset = {
         desert: 'sand_tileset',
@@ -1525,7 +1566,8 @@ function buildMap(scene) {
         ruins: 'ruins_tileset',
         riverside: 'riverside_tileset',
       }[zone];
-      const tilesetKey = (zoneTileset && scene.textures.exists(zoneTileset))
+      const transitionBase = inTransitionBand && (zone === 'riverside' || zone === 'desert' || boundaryInfo.zones.has('riverside') || boundaryInfo.zones.has('desert'));
+      const tilesetKey = !transitionBase && zoneTileset && scene.textures.exists(zoneTileset)
         ? zoneTileset : 'grass_tileset';
 
       const img = scene.add.image(
@@ -1580,6 +1622,7 @@ function addTerrainSeamBlends(scene) {
   ];
   let seamCount = 0;
   let cornerCount = 0;
+  let bandCount = 0;
 
   const addSeam = (r, c, zone, neighborZone, dir) => {
     const key = terrainBlendAsset(zone, neighborZone);
@@ -1614,19 +1657,41 @@ function addTerrainSeamBlends(scene) {
     cornerCount++;
   };
 
+  const addBandWash = (r, c, zone, zones, distance) => {
+    const neighborZone = zones.find((z) => z !== zone) || zone;
+    const key = terrainBlendAsset(zone, neighborZone);
+    if (!scene.textures.exists(key)) return;
+    const strength = Phaser.Math.Clamp(4 - distance, 1, 3);
+    const x = c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-42, 42);
+    const y = r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-38, 38);
+    const img = scene.add.image(x, y, key);
+    img.setScale(Phaser.Math.Between(420, 760) / img.height);
+    img.setAngle(Phaser.Math.Between(0, 359));
+    img.setAlpha(Phaser.Math.FloatBetween(0.08, 0.14) * strength);
+    img.setTint(terrainBlendTint(zone, neighborZone));
+    img.setDepth(-950 + strength);
+    bandCount++;
+  };
+
   for (let r = 1; r < MAP_ROWS - 1; r++) {
     for (let c = 1; c < MAP_COLS - 1; c++) {
       if (getCellType(r, c) !== 'grass') continue;
       const zone = getZone(r, c);
+      const boundaryInfo = terrainBoundaryInfo(r, c, 3);
+      if (boundaryInfo.distance === null) continue;
+      const boundaryZones = [...boundaryInfo.zones];
       const touchingZones = new Set([zone]);
       for (const dir of dirs) {
         const neighborZone = getZone(r + dir.dr, c + dir.dc);
         touchingZones.add(neighborZone);
         if (neighborZone === zone) continue;
-        if (seamCount < 900) addSeam(r, c, zone, neighborZone, dir);
+        if (seamCount < 1200) addSeam(r, c, zone, neighborZone, dir);
       }
-      if (touchingZones.size >= 3 && cornerCount < 160 && tileNoise(r, c, 743) > 0.18) {
-        addCorner(r, c, zone, [...touchingZones]);
+      if (bandCount < 900 && boundaryInfo.distance <= 3 && tileNoise(r, c, 751) > 0.28) {
+        addBandWash(r, c, zone, boundaryZones, boundaryInfo.distance);
+      }
+      if (boundaryInfo.zones.size >= 3 && cornerCount < 220 && tileNoise(r, c, 743) > 0.12) {
+        addCorner(r, c, zone, boundaryZones);
       }
     }
   }

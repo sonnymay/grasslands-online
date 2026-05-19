@@ -4,17 +4,34 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 10:45 PM CDT — post painterly floor overlay pass.**
+**State as of 2026-05-18 11:12 PM CDT — post organic transition band pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 64 adds real painterly floor overlay PNGs
-  and wires terrain blending to prefer those broad soft washes, making grass,
-  forest, riverside, desert, and ruins floors read less tiled and more organic.
-- **Cache version live in `project-grasslands/index.html`:** `?v=155`.
-- **Next change must use:** `?v=156`.
+- **Latest completed work:** session 67 attacks Claude Browser's #1 complaint:
+  hard square biome chunks. Boundary tiles now use neutral transition bases,
+  warped biome edges, and wider soft wash bands instead of full teal/sand
+  tiles meeting grass in one hard edge.
+- **Cache version live in `project-grasslands/index.html`:** `?v=158`.
+- **Next change must use:** `?v=159`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 67):**
+- Goal: fix the glaring checkerboard/rectangular biome-transition problem,
+  especially teal riverside patches and one-tile desert-to-grass edges.
+- Warped `getZone()` diagonal biome boundaries with deterministic low-frequency
+  noise so biome shapes stop reading as perfect compass rectangles/diamonds.
+- Added `terrainBoundaryInfo()` and `transitionGroundTile()` so a 3-tile band
+  around biome edges draws neutral grass/soil transition tiles instead of full
+  riverside/desert biome tiles.
+- Expanded `addTerrainSeamBlends()` with wide `addBandWash()` overlays across
+  the full transition band, plus higher seam/corner caps for fuller blending.
+- Cache bumped to `game.js?v=158`.
+- No gameplay, combat, controls, class selection, save schema, monster logic,
+  collision, map size, or sprite assets changed.
+- Verification: `node -c project-grasslands/game.js` passed and
+  `git diff --check` passed.
 
 **Where we left off (session 64):**
 - Goal: make the floor itself feel closer to Ragnarok Online by adding actual
@@ -495,7 +512,33 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 66 (latest)
+## 3. What we did in session 67 (latest)
+
+Cache now at **`?v=158`**. Claude Browser confirmed the remaining dominant
+problem was still square, harsh biome chunks — teal/cyan riverside blocks and
+bottom-left desert/cracked-earth tiles meeting grass in one hard tile. This
+session changes the map logic, not just decoration.
+
+1. **Organic biome silhouettes.** `getZone()` now applies deterministic
+   low-frequency boundary warp before choosing the outer biome, so biome
+   borders are no longer perfect compass rectangles/diamonds.
+2. **3-tile transition band.** Added `terrainBoundaryInfo()` to detect tiles
+   within 3 tiles of another biome.
+3. **Neutral base at edges.** Boundary-band tiles now use
+   `transitionGroundTile()` on the grass tileset for riverside/desert edges,
+   avoiding full teal/sand square tiles right against green grass.
+4. **Desert-to-grass strip.** Desert boundaries now mix dirt, tall grass, and
+   dry patches across the band before sand color washes appear on top.
+5. **Wider wash blending.** `addTerrainSeamBlends()` now adds broad
+   `addBandWash()` overlays across the full band, not only exact one-tile
+   seams.
+6. **More complete masks.** Seam cap increased `900 → 1200`; corner cap
+   `160 → 220`; band wash cap added at `900`.
+7. **Cache bump.** `?v=157` → `?v=158`.
+8. **Verification.** `node -c project-grasslands/game.js` passed and
+   `git diff --check` passed.
+
+## 3.1. What we did in session 66
 
 Cache now at **`?v=157`**. Sonny identified the #1 remaining visual problem:
 terrain tile transitions were still harsh, square, and blocky, especially
@@ -519,7 +562,7 @@ riverside/grass and biome edges. This session targets that problem directly.
 7. **Verification.** `node -c project-grasslands/game.js` passed and
    `git diff --check` passed.
 
-## 3.1. What we did in session 65
+## 3.2. What we did in session 65
 
 Cache now at **`?v=156`**. Sonny: "Improve the Choose Your Path
 character cards so they are easier to click and look more polished."
@@ -549,7 +592,7 @@ behavior changed.
    Open + close the preview cleanly to confirm next session.
 9. **Cache bump.** `?v=155` → `?v=156`.
 
-## 3.2. What we did in session 63
+## 3.3. What we did in session 63
 
 Cache now at **`?v=154`**. Sonny pointed out that the "Choose Your Path"
 class cards were hard to click and did not look good. This session targets
@@ -2847,7 +2890,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=157`**. Next change should use `?v=158`.
+  change. Current: **`?v=158`**. Next change should use `?v=159`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
