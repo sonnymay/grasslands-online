@@ -4,16 +4,29 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 9:29 PM CDT — post floor-shake camera fix.**
+**State as of 2026-05-18 10:19 PM CDT — post floor-first terrain blend pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 61 fixes floor/map shaking by moving
-  camera follow from the bobbing player sprite to a stable ground anchor.
-- **Cache version live in `project-grasslands/index.html`:** `?v=152`.
-- **Next change must use:** `?v=153`.
+- **Latest completed work:** session 62 responds to Claude Browser feedback
+  by improving floor/tile blending rather than adding more props.
+- **Cache version live in `project-grasslands/index.html`:** `?v=153`.
+- **Next change must use:** `?v=154`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 62):**
+- Goal: make the ground/floor less flat, grid-like, and saturated after Sonny
+  and Claude Browser called out tile variety and blocky transitions as the
+  biggest visual problem.
+- Warmed/desaturated base floor tint, including biome tilesets, so grass and
+  biome floors read less neon and less checkerboard.
+- Added a capped `placeFloorWash()` pass for large non-moving stains around
+  roads, biome borders, and rare open field tiles.
+- Strengthened road shoulder and biome-border transition overlays and made
+  mid/macro ground overlays larger/more visible.
+- No gameplay, combat, progression, controls, UI layout, map dimensions,
+  saves, monster logic, or blocking decoration placement changed.
 
 **Where we left off (session 61):**
 - Goal: stop the visible floor/map shaking Sonny noticed while playing.
@@ -445,7 +458,38 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 61 (latest)
+## 3. What we did in session 62 (latest)
+
+Cache now at **`?v=153`**. Sonny and Claude Browser called out the floor as
+the biggest visual problem: too flat, too tile-grid obvious, too saturated,
+and too blocky at transitions. This session targets floor/terrain only.
+
+1. **Warmer base floor palette.** Added `FLOOR_TILE_TINTS` and warmed /
+   desaturated the grasslands base tint so tiles read less neon.
+2. **Biome floor wash.** Biome tilesets now get a subtle shared wash instead
+   of pure white tint, reducing harsh square-to-square palette jumps.
+3. **Large terrain stains.** Added capped `placeFloorWash()` around roads,
+   biome borders, and rare open-field tiles using existing soft ground assets.
+4. **Stronger transitions.** Increased road-shoulder and biome-border overlay
+   density, size, and alpha so dirt/stone/mud edges blend less like rectangles.
+5. **More visible ground overlays.** Mid and macro overlay passes now use
+   larger sprites and slightly stronger alpha to hide repeated 128px tiles.
+6. **Scope preserved.** No gameplay, combat, progression, controls, UI
+   layout, monster logic, saves, map size, or blocking decoration placement
+   changed.
+7. **Verification.** `node -c project-grasslands/game.js` exited 0.
+8. **Cache bump.** `?v=152` -> `?v=153`.
+
+### Next beauty suggestions
+
+1. **Generate/import real floor overlay PNGs.** Biggest next leap: soft grass
+   blob, moss wash, wet mud, stone dust, sand wash, and path-shoulder strokes.
+2. **Autotile-style road/path edges.** Move beyond overlays by adding real
+   dirt edge/corner variants if source art arrives.
+3. **Desert oasis/bone-yard pass.** Resume biome scene beauty after the floor
+   has been checked in browser.
+
+## 3.1. What we did in session 61
 
 Cache now at **`?v=152`**. Sonny reported the floor/map visibly shaking while
 playing. This session prioritizes that bug over more beauty work.

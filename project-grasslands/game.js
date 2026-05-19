@@ -234,11 +234,18 @@ const CLASS_TIER_THRESHOLDS = [
 // desaturated colour. These are pushed toward richer, more saturated
 // hues so each biome reads as a distinct mood at a glance.
 const ZONE_TINTS = {
-  grasslands: 0xffffff,
+  grasslands: 0xf0f6d8,
   forest:     0x88b070, // mossy green, warmer than the old olive
   desert:     0xe8c878,
   ruins:      0xc2b89e, // warm sun-bleached stone instead of grey-mud
   riverside:  0xb8d8c8, // cool teal-mint rather than washed grey
+};
+const FLOOR_TILE_TINTS = {
+  grasslands: 0xf2f7d8,
+  forest:     0xd8e6bf,
+  desert:     0xf2d28c,
+  ruins:      0xd6cbb2,
+  riverside:  0xd8ead6,
 };
 const ANIM_FRAME_MS = 180;
 const WALK_FRAME_MS = 120;
@@ -1525,11 +1532,11 @@ function buildMap(scene) {
           const tint = ZONE_TINTS[zone] || 0xffffff;
           img.setTint(jitterTint(tint));
         } else {
-          // Biome tileset already correct palette — jitter from white
-          // shifts each tile imperceptibly, breaking grid recognition.
-          img.setTint(jitterTint(0xffffff));
+          // Biome tilesets still need a shared painterly wash so they don't
+          // read as harsh, saturated squares next to the grass base.
+          img.setTint(jitterTint(FLOOR_TILE_TINTS[zone] || 0xffffff));
         }
-        img.setAlpha(0.98 + Math.random() * 0.02);
+        img.setAlpha(1);
       } else if (tilesetKey === 'grass_tileset') {
         const tint = ZONE_TINTS[zone];
         if (tint && tint !== 0xffffff) img.setTint(tint);
@@ -2122,11 +2129,11 @@ function buildDecorations(scene) {
     return firstExisting([...flowerKeys, ...grassKeys]);
   };
   const groundOverlayTint = (zone, large = false) => ({
-    desert: large ? 0xd8bd78 : 0xd6c178,
-    ruins: large ? 0xbdb49f : 0xc8c0b0,
-    forest: large ? 0xa8c898 : 0xb8d8a0,
-    riverside: large ? 0xb8d8c8 : 0xc8e8d8,
-    grasslands: large ? 0xc8d8a8 : 0xd8e8c0,
+    desert: large ? 0xe0c07a : 0xd8bd78,
+    ruins: large ? 0xcbbfa8 : 0xd0c5ad,
+    forest: large ? 0x9fbf86 : 0xb6d49a,
+    riverside: large ? 0xb7d8c6 : 0xd0e8d0,
+    grasslands: large ? 0xd5e2ad : 0xe0edbf,
   }[zone] || 0xffffff);
 
   const transitionOverlayKey = (zone, neighborZone = zone, pathShoulder = false) => {
@@ -2154,6 +2161,14 @@ function buildDecorations(scene) {
     if (zone === 'riverside' || neighborZone === 'riverside') return 0xbfd8c8;
     if (zone === 'forest' || neighborZone === 'forest') return 0xa8c898;
     return 0xd8e0b8;
+  };
+
+  const floorWashKey = (zone) => {
+    if (zone === 'desert') return firstExisting(['deco_sand_scuff_soft_01', 'deco_dry_grass_tuft_01']);
+    if (zone === 'ruins') return firstExisting(['deco_stone_dust_soft_01', 'deco_pebble_cluster_01']);
+    if (zone === 'riverside') return firstExisting(['deco_stone_dust_soft_01', 'deco_sand_scuff_soft_01']);
+    if (zone === 'forest') return firstExisting(['deco_sand_scuff_soft_01', Phaser.Utils.Array.GetRandom(forestFernKeys)]);
+    return firstExisting(['deco_sand_scuff_soft_01', Phaser.Utils.Array.GetRandom(grassKeys)]);
   };
 
   const adjacentPathDir = (r, c) => {
@@ -2206,6 +2221,20 @@ function buildDecorations(scene) {
       allowFlip: opts.allowFlip,
       depth: opts.depth,
     });
+  };
+
+  const placeFloorWash = (tile_r, tile_c, zone, size, alpha, depth = -825) => {
+    const key = floorWashKey(zone);
+    if (!key || !scene.textures.exists(key)) return null;
+    const x = tile_c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-44, 44);
+    const y = tile_r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-38, 38);
+    const img = scene.add.image(x, y, key);
+    img.setScale(size / img.height);
+    img.setAlpha(alpha);
+    img.setAngle(Phaser.Math.Between(0, 359));
+    img.setDepth(depth);
+    img.setTint(groundOverlayTint(zone, true));
+    return img;
   };
 
   const addMicroScene = (tile_r, tile_c, zone, variant = 0) => {
@@ -2498,6 +2527,28 @@ function buildDecorations(scene) {
     addRuinsWallScene(s.r, s.c, Math.floor(tileNoise(s.r, s.c, 591) * 4));
   }
 
+  let floorWashCount = 0;
+  for (let r = 1; r < MAP_ROWS - 1; r++) {
+    for (let c = 1; c < MAP_COLS - 1; c++) {
+      if (getCellType(r, c) !== 'grass' || floorWashCount >= 220) continue;
+      const zone = getZone(r, c);
+      const nearRoad = !!adjacentPathDir(r, c);
+      const nearEdge = nearZoneBoundary(r, c);
+      const noise = tileNoise(r, c, nearRoad ? 611 : 612);
+      if ((nearRoad && noise > 0.70) || (nearEdge && noise > 0.74) || noise > 0.988) {
+        const dry = zone === 'desert' || zone === 'ruins';
+        placeFloorWash(
+          r,
+          c,
+          zone,
+          dry ? Phaser.Math.Between(260, 460) : Phaser.Math.Between(360, 620),
+          dry ? Phaser.Math.FloatBetween(0.06, 0.12) : Phaser.Math.FloatBetween(0.08, 0.15)
+        );
+        floorWashCount++;
+      }
+    }
+  }
+
   let roadBlendCount = 0;
   let biomeBlendCount = 0;
   for (let r = 1; r < MAP_ROWS - 1; r++) {
@@ -2505,13 +2556,13 @@ function buildDecorations(scene) {
       if (getCellType(r, c) !== 'grass') continue;
       const zone = getZone(r, c);
       const pathDir = adjacentPathDir(r, c);
-      if (pathDir && roadBlendCount < 420 && tileNoise(r, c, 301) > 0.34) {
+      if (pathDir && roadBlendCount < 700 && tileNoise(r, c, 301) > 0.24) {
         const key = transitionOverlayKey(zone, zone, true);
         placeGroundTransition(r, c, key, {
           dir: pathDir,
           edgeOffset: 42,
-          h: Phaser.Math.Between(86, 170),
-          alpha: Phaser.Math.FloatBetween(0.11, 0.21),
+          h: Phaser.Math.Between(120, 230),
+          alpha: Phaser.Math.FloatBetween(0.16, 0.28),
           tint: blendTint(zone, zone),
           depth: -790,
         });
@@ -2530,11 +2581,11 @@ function buildDecorations(scene) {
 
       const zones = [...neighborZones(r, c)].filter((z) => z !== zone);
       const neighborZone = zones[0];
-      if (neighborZone && biomeBlendCount < 280 && tileNoise(r, c, 311) > 0.36) {
+      if (neighborZone && biomeBlendCount < 420 && tileNoise(r, c, 311) > 0.28) {
         const key = transitionOverlayKey(zone, neighborZone, false);
         placeGroundTransition(r, c, key, {
-          h: Phaser.Math.Between(100, 210),
-          alpha: Phaser.Math.FloatBetween(0.075, 0.15),
+          h: Phaser.Math.Between(150, 280),
+          alpha: Phaser.Math.FloatBetween(0.10, 0.20),
           tint: blendTint(zone, neighborZone),
           depth: -795,
         });
@@ -2580,7 +2631,7 @@ function buildDecorations(scene) {
   const softKeys = [...flowerKeys, ...grassKeys];
   // Mid-size overlay layer — sparse and low-alpha so it adds organic
   // variation without drawing attention as another large patch pattern.
-  const softCount = 520;
+  const softCount = 640;
   for (let i = 0; i < softCount; i++) {
     const x = Phaser.Math.Between(0, WORLD_W);
     const y = Phaser.Math.Between(0, WORLD_H);
@@ -2591,9 +2642,9 @@ function buildDecorations(scene) {
     if (!scene.textures.exists(key)) continue;
     const img = scene.add.image(x, y, key);
     const dry = z === 'desert' || z === 'ruins';
-    const baseH = dry ? Phaser.Math.Between(120, 220) : Phaser.Math.Between(170, 260);
+    const baseH = dry ? Phaser.Math.Between(150, 260) : Phaser.Math.Between(210, 340);
     img.setScale(baseH / img.height);
-    img.setAlpha(dry ? Phaser.Math.FloatBetween(0.045, 0.085) : Phaser.Math.FloatBetween(0.07, 0.12));
+    img.setAlpha(dry ? Phaser.Math.FloatBetween(0.06, 0.11) : Phaser.Math.FloatBetween(0.09, 0.16));
     img.setAngle(Phaser.Math.Between(0, 359));
     img.setDepth(-800);
     img.setTint(groundOverlayTint(z, false));
@@ -2601,7 +2652,7 @@ function buildDecorations(scene) {
 
   // Macro-blob layer — larger, fainter sprites that span multiple tiles,
   // adding broad value variance and breaking long axis-aligned tile rows.
-  const macroCount = 120;
+  const macroCount = 170;
   for (let i = 0; i < macroCount; i++) {
     const x = Phaser.Math.Between(0, WORLD_W);
     const y = Phaser.Math.Between(0, WORLD_H);
@@ -2612,9 +2663,9 @@ function buildDecorations(scene) {
     if (!scene.textures.exists(key)) continue;
     const img = scene.add.image(x, y, key);
     const dry = z === 'desert' || z === 'ruins';
-    const baseH = dry ? Phaser.Math.Between(220, 360) : Phaser.Math.Between(320, 460);
+    const baseH = dry ? Phaser.Math.Between(300, 520) : Phaser.Math.Between(440, 720);
     img.setScale(baseH / img.height);
-    img.setAlpha(dry ? Phaser.Math.FloatBetween(0.025, 0.055) : Phaser.Math.FloatBetween(0.04, 0.08));
+    img.setAlpha(dry ? Phaser.Math.FloatBetween(0.04, 0.08) : Phaser.Math.FloatBetween(0.055, 0.11));
     img.setAngle(Phaser.Math.Between(0, 359));
     img.setDepth(-820);
     img.setTint(groundOverlayTint(z, true));
