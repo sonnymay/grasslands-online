@@ -946,6 +946,7 @@ function create() {
   sliceTileset('forest_tileset');
   sliceTileset('ruins_tileset');
   sliceTileset('riverside_tileset');
+  createGrassFieldTexture(scene);
 
   // World bounds + camera
   scene.physics.world.setBounds(0, 0, WORLD_W, WORLD_H);
@@ -1597,38 +1598,161 @@ function pickNaturalGroundTile(zone, r, c, type) {
 }
 
 function buildMap(scene) {
-  // RO-style approach (Sonny called this out): every grass cell draws the
-  // SAME uniform TILE.GRASS frame from grass_tileset, no per-cell variant,
-  // no biome tileset swap, no per-cell tint. Biome identity comes from
-  // large feathered blob overlays in addBiomeWash() — the same approach
-  // that makes the pond look organic. Per-tile tile selection always
-  // reads as a grid no matter how the noise is tuned.
+  // Continuous grass base: do not draw a repeated grass image per cell.
+  // Even a uniform tile still exposes a rhombus grid at this camera angle.
+  // Paths remain cell-based, while the open field is one painterly canvas.
+  if (scene.textures.exists('grass_field_texture')) {
+    scene.add.tileSprite(0, 0, WORLD_W, WORLD_H, 'grass_field_texture')
+      .setOrigin(0, 0)
+      .setDepth(-1010);
+  } else {
+    scene.add.rectangle(0, 0, WORLD_W, WORLD_H, 0x79a94e, 1)
+      .setOrigin(0, 0)
+      .setDepth(-1010);
+  }
+  addGrassWorldWashes(scene);
+  addPathWashes(scene);
+  addBiomeWash(scene);
+}
+
+function createGrassFieldTexture(scene) {
+  if (scene.textures.exists('grass_field_texture')) return;
+  const size = 1024;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const fract = (n) => n - Math.floor(n);
+  const smooth = (t) => t * t * (3 - 2 * t);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const hash = (x, y, seed = 0) => {
+    const n = Math.sin(x * 127.1 + y * 311.7 + seed * 74.7) * 43758.5453123;
+    return fract(n);
+  };
+  const tileNoise2d = (x, y, cells, seed = 0) => {
+    const gx = (x / size) * cells;
+    const gy = (y / size) * cells;
+    const x0 = Math.floor(gx);
+    const y0 = Math.floor(gy);
+    const tx = smooth(gx - x0);
+    const ty = smooth(gy - y0);
+    const wrap = (v) => ((v % cells) + cells) % cells;
+    const a = hash(wrap(x0), wrap(y0), seed);
+    const b = hash(wrap(x0 + 1), wrap(y0), seed);
+    const c = hash(wrap(x0), wrap(y0 + 1), seed);
+    const d = hash(wrap(x0 + 1), wrap(y0 + 1), seed);
+    return lerp(lerp(a, b, tx), lerp(c, d, tx), ty);
+  };
+  const wrapped = (x, y, margin, draw) => {
+    const xs = [0];
+    const ys = [0];
+    if (x - margin < 0) xs.push(size);
+    if (x + margin > size) xs.push(-size);
+    if (y - margin < 0) ys.push(size);
+    if (y + margin > size) ys.push(-size);
+    for (const ox of xs) for (const oy of ys) draw(x + ox, y + oy);
+  };
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const small = tileNoise2d(x, y, 160, 2);
+      const medium = tileNoise2d(x, y, 78, 7);
+      const nx = (x / size) * Math.PI * 2;
+      const ny = (y / size) * Math.PI * 2;
+      const blade = Math.sin(nx * 17 + Math.cos(ny * 7) * 1.6) * 0.5 + 0.5;
+      const shade = -9 + small * 13 + medium * 8 + blade * 4;
+      data[i] = Phaser.Math.Clamp(118 + shade, 82, 164);
+      data[i + 1] = Phaser.Math.Clamp(164 + shade * 0.82, 120, 205);
+      data[i + 2] = Phaser.Math.Clamp(78 + shade * 0.5, 52, 118);
+      data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+  for (let i = 0; i < 720; i++) {
+    const x = hash(i, 9, 1) * size;
+    const y = hash(i, 17, 2) * size;
+    const rx = 8 + hash(i, 21, 3) * 26;
+    const ry = 5 + hash(i, 29, 4) * 18;
+    const margin = Math.max(rx, ry);
+    wrapped(x, y, margin, (wx, wy) => {
+      const g = ctx.createRadialGradient(wx, wy, 0, wx, wy, margin);
+      g.addColorStop(0, `rgba(210, 226, 128, ${0.025 + hash(i, 35, 5) * 0.025})`);
+      g.addColorStop(1, 'rgba(210, 226, 128, 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(wx, wy, rx, ry, hash(i, 43, 6) * Math.PI, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 6500; i++) {
+    const x = hash(i, 53, 7) * size;
+    const y = hash(i, 61, 8) * size;
+    const len = 4 + hash(i, 67, 9) * 13;
+    const angle = -0.8 + hash(i, 71, 10) * 1.6;
+    const light = hash(i, 79, 11) > 0.55;
+    ctx.strokeStyle = light ? 'rgba(221, 232, 150, 0.075)' : 'rgba(54, 103, 45, 0.08)';
+    ctx.lineWidth = 1;
+    wrapped(x, y, len + 2, (wx, wy) => {
+      ctx.beginPath();
+      ctx.moveTo(wx, wy);
+      ctx.lineTo(wx + Math.cos(angle) * len, wy + Math.sin(angle) * len);
+      ctx.stroke();
+    });
+  }
+  scene.textures.addCanvas('grass_field_texture', canvas);
+}
+
+function addGrassWorldWashes(scene) {
+  const rand = (i, seed) => {
+    const n = Math.sin(i * 127.1 + seed * 311.7) * 43758.5453123;
+    return n - Math.floor(n);
+  };
+  const g = scene.add.graphics().setDepth(-1009);
+  for (let i = 0; i < 620; i++) {
+    const x = rand(i, 1201) * WORLD_W;
+    const y = rand(i, 1202) * WORLD_H;
+    const w = 220 + rand(i, 1203) * 760;
+    const h = 120 + rand(i, 1204) * 420;
+    const light = rand(i, 1205) > 0.48;
+    g.fillStyle(light ? 0xcbdc83 : 0x4f7c3b, light ? 0.030 : 0.026);
+    g.fillEllipse(x, y, w, h);
+  }
+  for (let i = 0; i < 900; i++) {
+    const x = rand(i, 1301) * WORLD_W;
+    const y = rand(i, 1302) * WORLD_H;
+    const w = 52 + rand(i, 1303) * 160;
+    const h = 22 + rand(i, 1304) * 86;
+    g.fillStyle(0xe0e89b, 0.025);
+    g.fillEllipse(x, y, w, h);
+  }
+}
+
+function addPathWashes(scene) {
+  const g = scene.add.graphics().setDepth(-1002);
   for (let r = 0; r < MAP_ROWS; r++) {
     for (let c = 0; c < MAP_COLS; c++) {
       const type = getCellType(r, c);
-      let idx;
-      if (type === 'path_cross' || type === 'path_open') idx = TILE.DIRT_OPEN;
-      else if (type === 'path_h') idx = Math.random() < 0.55 ? TILE.DIRT_H : TILE.DIRT_H2;
-      else if (type === 'path_v') idx = Math.random() < 0.55 ? TILE.DIRT_V : TILE.DIRT_V2;
-      else if (type === 'path_loop') idx = Math.random() < 0.5 ? TILE.DIRT_WIDE : TILE.DIRT_PATCH;
-      else if (type === 'path_diag') idx = Math.random() < 0.5 ? TILE.DIRT_CORNER : TILE.DIRT_HEAVY;
-      else idx = TILE.GRASS; // uniform neutral grass everywhere
-
-      const img = scene.add.image(
-        c * TILE_SIZE + TILE_SIZE / 2,
-        r * TILE_SIZE + TILE_SIZE / 2,
-        'grass_tileset', `tile_${idx}`
-      );
-      img.setDisplaySize(TILE_SIZE + 2, TILE_SIZE + 2);
-      if (type === 'grass') {
-        if (Math.random() < 0.5) img.setFlipX(true);
-        if (Math.random() < 0.5) img.setFlipY(true);
+      if (type === 'grass') continue;
+      const x = c * TILE_SIZE + TILE_SIZE / 2;
+      const y = r * TILE_SIZE + TILE_SIZE / 2;
+      const n = tileNoise(r, c, 1411);
+      const wide = type === 'path_cross' || type === 'path_open';
+      const baseW = wide ? 172 : 150;
+      const baseH = wide ? 104 : 88;
+      g.fillStyle(0xbca35d, 0.065);
+      g.fillEllipse(x, y, baseW + n * 42, baseH + n * 24);
+      g.fillStyle(0x6f8f45, 0.060);
+      g.fillEllipse(x + (tileNoise(r, c, 1412) - 0.5) * 38, y + (tileNoise(r, c, 1413) - 0.5) * 26, baseW * 0.82, baseH * 0.62);
+      if (tileNoise(r, c, 1414) > 0.74) {
+        g.fillStyle(0xe0d28a, 0.070);
+        g.fillEllipse(x + (tileNoise(r, c, 1415) - 0.5) * 70, y + (tileNoise(r, c, 1416) - 0.5) * 48, 42, 18);
       }
-      img.setDepth(-1000);
     }
   }
-
-  addBiomeWash(scene);
 }
 
 // Biome identity = large irregular feathered blobs painted on the neutral
@@ -1758,7 +1882,7 @@ function buildDecorations(scene) {
       img.displayWidth * (opts.shadowW ?? 0.72),
       Math.max(8, img.displayHeight * (opts.shadowH ?? 0.12)),
       0x000000,
-      opts.shadowAlpha ?? 0.16
+      opts.shadowAlpha ?? 0.22
     );
     shadow.setDepth((opts.alignBottom ? y : (opts.depth ?? -500)) - 2);
     shadow.setAngle((img.angle || 0) * 0.25);
@@ -2019,16 +2143,41 @@ function buildDecorations(scene) {
       const nearPath = [[1,0],[-1,0],[0,1],[0,-1]].some(([dr, dc]) =>
         getCellType(r + dr, c + dc) !== 'grass'
       );
-      if (nearBoundary && boundaryAccentCount < 320 && Math.random() < 0.20) {
+      if (nearBoundary && boundaryAccentCount < 520 && Math.random() < 0.34) {
         const accent = edgeAccentForZone(zone, false);
         placeTileAccent(r, c, accent.key, accent.h, accent.opts);
         boundaryAccentCount++;
       }
-      if (nearPath && pathShoulderCount < 220 && Math.random() < 0.12) {
+      if (nearPath && pathShoulderCount < 380 && Math.random() < 0.22) {
         const accent = edgeAccentForZone(zone, true);
         placeTileAccent(r, c, accent.key, accent.h, accent.opts);
         pathShoulderCount++;
       }
+    }
+  }
+
+  // Open-field pockets: small authored clusters in the empty grass between
+  // roads and boundaries. This breaks up "test level" stretches without
+  // blocking movement or bringing back terrain grid artifacts.
+  let fieldPocketCount = 0;
+  for (let r = 2; r < MAP_ROWS - 2; r++) {
+    for (let c = 2; c < MAP_COLS - 2; c++) {
+      if (fieldPocketCount >= 260) break;
+      if (getCellType(r, c) !== 'grass') continue;
+      const nearPath = [[1,0],[-1,0],[0,1],[0,-1]].some(([dr, dc]) =>
+        getCellType(r + dr, c + dc) !== 'grass'
+      );
+      if (nearPath || nearZoneBoundary(r, c) || tileNoise(r, c, 917) < 0.986) continue;
+      const zone = getZone(r, c);
+      const items = Phaser.Math.Between(4, 7);
+      for (let i = 0; i < items; i++) {
+        const rr = Phaser.Math.Clamp(r + Phaser.Math.Between(-1, 1), 1, MAP_ROWS - 2);
+        const cc = Phaser.Math.Clamp(c + Phaser.Math.Between(-1, 1), 1, MAP_COLS - 2);
+        if (getCellType(rr, cc) !== 'grass') continue;
+        const accent = edgeAccentForZone(zone, false);
+        placeTileAccent(rr, cc, accent.key, accent.h, accent.opts);
+      }
+      fieldPocketCount++;
     }
   }
 
@@ -2226,15 +2375,15 @@ function buildDecorations(scene) {
   // Grasslands (center) — dense ground cover + scattered focal trees.
   // Counts ~2.5× the pre-19200 baseline so the 9× area doesn't read as
   // sparse, plus cluster passes for the RO-style thicket feel.
-  for (let i = 0; i < 560; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     52, { alpha: 0.95, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3 });
-  for (let i = 0; i < 290; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),    60, { maxAngle: 15, zoneFilter: 'grasslands', sway: true, swayAmp: 2 });
-  for (let i = 0; i < 170; i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  44, { maxAngle: 10, zoneFilter: 'grasslands' });
-  for (let i = 0; i < 140; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      72, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'grasslands', shadow: true });
-  for (let i = 0; i <  90; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'grasslands', shadow: true });
-  for (let i = 0; i <  10; i++) place('pond_01',                                  220, { maxAngle:  0, alignBottom: true, blockRadius: 6, allowFlip: false, zoneFilter: 'grasslands', shimmer: true });
+  for (let i = 0; i < 820; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     52, { alpha: 0.95, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3 });
+  for (let i = 0; i < 450; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),    60, { maxAngle: 15, zoneFilter: 'grasslands', sway: true, swayAmp: 2 });
+  for (let i = 0; i < 260; i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  44, { maxAngle: 10, zoneFilter: 'grasslands' });
+  for (let i = 0; i < 190; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      72, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'grasslands', shadow: true });
+  for (let i = 0; i < 120; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'grasslands', shadow: true });
+  for (let i = 0; i <  14; i++) place('pond_01',                                  220, { maxAngle:  0, alignBottom: true, blockRadius: 6, allowFlip: false, zoneFilter: 'grasslands', shimmer: true });
   // Grasslands clusters: grass-tuft thickets + flower patches.
-  for (let i = 0; i <  60; i++) placeCluster(Phaser.Utils.Array.GetRandom(grassKeys),  52, Phaser.Math.Between(5, 9), { alpha: 0.95, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3 });
-  for (let i = 0; i <  48; i++) placeCluster(Phaser.Utils.Array.GetRandom(flowerKeys), 58, Phaser.Math.Between(4, 7), { maxAngle: 14, zoneFilter: 'grasslands', sway: true, swayAmp: 2 });
+  for (let i = 0; i < 130; i++) placeCluster(Phaser.Utils.Array.GetRandom(grassKeys),  52, Phaser.Math.Between(5, 9), { alpha: 0.95, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3 });
+  for (let i = 0; i < 105; i++) placeCluster(Phaser.Utils.Array.GetRandom(flowerKeys), 58, Phaser.Math.Between(4, 7), { maxAngle: 14, zoneFilter: 'grasslands', sway: true, swayAmp: 2 });
 
   // Forest (north) — heavy trees, dark bushes, mushrooms. Tinted darker green.
   for (let i = 0; i < 480; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     200, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'forest', tint: forestTint, shadow: true });
@@ -2973,10 +3122,10 @@ class PlayerController {
     this.shadow = scene.add.ellipse(
       x,
       y + this.sprite.displayHeight * 0.36,
-      this.sprite.displayWidth * 0.58,
-      Math.max(8, this.sprite.displayHeight * 0.12),
+      this.sprite.displayWidth * 0.70,
+      Math.max(9, this.sprite.displayHeight * 0.15),
       0x000000,
-      0.24
+      0.30
     ).setOrigin(0.5);
 
     // Player name/level — slightly larger with a heavier outline and a
@@ -3159,7 +3308,7 @@ class PlayerController {
 
   _syncShadow() {
     this.shadow.setPosition(this.sprite.x, this.groundY + this.sprite.displayHeight * 0.36);
-    this.shadow.setDisplaySize(this.sprite.displayWidth * 0.58, Math.max(8, this.sprite.displayHeight * 0.12));
+    this.shadow.setDisplaySize(this.sprite.displayWidth * 0.70, Math.max(9, this.sprite.displayHeight * 0.15));
   }
 
   _syncFollowTarget() {
@@ -3911,29 +4060,18 @@ class MonsterController {
         duration: 700, yoyo: true, repeat: -1,
       });
       if (typeof ui !== 'undefined' && ui) {
-        ui.message(`★ A ${cfg.name} appeared!`);
+        ui.announce(`Rare ${cfg.name} appeared`, { tone: 'rare', duration: 1700 });
       }
-      // Screen flash + center banner so the rare isn't missed.
-      const flash = scene.add.rectangle(0, 0, GAME_W, GAME_H, cfg.tint || 0xffe066, 0.4)
-        .setOrigin(0, 0).setScrollFactor(0).setDepth(19000);
-      scene.tweens.add({ targets: flash, alpha: 0, duration: 600,
-        onComplete: () => flash.destroy() });
-      const banner = scene.add.text(GAME_W / 2, 220, `★ RARE ${cfg.name.toUpperCase()} ★`, {
-        fontSize: '36px', fontStyle: 'bold', color: '#ffffff',
-        stroke: '#000', strokeThickness: 6,
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(19100).setAlpha(0);
-      scene.tweens.add({ targets: banner, alpha: 1, duration: 300, yoyo: true,
-        hold: 1500, onComplete: () => banner.destroy() });
       sfxLevelUp();
     }
     this.sprite.setCollideWorldBounds(true);
     this.shadow = scene.add.ellipse(
       x,
       y + this.sprite.displayHeight * 0.34,
-      this.sprite.displayWidth * 0.78,
-      Math.max(7, this.sprite.displayHeight * 0.14),
+      this.sprite.displayWidth * 0.88,
+      Math.max(8, this.sprite.displayHeight * 0.17),
       0x000000,
-      0.22
+      0.30
     ).setOrigin(0.5);
 
     const nameFontSize = isBossCfg(cfg) ? '21px' : '19px';
@@ -3953,7 +4091,7 @@ class MonsterController {
   _syncShadow() {
     this.shadow.setPosition(this.sprite.x, this.sprite.y + this.sprite.displayHeight * 0.34);
     if (this.auraRing) this.auraRing.setPosition(this.sprite.x, this.sprite.y + 8);
-    this.shadow.setDisplaySize(this.sprite.displayWidth * 0.78, Math.max(7, this.sprite.displayHeight * 0.14));
+    this.shadow.setDisplaySize(this.sprite.displayWidth * 0.88, Math.max(8, this.sprite.displayHeight * 0.17));
   }
 
   update(time, delta) {
@@ -4015,12 +4153,12 @@ class MonsterController {
 
     this._syncShadow();
     const topY = this.sprite.y - this.sprite.displayHeight / 2;
-    const nameY = topY - 10;
+    const nameY = topY + 3;
     const labelDepth = this.sprite.y + 90;
     this.nameTag.setPosition(this.sprite.x, nameY);
     this.nameTag.setDepth(labelDepth);
-    this.hpBarBg.setPosition(this.sprite.x, topY + 7);
-    this.hpBar.setPosition(this.sprite.x - 20, topY + 7);
+    this.hpBarBg.setPosition(this.sprite.x, topY + 16);
+    this.hpBar.setPosition(this.sprite.x - 20, topY + 16);
     this.hpBarBg.setDepth(labelDepth - 2);
     this.hpBar.setDepth(labelDepth - 1);
     this.hpBar.width = 40 * Math.max(0, this.hp / this.maxHP);
@@ -4397,21 +4535,11 @@ class LootDrop {
 
 function showZoneBanner(scene, label, zoneKey) {
   if (!scene || !label) return;
-  const txt = scene.add.text(GAME_W / 2, 120, `Entering ${label}`, {
-    fontSize: '32px', fontStyle: 'bold', color: '#ffe066',
-    stroke: '#000', strokeThickness: 5,
-  }).setOrigin(0.5).setScrollFactor(0).setDepth(10500).setAlpha(0);
   const diff = ZONE_DIFFICULTY[zoneKey];
-  const diffTxt = diff ? scene.add.text(GAME_W / 2, 160, diff.tag, {
-    fontSize: '20px', fontStyle: 'bold', color: diff.color,
-    stroke: '#000', strokeThickness: 4,
-  }).setOrigin(0.5).setScrollFactor(0).setDepth(10500).setAlpha(0) : null;
-  const targets = diffTxt ? [txt, diffTxt] : [txt];
-  scene.tweens.add({
-    targets, alpha: 1, duration: 350,
-    yoyo: true, hold: 1400,
-    onComplete: () => targets.forEach(t => t.destroy()),
-  });
+  const text = diff ? `Entering ${label} - ${diff.tag}` : `Entering ${label}`;
+  if (typeof ui !== 'undefined' && ui) {
+    ui.announce(text, { tone: zoneKey === 'desert' || zoneKey === 'ruins' ? 'danger' : 'zone', duration: 1400 });
+  }
 }
 
 function showBossZoneHint(scene, zoneKey) {
@@ -4432,18 +4560,9 @@ function showBossZoneHint(scene, zoneKey) {
     label = `${cfg.name} returns in ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
   }
   if (!label) return;
-  const txt = scene.add.text(GAME_W / 2, 192, label, {
-    fontSize: '17px', fontStyle: 'bold', color: '#ffdddd',
-    stroke: '#3a0000', strokeThickness: 4,
-  }).setOrigin(0.5).setScrollFactor(0).setDepth(10500).setAlpha(0);
-  scene.tweens.add({
-    targets: txt,
-    alpha: 1,
-    duration: 280,
-    yoyo: true,
-    hold: 1300,
-    onComplete: () => txt.destroy(),
-  });
+  if (typeof ui !== 'undefined' && ui) {
+    ui.announce(label, { tone: 'danger', duration: 1400 });
+  }
 }
 
 // ---------- Class selection overlay ----------
@@ -5306,6 +5425,11 @@ class UIManager {
   constructor(scene) {
     this.scene = scene;
     this.messages = [];
+    this.toastQueue = [];
+    this.toastActive = false;
+    const PANEL_FILL = 0x21160e;
+    const PANEL_STROKE = 0x8f6130;
+    const PANEL_GOLD = 0xc69a52;
     const crisp = (text) => {
       if (text && text.setResolution) text.setResolution(UI_TEXT_RESOLUTION);
       return text;
@@ -5313,9 +5437,9 @@ class UIManager {
 
     // Bottom status band — slim full-width player HUD bar.
     this.bottomH = 56;
-    this.bar = scene.add.rectangle(0, GAME_H - this.bottomH, GAME_W, this.bottomH, 0x10180f, 0.88)
+    this.bar = scene.add.rectangle(0, GAME_H - this.bottomH, GAME_W, this.bottomH, 0x17100a, 0.90)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10000)
-      .setStrokeStyle(2, 0x3f5732, 0.9);
+      .setStrokeStyle(2, PANEL_STROKE, 0.95);
     this.hpBarW = Math.max(220, Math.min(320, GAME_W * 0.22));
     const bottomY = GAME_H - this.bottomH;
     const hpX = 20;
@@ -5328,9 +5452,9 @@ class UIManager {
     const panelH = 30;
     const barH = 16;
 
-    this.hpPanel = scene.add.rectangle(hpX - 8, hpY - panelH / 2, this.hpBarW + 16, panelH, 0x0d150d, 0.6)
+    this.hpPanel = scene.add.rectangle(hpX - 8, hpY - panelH / 2, this.hpBarW + 16, panelH, PANEL_FILL, 0.72)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10001)
-      .setStrokeStyle(1, 0xb8d29b, 0.4);
+      .setStrokeStyle(1, PANEL_GOLD, 0.56);
     this.hpBg = scene.add.rectangle(hpX, hpY, this.hpBarW, barH, 0x2c302a)
       .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10002);
     this.hpFill = scene.add.rectangle(hpX, hpY, this.hpBarW, barH, 0xcc3333)
@@ -5339,9 +5463,9 @@ class UIManager {
       fontSize: '15px', fontStyle: 'bold', color: '#fff7ef', stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
 
-    this.expPanel = scene.add.rectangle(expX - 8, expY - panelH / 2, this.expBarW + 16, panelH, 0x0d150d, 0.6)
+    this.expPanel = scene.add.rectangle(expX - 8, expY - panelH / 2, this.expBarW + 16, panelH, PANEL_FILL, 0.72)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10001)
-      .setStrokeStyle(1, 0xb8d29b, 0.4);
+      .setStrokeStyle(1, PANEL_GOLD, 0.56);
     this.expBg = scene.add.rectangle(expX, expY, this.expBarW, barH, 0x2c302a)
       .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10002);
     this.expFill = scene.add.rectangle(expX, expY, this.expBarW, barH, 0x8e50d6)
@@ -5353,9 +5477,9 @@ class UIManager {
     // Bottom-right status panel: Lv on the left edge, Zeny on the right
     // edge, with a thin vertical divider so the two values can never run
     // into each other regardless of width.
-    this.statusPanel = scene.add.rectangle(statusX, bottomY + (this.bottomH - 36) / 2, statusW, 36, 0x0d150d, 0.7)
+    this.statusPanel = scene.add.rectangle(statusX, bottomY + (this.bottomH - 36) / 2, statusW, 36, PANEL_FILL, 0.78)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10001)
-      .setStrokeStyle(1, 0xffe066, 0.55);
+      .setStrokeStyle(1, PANEL_GOLD, 0.75);
     this.statusDivider = scene.add.rectangle(statusX + Math.floor(statusW * 0.42), bottomY + (this.bottomH - 22) / 2, 1, 22, 0xffe066, 0.45)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10002);
     this.lvlText = scene.add.text(statusX + 14, hpY, 'Lv.1', {
@@ -5371,16 +5495,27 @@ class UIManager {
       fontSize: '18px', color: '#d8f7ff', stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10008).setAlpha(0.32);
 
+    // One-at-a-time notification toast. This replaces stacked zone/rare/boss
+    // banners so the playfield stays readable.
+    this.toastBg = scene.add.rectangle(GAME_W / 2, 74, 420, 34, PANEL_FILL, 0.92)
+      .setOrigin(0.5).setScrollFactor(0).setDepth(12500)
+      .setStrokeStyle(2, PANEL_GOLD, 0.95)
+      .setVisible(false);
+    this.toastText = scene.add.text(GAME_W / 2, 74, '', {
+      fontSize: '15px', fontStyle: 'bold', color: '#fff4d6',
+      stroke: '#000', strokeThickness: 3,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(12501).setVisible(false);
+
     // Mini-map top-right — anchored to viewport right edge.
     this.miniW = Math.max(150, Math.min(180, Math.floor(GAME_W * 0.14)));
     this.miniH = this.miniW;
     this.miniX = GAME_W - this.miniW - 12;
     this.miniY = 12;
-    this.miniBg = scene.add.rectangle(this.miniX, this.miniY, this.miniW, this.miniH, 0x000000, 0.55)
+    this.miniBg = scene.add.rectangle(this.miniX, this.miniY, this.miniW, this.miniH, PANEL_FILL, 0.82)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10010);
     this.miniBorder = scene.add.rectangle(this.miniX, this.miniY, this.miniW, this.miniH)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10012)
-      .setStrokeStyle(2, 0xffffff, 0.9).setFillStyle();
+      .setStrokeStyle(3, PANEL_GOLD, 0.96).setFillStyle();
     this.miniGfx = scene.add.graphics().setScrollFactor(0).setDepth(10011);
     // Duplicate HP bar under the minimap was removed — the player HUD at the
     // bottom of the screen is the single source of truth for HP.
@@ -5411,9 +5546,9 @@ class UIManager {
     const btnW = this.miniW - 8, btnH = 26;
     const btnX = this.miniX + 4;
     let toolbarY = miniHpY + 12;
-    const TOOLBAR_FILL = 0x142018;
-    const TOOLBAR_STROKE = 0xb8d29b;
-    const TOOLBAR_TEXT = '#f2f7df';
+    const TOOLBAR_FILL = 0x24180f;
+    const TOOLBAR_STROKE = PANEL_GOLD;
+    const TOOLBAR_TEXT = '#fff4d6';
     const TOOLBAR_MUTED = '#c7d2b0';
     const TOOLBAR_GOLD = '#ffe066';
     const TOOLBAR_RED = '#ff9999';
@@ -5428,7 +5563,7 @@ class UIManager {
       const y = toolbarY;
       const isAction = role === 'action';
       const isWarning = role === 'warning';
-      const bg = scene.add.rectangle(btnX, y, btnW, btnH, isWarning ? 0x2f1a18 : TOOLBAR_FILL, 0.86)
+      const bg = scene.add.rectangle(btnX, y, btnW, btnH, isWarning ? 0x382018 : TOOLBAR_FILL, 0.90)
         .setOrigin(0, 0).setScrollFactor(0).setDepth(10010)
         .setStrokeStyle(1, isAction ? 0xffe066 : isWarning ? 0xff7777 : TOOLBAR_STROKE, isAction ? 1 : 0.78)
         .setInteractive({ useHandCursor: true });
@@ -5633,9 +5768,9 @@ class UIManager {
     const UL_PAD = 6;
     this.panelW = Math.max(300, Math.min(380, Math.floor(GAME_W * 0.24)));
     let ulY = 12;
-    this.questBg = scene.add.rectangle(UL_X, ulY, this.panelW, 56, 0x10180f, 0.78)
+    this.questBg = scene.add.rectangle(UL_X, ulY, this.panelW, 56, PANEL_FILL, 0.86)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
-      .setStrokeStyle(1, 0xb8d29b, 0.7);
+      .setStrokeStyle(2, PANEL_GOLD, 0.85);
     this.questText = scene.add.text(UL_X + 12, ulY + 9, '', {
       fontSize: '14px', fontStyle: 'bold', color: '#ffffff', stroke: '#000', strokeThickness: 3,
       lineSpacing: 2, wordWrap: { width: this.panelW - 24 },
@@ -5643,9 +5778,9 @@ class UIManager {
     this.questBg.setVisible(false);
     this.questText.setVisible(false);
     ulY += 56 + UL_PAD;
-    this.gearBg = scene.add.rectangle(UL_X, ulY, this.panelW, 40, 0x10180f, 0.74)
+    this.gearBg = scene.add.rectangle(UL_X, ulY, this.panelW, 40, PANEL_FILL, 0.84)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
-      .setStrokeStyle(1, 0xb8d29b, 0.58)
+      .setStrokeStyle(2, PANEL_GOLD, 0.72)
       .setInteractive({ useHandCursor: true });
     this.gearBg.on('pointerdown', () => {
       const w = player.equipment.weapon;
@@ -5665,9 +5800,9 @@ class UIManager {
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
     ulY += 40 + UL_PAD;
     // Boss ticker.
-    this.bossTickerBg = scene.add.rectangle(UL_X, ulY, this.panelW, 26, 0x10180f, 0.74)
+    this.bossTickerBg = scene.add.rectangle(UL_X, ulY, this.panelW, 26, PANEL_FILL, 0.84)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
-      .setStrokeStyle(1, 0xff8866, 0.62);
+      .setStrokeStyle(2, 0xb96943, 0.82);
     this.bossTickerText = scene.add.text(UL_X + 12, ulY + 5, '', {
       fontSize: '13px', color: '#ffcc99', stroke: '#000', strokeThickness: 2,
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
@@ -5675,9 +5810,9 @@ class UIManager {
     this.bossTickerText.setVisible(false);
     ulY += 26 + UL_PAD;
     // Hot-streak indicator — only visible when streak > 0.
-    this.streakBg = scene.add.rectangle(UL_X, ulY, this.panelW, 26, 0x10180f, 0.74)
+    this.streakBg = scene.add.rectangle(UL_X, ulY, this.panelW, 26, PANEL_FILL, 0.84)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
-      .setStrokeStyle(1, 0xffaa33, 0.62);
+      .setStrokeStyle(2, PANEL_GOLD, 0.78);
     this.streakText = scene.add.text(UL_X + 12, ulY + 5, '', {
       fontSize: '13px', color: '#ffcc66',
       stroke: '#000', strokeThickness: 2,
@@ -5686,9 +5821,9 @@ class UIManager {
     this.streakText.setVisible(false);
     ulY += 26 + UL_PAD;
     // Discovery progress — least important, smallest type.
-    this.discoveryBg = scene.add.rectangle(UL_X, ulY, this.panelW, 24, 0x10180f, 0.7)
+    this.discoveryBg = scene.add.rectangle(UL_X, ulY, this.panelW, 24, PANEL_FILL, 0.80)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10005)
-      .setStrokeStyle(1, 0xb8d29b, 0.5);
+      .setStrokeStyle(1, PANEL_GOLD, 0.62);
     this.discoveryText = scene.add.text(UL_X + 12, ulY + 4, '', {
       fontSize: '12px', color: '#aaffcc', stroke: '#000', strokeThickness: 2,
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(10006);
@@ -5720,6 +5855,7 @@ class UIManager {
 
     for (const text of [
       this.hpText, this.expText, this.lvlText, this.zenyText, this.saveGlyph,
+      this.toastText,
       this.tipText, this.rsText,
       this.tvText, this.muteText, this.apText, this.clText,
       this.lvText, this.lv10Text, this.lvMText, this.shText,
@@ -5728,11 +5864,71 @@ class UIManager {
     ]) { if (text) crisp(text); }
   }
 
-  message(msg) {
+  announce(msg, opts = {}) {
+    this._enqueueToast(msg, opts);
+  }
+
+  _enqueueToast(msg, opts = {}) {
+    if (!msg || !this.toastBg || !this.toastText) return;
+    this.toastQueue.push({
+      msg: String(msg),
+      tone: opts.tone || 'info',
+      duration: opts.duration || 1500,
+    });
+    while (this.toastQueue.length > 5) this.toastQueue.shift();
+    this._showNextToast();
+  }
+
+  _showNextToast() {
+    if (this.toastActive || !this.toastQueue.length) return;
+    const item = this.toastQueue.shift();
+    const tones = {
+      info:   { fill: 0x21160e, stroke: 0xc69a52, color: '#fff4d6' },
+      zone:   { fill: 0x1f2110, stroke: 0xd8b85e, color: '#fff1a8' },
+      rare:   { fill: 0x2b2109, stroke: 0xffd45a, color: '#fff2a0' },
+      danger: { fill: 0x2a130f, stroke: 0xd56b4a, color: '#ffd6c8' },
+    };
+    const tone = tones[item.tone] || tones.info;
+    this.toastActive = true;
+    this.toastText.setText(item.msg);
+    if (this.toastText.setWordWrapWidth) this.toastText.setWordWrapWidth(Math.max(320, Math.floor(GAME_W * 0.52)));
+    this.toastText.setColor(tone.color);
+    const width = Math.min(Math.max(360, Math.floor(GAME_W * 0.58)), Math.max(340, this.toastText.width + 42));
+    const height = Math.max(36, this.toastText.height + 16);
+    this.toastBg.setSize(width, height);
+    this.toastBg.setDisplaySize(width, height);
+    this.toastBg
+      .setFillStyle(tone.fill, 0.93)
+      .setStrokeStyle(2, tone.stroke, 0.95)
+      .setAlpha(0)
+      .setVisible(true);
+    this.toastText.setAlpha(0).setVisible(true);
+    this.scene.tweens.add({
+      targets: [this.toastBg, this.toastText],
+      alpha: 1,
+      duration: 160,
+      onComplete: () => {
+        this.scene.time.delayedCall(item.duration, () => {
+          this.scene.tweens.add({
+            targets: [this.toastBg, this.toastText],
+            alpha: 0,
+            duration: 260,
+            onComplete: () => {
+              this.toastBg.setVisible(false);
+              this.toastText.setVisible(false);
+              this.toastActive = false;
+              this._showNextToast();
+            },
+          });
+        });
+      },
+    });
+  }
+
+  message(msg, opts = {}) {
     this.messages.push(msg);
     if (this.messages.length > 10) this.messages.shift();
-    // Chat panel was removed; nothing to render to. We keep the buffer in
-    // case future features want to surface recent events again.
+    this._enqueueToast(msg, opts);
   }
 
   visibleMessages() {
@@ -6023,11 +6219,24 @@ class UIManager {
       const pos = toMini((p.c + 0.5) * TILE_SIZE, (p.r + 0.5) * TILE_SIZE);
       if (inMini(pos, 5)) g.strokeCircle(pos.x, pos.y, 4);
     }
-    // Monsters.
-    for (const m of bloblings) {
-      if (!m.alive) continue;
+    // Monsters: cap normal dots so the minimap is a readable navigation aid,
+    // not confetti. Bosses/rares stay visible; normal mobs are nearest-only.
+    const monsterDots = bloblings
+      .filter(m => m.alive)
+      .map(m => {
+        const dx = m.sprite.x - player.sprite.x;
+        const dy = m.sprite.y - player.sprite.y;
+        const dist = Math.hypot(dx, dy);
+        const priority = (isBossCfg(m.cfg) || m.cfg.rare) ? 0 : dist;
+        return { m, dist, priority };
+      })
+      .filter(row => row.priority === 0 || row.dist < 1700)
+      .sort((a, b) => a.priority - b.priority)
+      .slice(0, 28);
+    for (const row of monsterDots) {
+      const m = row.m;
       let color = 0xff5555;
-      let r = 2;
+      let r = 1.6;
       let outline = null;
       if (m.typeId === 'mooham') color = 0xffaa55;
       else if (m.typeId === 'moowaan') color = 0x55ff88;
@@ -6039,7 +6248,7 @@ class UIManager {
       else if (isBossCfg(m.cfg)) { color = m.cfg.tint || 0xffff44; r = 4; outline = 0x000000; }
       const pos = toMini(m.sprite.x, m.sprite.y);
       if (!inMini(pos, r + 3)) continue;
-      g.fillStyle(color, 1);
+      g.fillStyle(color, outline === null ? 0.72 : 1);
       g.fillCircle(pos.x, pos.y, r);
       if (outline !== null) {
         g.lineStyle(2, outline, 1);

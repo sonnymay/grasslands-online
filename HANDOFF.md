@@ -4,18 +4,46 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 11:52 PM CDT — post square-transition removal.**
+**State as of 2026-05-19 12:41 AM CDT — post world-map visual cleanup.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 70 removes the failed per-tile blend/mask
-  path entirely. Biome transition bands now keep a continuous neutral grass
-  base and use sparse large organic floor PNGs for color bleed, matching the
-  working shoreline/pond style instead of stamping square overlays.
-- **Cache version live in `project-grasslands/index.html`:** `?v=161`.
-- **Next change must use:** `?v=162`.
+- **Latest completed work:** session 73 fixes the seven blunt browser-review
+  issues: grass tile seams, empty field density, stacked announcement clutter,
+  placeholder HUD panels, noisy minimap dots, disconnected monster labels, and
+  weak ground-contact shadows.
+- **Cache version live in `project-grasslands/index.html`:** `?v=165`.
+- **Next change must use:** `?v=166`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 73):**
+- Goal: respond to the latest honest feedback and fix all seven highest-impact
+  visual/UI issues in one cohesive pass.
+- Grass floor: `buildMap()` no longer draws grass or path as per-cell tiles.
+  Open terrain uses a procedural seamless `grass_field_texture`; broad
+  variation now comes from non-repeating world-space washes, so the visible
+  rhombus/square floor grid is gone.
+- Paths: old hard-edged path cells were replaced by soft overlapping ground
+  washes via `addPathWashes(scene)`, so roads read as worn grass/dirt instead
+  of rectangular blocks.
+- Density: added open-field pocket clusters, stronger boundary/path shoulder
+  accents, and increased grasslands flowers, tall grass, mushrooms, bushes,
+  trees, ponds, and clustered thickets.
+- UI: `UIManager` now owns a one-at-a-time toast queue; zone banners, boss
+  hints, rare spawn alerts, and normal messages route through it instead of
+  stacking independent text on screen.
+- HUD: minimap, toolbar, quest, gear, boss ticker, streak, discovery, bottom
+  status, HP, and EXP panels now use warm brown/gold framed styling.
+- Minimap: normal monster dots are capped to nearest/nearby only; bosses and
+  rares stay visible, reducing confetti noise.
+- Depth: player, monster, and prop shadows are darker/wider; monster labels
+  sit closer to sprite heads with HP bars just below.
+- Cache bumped to `game.js?v=165`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check` passed, local HTTP server served `index.html`, and Chrome
+  preview confirmed the game boots with continuous grass, denser props, styled
+  HUD panels, a readable minimap, and one toast at a time.
 
 **Where we left off (session 70):**
 - Goal: answer Claude Browser's blunt feedback that teal/brown squares were
@@ -567,7 +595,36 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 72 (latest)
+## 3. What we did in session 73 (latest)
+
+Cache now at **`?v=165`**. The latest pass fixes the seven browser-review
+issues that made the map still feel prototype-like.
+
+1. **Grass seams removed.** `buildMap()` no longer draws repeated grass
+   cells. It creates a seamless procedural `grass_field_texture` and adds
+   non-repeating world-space washes so broad color variation cannot reveal a
+   square repeat.
+2. **Hard path blocks removed.** Path cells still exist for navigation and
+   minimap logic, but their visual rendering now uses `addPathWashes(scene)`
+   with overlapping soft ellipses instead of rectangular tile sprites.
+3. **Map density increased.** Added up to 260 open-field pockets, raised
+   boundary and road-shoulder accents, and increased grasslands scatter and
+   cluster counts for flowers, tall grass, mushrooms, bushes, trees, and ponds.
+4. **Announcement clutter fixed.** `UIManager` now has a toast queue. Normal
+   messages, zone entries, boss hints, and rare spawn alerts display one at a
+   time with fade in/out.
+5. **HUD restyled.** Main panels now use warm brown/gold framed fills instead
+   of plain dark rectangles.
+6. **Minimap decluttered.** Normal monster dots are limited to nearest/nearby
+   mobs; bosses and rares still stay visible.
+7. **Depth improved.** Player/monster/prop shadows are stronger, and monster
+   name labels were pulled closer to the sprite heads.
+8. **Verification.** `node -c project-grasslands/game.js` and
+   `git diff --check` passed. Local preview at `http://127.0.0.1:8000/`
+   booted in Chrome and visually confirmed the continuous grass, denser world,
+   framed HUD, cleaner minimap, and one-at-a-time toast behavior.
+
+## 3.1. What we did in session 72
 
 Cache now at **`?v=163`**. Sonny generated all 4 biome blob PNGs
 (`biome_{forest,desert,ruins,riverside}_blob.png`, 1254×1254) but they
@@ -598,7 +655,7 @@ greys baked into the image. Wired them with a runtime alpha-key.
    desert, ruins.
 5. **Cache bump.** `?v=162` → `?v=163`.
 
-## 3.1. What we did in session 71
+## 3.2. What we did in session 71
 
 Cache now at **`?v=162`**. Sonny correctly diagnosed the architectural
 bug: per-cell biome tile selection always produces a grid no matter
