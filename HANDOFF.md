@@ -595,7 +595,40 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 74 (latest)
+## 3. What we did in session 75 (latest)
+
+Cache now at **`?v=168`**. Score 5.5/10 feedback: grass tones read as
+camouflage swirls, map barren, camera too zoomed out. Keep biome
+blob transitions (8/10 desert edge praised — that approach is the
+target style).
+
+1. **`addGrassTones` rewritten.** Was 280 big radial blobs reading as
+   marble swirls. Now **5500 SMALL specks** at 22–58 px radius,
+   alpha 0.14–0.28, three pure greens:
+   - dark moss `0x3a5d2b` × 2200
+   - mid `0x6b8a4a` × 1800
+   - light highlight `0xa8c878` × 1500
+
+   Each speck is a 2-layer circle (inner full alpha, outer half
+   alpha at 1.5× radius) → soft edge at ground-texture scale, not
+   patch scale. Eye reads as grass variation, not marble.
+2. **Camera zoom `0.65 → 0.85`.** Props feel bigger, world stops
+   reading as abandoned. Player still sees a useful screen radius.
+3. **Grasslands density 1.5× again** (3.4× cumulative since session
+   73): tufts 1300→2000, flowers 720→1100, mushrooms 380→580,
+   bushes 280→420, trees 180→280. Fills dead zones.
+4. **Verification.** Preview screenshot: stipple texture on grass
+   (not swirls), props larger, riverside blob still beautiful.
+5. **Cache bump.** `?v=167` → `?v=168`.
+
+### Still queued
+- Fantasy UI re-skin (parchment/wood/brass frames replacing plain
+  dark rectangles).
+- Notification stack consolidation.
+- Apply desert-style feathered blob transitions to forest/ruins.
+- Grass blade texture in tile art (limit of code-only).
+
+## 3.1. What we did in session 74
 
 Cache now at **`?v=167`**. Sonny scored the game 4.5/10 with three
 biggest visual drags: grass reads as flat snooker table, yellow-green
@@ -3239,7 +3272,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=167`**. Next change should use `?v=168`.
+  change. Current: **`?v=168`**. Next change should use `?v=169`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
