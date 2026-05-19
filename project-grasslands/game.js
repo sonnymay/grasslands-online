@@ -747,6 +747,7 @@ function preload() {
   this.load.image('landmark_ruins_well', 'assets/decorations/landmark_ruins_well.png');
   this.load.image('landmark_riverside_bridge', 'assets/decorations/landmark_riverside_bridge.png');
   this.load.image('campfire_01', 'assets/decorations/campfire_01.png');
+  this.load.image('tent_canvas_front_01', 'assets/decorations/tent_canvas_front_01.png');
   // Decorations
   for (let i = 1; i <= 4; i++) this.load.image(`deco_flower_cluster_0${i}`, `assets/decorations/deco_flower_cluster_0${i}.png`);
   for (let i = 1; i <= 3; i++) this.load.image(`deco_rock_0${i}`, `assets/decorations/deco_rock_0${i}.png`);
@@ -3049,15 +3050,16 @@ function buildDecorations(scene) {
       .setDepth(-781);
     scene.add.ellipse(campX + 18, campY + 20, 260, 110, 0xd6c08a, 0.045)
       .setDepth(-780);
+    const frontTentKey = scene.textures.exists('tent_canvas_front_01') ? 'tent_canvas_front_01' : 'camp_tent_canvas';
     const tents = [
-      { dx: -128, dy: -28, angle: -7 },
-      { dx:   36, dy: -60, angle:  4 },
-      { dx:  150, dy:  38, angle:  8 },
+      { dx: -128, dy: -28, angle: -7, key: frontTentKey, h: frontTentKey === 'tent_canvas_front_01' ? 136 : 112 },
+      { dx:   36, dy: -60, angle:  4, key: 'camp_tent_canvas', h: 112 },
+      { dx:  150, dy:  38, angle:  8, key: frontTentKey, h: frontTentKey === 'tent_canvas_front_01' ? 132 : 112 },
     ];
     for (const tent of tents) {
       const x = campX + tent.dx;
       const y = campY + tent.dy;
-      placeLandmarkDeco('camp_tent_canvas', x, y, 112, {
+      placeLandmarkDeco(tent.key, x, y, tent.h, {
         alignBottom: true,
         allowFlip: false,
         angle: tent.angle,

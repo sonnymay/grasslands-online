@@ -4,18 +4,41 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 90 campfire asset wiring pass.**
+**State as of 2026-05-19 — post session 91 front tent asset wiring pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 90 starts `MAP_VISION_PLAN.md` Phase 1
-  from the real current cache state. It wires the generated
-  `campfire_01.png` asset into preload, uses it in the spawn camp when
-  available, and adds fast flame flicker plus slow glow breathing.
-- **Cache version live in `project-grasslands/index.html`:** `?v=194`.
-- **Next change must use:** `?v=195`.
+- **Latest completed work:** session 91 continues `MAP_VISION_PLAN.md` Phase 2
+  by moving/wiring the generated `tent_canvas_front_01.png` asset into the
+  spawn camp. Two front-facing tent placements now use the real transparent
+  PNG when available; one canvas tent remains as the temporary side-angle
+  placeholder until `tent_canvas_side_01.png` lands.
+- **Cache version live in `project-grasslands/index.html`:** `?v=195`.
+- **Next change must use:** `?v=196`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 91):**
+- Goal: continue autonomously from `MAP_VISION_PLAN.md` Phase 2, starting with
+  `tent_canvas_front_01.png`.
+- Correct asset used: `/Users/santipapmay/Downloads/tent_canvas_front_01.png`
+  was copied to
+  `project-grasslands/assets/decorations/tent_canvas_front_01.png`. It is
+  320x320 RGBA with alpha.
+- `preload()` now loads `tent_canvas_front_01`.
+- `addSpawnCamp()` now chooses `tent_canvas_front_01` for the two front-facing
+  tents when present, falling back to the old runtime `camp_tent_canvas` if
+  missing. The middle tent intentionally stays on `camp_tent_canvas` until the
+  side-angle tent asset lands.
+- Static decoration shadows remain disabled. Baked-in art contact shadows are
+  allowed and are part of the tent PNG itself.
+- Cache bumped to `game.js?v=195`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md`
+  passed, PNG alpha/dimensions were confirmed, and Chrome preview at
+  `http://localhost:8002/?codex=tent-front-v195` loaded `game.js?v=195`
+  with no current console warnings/errors. The two front tent sprites were
+  visible in the spawn camp and grounded correctly.
 
 **Where we left off (session 90):**
 - Goal: read `MAP_VISION_PLAN.md` and continue from the first roadmap action:
