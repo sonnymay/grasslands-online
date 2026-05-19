@@ -4,18 +4,39 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 93 ragged ground polish pass.**
+**State as of 2026-05-19 — post session 94 wooden cart asset wiring pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 93 responds to the latest review that the
-  world is alive but the ground still feels too flat/airbrushed. Dirt paths now
-  get a hard ragged edge layer of dirt chips and grass intrusions, and
-  grasslands get extra tiny blade/scuff/pebble micro-clusters in world space.
-- **Cache version live in `project-grasslands/index.html`:** `?v=197`.
-- **Next change must use:** `?v=198`.
+- **Latest completed work:** session 94 wires Sonny-generated
+  `wooden_cart_01.png` into the spawn camp, replacing the flat runtime canvas
+  wagon when the real PNG is available.
+- **Cache version live in `project-grasslands/index.html`:** `?v=198`.
+- **Next change must use:** `?v=199`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 94):**
+- Goal: use Sonny's generated cart asset from Downloads while preserving the
+  "no more direct image generation unless requested" preference.
+- Source asset:
+  `/Users/santipapmay/Downloads/wooden_cart_01.png`. It was 1594x987 with a
+  fake checkerboard background and no alpha, so it was normalized locally into
+  `project-grasslands/assets/decorations/wooden_cart_01.png`.
+- Final project asset: `wooden_cart_01.png`, 420x260 RGBA with real alpha.
+  The original Downloads file was left untouched.
+- `preload()` now loads `wooden_cart_01`.
+- `addSpawnCamp()` now chooses `wooden_cart_01` for the camp cart when
+  present, falling back to the old runtime `camp_wagon_canvas` if missing.
+- Static decoration shadows remain disabled. The cart uses the baked contact
+  patch in the art itself.
+- Cache bumped to `game.js?v=198`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md`
+  passed, PNG alpha/dimensions were confirmed, and Chrome preview at
+  `http://localhost:8002/?codex=cart-v198` loaded `game.js?v=198` with no
+  current console warnings/errors. The real cart was visible in camp and
+  reads as a stronger anchor prop than the old runtime canvas wagon.
 
 **Where we left off (session 93):**
 - Goal: act on the new review feedback without undoing the no-decoration-shadow

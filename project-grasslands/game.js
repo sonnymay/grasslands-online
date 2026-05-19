@@ -749,6 +749,7 @@ function preload() {
   this.load.image('campfire_01', 'assets/decorations/campfire_01.png');
   this.load.image('tent_canvas_front_01', 'assets/decorations/tent_canvas_front_01.png');
   this.load.image('tent_canvas_side_01', 'assets/decorations/tent_canvas_side_01.png');
+  this.load.image('wooden_cart_01', 'assets/decorations/wooden_cart_01.png');
   // Decorations
   for (let i = 1; i <= 4; i++) this.load.image(`deco_flower_cluster_0${i}`, `assets/decorations/deco_flower_cluster_0${i}.png`);
   for (let i = 1; i <= 3; i++) this.load.image(`deco_rock_0${i}`, `assets/decorations/deco_rock_0${i}.png`);
@@ -3225,8 +3226,9 @@ function buildDecorations(scene) {
         baseCluster: 0,
       });
     }
+    const cartKey = scene.textures.exists('wooden_cart_01') ? 'wooden_cart_01' : 'camp_wagon_canvas';
     const campDetails = [
-      { key: 'camp_wagon_canvas', dx: 278, dy: 4, h: 136, angle: -7, block: 1 },
+      { key: cartKey, dx: 278, dy: 4, h: cartKey === 'wooden_cart_01' ? 150 : 136, angle: cartKey === 'wooden_cart_01' ? -2 : -7, block: 1 },
       { key: 'camp_logbench_canvas', dx: -92, dy: 120, h: 76, angle: -5, block: 0 },
       { key: 'camp_logbench_canvas', dx: 92, dy: 98, h: 68, angle: 7, block: 0 },
       { key: 'camp_pot_canvas', dx: -4, dy: 62, h: 62, angle: 0, block: 0 },
