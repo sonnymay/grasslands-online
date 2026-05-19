@@ -934,7 +934,6 @@ function create() {
   sliceTileset('forest_tileset');
   sliceTileset('ruins_tileset');
   sliceTileset('riverside_tileset');
-  createTerrainBlendMasks(scene);
 
   // World bounds + camera
   scene.physics.world.setBounds(0, 0, WORLD_W, WORLD_H);
@@ -1457,70 +1456,8 @@ function terrainBlendTint(zone, neighborZone = zone) {
   return 0xd8e0b8;
 }
 
-function terrainZoneEdgeTint(zone) {
-  return {
-    grasslands: 0xd8e6b8,
-    forest: 0xb8d8a0,
-    desert: 0xd8bd78,
-    ruins: 0xbfb6a2,
-    riverside: 0xbfd8c8,
-  }[zone] || 0xd8e0b8;
-}
-
-function terrainTransitionBaseTint(zone, zones, distance = 3) {
-  const closeness = Phaser.Math.Clamp((4 - (distance || 3)) / 3, 0.2, 1);
-  if (zones.has('desert')) {
-    return zone === 'desert'
-      ? (closeness > 0.66 ? 0xd8d5a8 : 0xe0e6bc)
-      : (closeness > 0.66 ? 0xe2eac0 : 0xe8efcc);
-  }
-  if (zones.has('riverside')) {
-    return zone === 'riverside'
-      ? (closeness > 0.66 ? 0xd8e8ce : 0xe2efcf)
-      : (closeness > 0.66 ? 0xe0edcc : 0xe8f2d4);
-  }
-  if (zones.has('ruins')) return closeness > 0.66 ? 0xd8d7ba : 0xe2e7c8;
-  if (zones.has('forest')) return closeness > 0.66 ? 0xd8e6c4 : 0xe2efd0;
-  return 0xe0e8c8;
-}
-
-function createTerrainBlendMasks(scene) {
-  if (scene.textures.exists('terrain_edge_alpha_mask')) return;
-  const makeMask = (key, alphaAt) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = TILE_SIZE;
-    canvas.height = TILE_SIZE;
-    const ctx = canvas.getContext('2d');
-    const img = ctx.createImageData(TILE_SIZE, TILE_SIZE);
-    for (let y = 0; y < TILE_SIZE; y++) {
-      for (let x = 0; x < TILE_SIZE; x++) {
-        const i = (y * TILE_SIZE + x) * 4;
-        const alpha = Phaser.Math.Clamp(alphaAt(x, y), 0, 1);
-        img.data[i] = 255;
-        img.data[i + 1] = 255;
-        img.data[i + 2] = 255;
-        img.data[i + 3] = Math.round(alpha * 255);
-      }
-    }
-    ctx.putImageData(img, 0, 0);
-    scene.textures.addCanvas(key, canvas);
-  };
-
-  makeMask('terrain_edge_alpha_mask', (x, y) => {
-    const wave = Math.sin(x * 0.12) * 7 + Math.sin(x * 0.31 + 1.7) * 4;
-    const d = y - (6 + wave);
-    const base = 1 - d / 82;
-    const grain = 0.84 + Math.sin((x * 13 + y * 7) * 0.07) * 0.08;
-    return base * grain;
-  });
-
-  makeMask('terrain_corner_alpha_mask', (x, y) => {
-    const waveX = Math.sin(y * 0.14) * 8;
-    const waveY = Math.sin(x * 0.13 + 0.8) * 8;
-    const d = Math.hypot(x + waveX, y + waveY);
-    const grain = 0.86 + Math.sin((x * 11 + y * 17) * 0.05) * 0.08;
-    return (1 - d / 118) * grain;
-  });
+function terrainTransitionBaseTint() {
+  return 0xf0f6d8;
 }
 
 function terrainBoundaryInfo(r, c, radius = 3) {
@@ -1683,87 +1620,22 @@ function buildMap(scene) {
 }
 
 function addTerrainSeamBlends(scene) {
-  const dirs = [
-    { dr: -1, dc: 0, angle: 0, maskAngle: 0, ox: 0, oy: -TILE_SIZE / 2 },
-    { dr: 1, dc: 0, angle: 0, maskAngle: 180, ox: 0, oy: TILE_SIZE / 2 },
-    { dr: 0, dc: -1, angle: 90, maskAngle: -90, ox: -TILE_SIZE / 2, oy: 0 },
-    { dr: 0, dc: 1, angle: 90, maskAngle: 90, ox: TILE_SIZE / 2, oy: 0 },
-  ];
-  let seamCount = 0;
-  let cornerCount = 0;
-  let bandCount = 0;
+  let blendCount = 0;
 
-  const addSeam = (r, c, zone, neighborZone, dir) => {
-    if (scene.textures.exists('terrain_edge_alpha_mask')) {
-      const mask = scene.add.image(
-        c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-4, 4),
-        r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-4, 4),
-        'terrain_edge_alpha_mask'
-      );
-      mask.setDisplaySize(TILE_SIZE + 22, TILE_SIZE + 22);
-      mask.setAngle(dir.maskAngle + Phaser.Math.Between(-3, 3));
-      mask.setAlpha(Phaser.Math.FloatBetween(0.48, 0.68));
-      mask.setTint(terrainZoneEdgeTint(neighborZone));
-      mask.setDepth(-934);
-    }
-    const key = terrainBlendAsset(zone, neighborZone);
-    if (!scene.textures.exists(key)) return;
-    const noise = tileNoise(r, c, 731 + dir.dr * 11 + dir.dc * 17);
-    const x = c * TILE_SIZE + TILE_SIZE / 2 + dir.ox + Phaser.Math.Between(-18, 18);
-    const y = r * TILE_SIZE + TILE_SIZE / 2 + dir.oy + Phaser.Math.Between(-16, 16);
-    const img = scene.add.image(x, y, key);
-    img.setDisplaySize(
-      Phaser.Math.Between(250, 410),
-      Phaser.Math.Between(110, 185)
-    );
-    img.setAngle(dir.angle + Phaser.Math.Between(-5, 5));
-    img.setAlpha(Phaser.Math.FloatBetween(0.18, 0.32));
-    img.setTint(terrainBlendTint(zone, neighborZone));
-    img.setDepth(-940 + noise * 4);
-    seamCount++;
-  };
-
-  const addCorner = (r, c, zone, zones) => {
-    const neighborZone = zones.find((z) => z !== zone) || zone;
-    if (scene.textures.exists('terrain_corner_alpha_mask')) {
-      const mask = scene.add.image(
-        c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-10, 10),
-        r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-10, 10),
-        'terrain_corner_alpha_mask'
-      );
-      mask.setDisplaySize(TILE_SIZE + 42, TILE_SIZE + 42);
-      mask.setAngle(Phaser.Math.Between(0, 3) * 90);
-      mask.setAlpha(Phaser.Math.FloatBetween(0.32, 0.52));
-      mask.setTint(terrainZoneEdgeTint(neighborZone));
-      mask.setDepth(-938);
-    }
-    const key = terrainBlendAsset(zone, neighborZone);
-    if (!scene.textures.exists(key)) return;
-    const x = c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-34, 34);
-    const y = r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-30, 30);
-    const img = scene.add.image(x, y, key);
-    img.setScale(Phaser.Math.Between(430, 700) / img.height);
-    img.setAngle(Phaser.Math.Between(0, 359));
-    img.setAlpha(Phaser.Math.FloatBetween(0.12, 0.22));
-    img.setTint(terrainBlendTint(zone, neighborZone));
-    img.setDepth(-945);
-    cornerCount++;
-  };
-
-  const addBandWash = (r, c, zone, zones, distance) => {
+  const addOrganicBlend = (r, c, zone, zones, distance) => {
     const neighborZone = zones.find((z) => z !== zone) || zone;
     const key = terrainBlendAsset(zone, neighborZone);
     if (!scene.textures.exists(key)) return;
-    const strength = Phaser.Math.Clamp(4 - distance, 1, 3);
-    const x = c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-42, 42);
-    const y = r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-38, 38);
+    const closeness = Phaser.Math.Clamp(4 - (distance || 3), 1, 3);
+    const x = c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-72, 72);
+    const y = r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-64, 64);
     const img = scene.add.image(x, y, key);
-    img.setScale(Phaser.Math.Between(420, 760) / img.height);
+    img.setScale(Phaser.Math.Between(620, 1180) / img.height);
     img.setAngle(Phaser.Math.Between(0, 359));
-    img.setAlpha(Phaser.Math.FloatBetween(0.045, 0.085) * strength);
+    img.setAlpha(Phaser.Math.FloatBetween(0.055, 0.115) * closeness);
     img.setTint(terrainBlendTint(zone, neighborZone));
-    img.setDepth(-950 + strength);
-    bandCount++;
+    img.setDepth(-948 + closeness);
+    blendCount++;
   };
 
   for (let r = 1; r < MAP_ROWS - 1; r++) {
@@ -1773,18 +1645,9 @@ function addTerrainSeamBlends(scene) {
       const boundaryInfo = terrainBoundaryInfo(r, c, 3);
       if (boundaryInfo.distance === null) continue;
       const boundaryZones = [...boundaryInfo.zones];
-      const touchingZones = new Set([zone]);
-      for (const dir of dirs) {
-        const neighborZone = getZone(r + dir.dr, c + dir.dc);
-        touchingZones.add(neighborZone);
-        if (neighborZone === zone) continue;
-        if (seamCount < 1200) addSeam(r, c, zone, neighborZone, dir);
-      }
-      if (bandCount < 620 && boundaryInfo.distance <= 3 && tileNoise(r, c, 751) > 0.48) {
-        addBandWash(r, c, zone, boundaryZones, boundaryInfo.distance);
-      }
-      if (boundaryInfo.zones.size >= 3 && cornerCount < 220 && tileNoise(r, c, 743) > 0.12) {
-        addCorner(r, c, zone, boundaryZones);
+      const threshold = boundaryInfo.distance === 1 ? 0.28 : (boundaryInfo.distance === 2 ? 0.54 : 0.76);
+      if (blendCount < 460 && tileNoise(r, c, 751) > threshold) {
+        addOrganicBlend(r, c, zone, boundaryZones, boundaryInfo.distance);
       }
     }
   }
