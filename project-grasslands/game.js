@@ -1778,6 +1778,20 @@ function addPathWashes(scene) {
       wide,
     };
   };
+  const addPathEdgeFleck = (x, y, color, alpha, longAxis, side) => {
+    const w = Phaser.Math.Between(7, 24);
+    const h = Phaser.Math.Between(3, 9);
+    g.fillStyle(color, alpha);
+    if (Phaser.Math.Between(0, 2) === 0) {
+      g.fillTriangle(
+        x - longAxis.x * w * 0.55, y - longAxis.y * w * 0.55,
+        x + longAxis.x * w * 0.55, y + longAxis.y * w * 0.55,
+        x + side.x * h, y + side.y * h,
+      );
+    } else {
+      g.fillRect(x - w * 0.5, y - h * 0.5, w, h);
+    }
+  };
   const roadSegment = (a, b) => {
     const wide = a.wide || b.wide;
     const outer = wide ? 122 : 102;
@@ -1799,6 +1813,57 @@ function addPathWashes(scene) {
     stroke(outer, 0x6f5a34, 0.12);
     stroke(mid, 0x94723f, 0.11);
     stroke(inner, 0xb1894f, 0.045);
+    const pointAt = (t) => {
+      if (t < 0.5) {
+        const u = t * 2;
+        return { x: Phaser.Math.Linear(a.x, cx, u), y: Phaser.Math.Linear(a.y, cy, u) };
+      }
+      const u = (t - 0.5) * 2;
+      return { x: Phaser.Math.Linear(cx, b.x, u), y: Phaser.Math.Linear(cy, b.y, u) };
+    };
+    const tx = dx / len;
+    const ty = dy / len;
+    const tangent = { x: tx, y: ty };
+    const normal = { x: nx, y: ny };
+    const flecks = Math.max(6, Math.floor(len / 20));
+    for (let i = 0; i < flecks; i++) {
+      const t = Phaser.Math.Clamp((i + Phaser.Math.FloatBetween(0.08, 0.92)) / flecks, 0.03, 0.97);
+      const p = pointAt(t);
+      for (const sign of [-1, 1]) {
+        if (Phaser.Math.Between(0, wide ? 4 : 5) === 0) continue;
+        const edge = outer * 0.48 + Phaser.Math.Between(-16, 22);
+        const side = { x: normal.x * sign, y: normal.y * sign };
+        const x = p.x + side.x * edge + Phaser.Math.Between(-7, 7);
+        const y = p.y + side.y * edge + Phaser.Math.Between(-5, 5);
+        const dirt = Phaser.Math.Between(0, 9) > 2;
+        addPathEdgeFleck(
+          x, y,
+          dirt ? Phaser.Utils.Array.GetRandom([0x7a5d36, 0xa9824c, 0x5f4c31]) : Phaser.Utils.Array.GetRandom([0x567642, 0x739452]),
+          dirt ? Phaser.Math.FloatBetween(0.20, 0.34) : Phaser.Math.FloatBetween(0.14, 0.24),
+          tangent,
+          side,
+        );
+      }
+    }
+    const stitchCount = Math.max(3, Math.floor(len / 42));
+    for (const sign of [-1, 1]) {
+      for (let i = 0; i < stitchCount; i++) {
+        if (Phaser.Math.Between(0, 4) === 0) continue;
+        const t0 = Phaser.Math.Clamp((i + Phaser.Math.FloatBetween(0.04, 0.32)) / stitchCount, 0.02, 0.96);
+        const t1 = Phaser.Math.Clamp(t0 + Phaser.Math.FloatBetween(0.035, 0.085), 0.04, 0.98);
+        const p0 = pointAt(t0);
+        const p1 = pointAt(t1);
+        const edge = outer * 0.48 + Phaser.Math.Between(-12, 18);
+        const side = { x: normal.x * sign, y: normal.y * sign };
+        g.lineStyle(Phaser.Math.Between(1, 3), Phaser.Utils.Array.GetRandom([0x5b4a30, 0x8a683c, 0x587240]), Phaser.Math.FloatBetween(0.16, 0.28));
+        g.lineBetween(
+          p0.x + side.x * edge + Phaser.Math.Between(-5, 5),
+          p0.y + side.y * edge + Phaser.Math.Between(-4, 4),
+          p1.x + side.x * edge + Phaser.Math.Between(-5, 5),
+          p1.y + side.y * edge + Phaser.Math.Between(-4, 4),
+        );
+      }
+    }
   };
   const roadNode = (r, c) => {
     const p = pathPoint(r, c);
@@ -1816,6 +1881,22 @@ function addPathWashes(scene) {
       const y = p.y + Math.sin(a) * dist * 0.72 + Phaser.Math.Between(-8, 8);
       g.fillStyle(i % 2 === 0 ? 0x5f7f47 : 0x6b5734, i % 2 === 0 ? 0.035 : 0.062);
       g.fillEllipse(x, y, Phaser.Math.Between(28, 74), Phaser.Math.Between(12, 32));
+    }
+    for (let i = 0; i < 12; i++) {
+      if (tileNoise(r, c, 1450 + i) < 0.28) continue;
+      const a = tileNoise(r, c, 1460 + i) * Math.PI * 2;
+      const dist = radius * Phaser.Math.FloatBetween(0.78, 1.18);
+      const x = p.x + Math.cos(a) * dist + Phaser.Math.Between(-12, 12);
+      const y = p.y + Math.sin(a) * dist * 0.78 + Phaser.Math.Between(-8, 8);
+      const tangent = { x: Math.cos(a + Math.PI / 2), y: Math.sin(a + Math.PI / 2) * 0.55 };
+      const side = { x: Math.cos(a), y: Math.sin(a) };
+      addPathEdgeFleck(
+        x, y,
+        Phaser.Utils.Array.GetRandom([0x6b5433, 0x8a6a3d, 0x658347]),
+        Phaser.Math.FloatBetween(0.15, 0.28),
+        tangent,
+        side,
+      );
     }
   };
 
@@ -2043,6 +2124,38 @@ function addGrassTones(scene) {
       }
     }
   });
+  const patchColors = [0x294f2c, 0x4d6e35, 0x78984f, 0x9b965e, 0xc3b06f];
+  const g = scene.add.graphics().setDepth(-959);
+  let patches = 0, attempts = 0;
+  while (patches < 520 && attempts < 5200) {
+    attempts++;
+    const r = Phaser.Math.Between(0, MAP_ROWS - 1);
+    const c = Phaser.Math.Between(0, MAP_COLS - 1);
+    if (getZone(r, c) !== 'grasslands' || getCellType(r, c) !== 'grass') continue;
+    if (tileNoise(r, c, 2231) < 0.43) continue;
+    patches++;
+    const cx = c * TILE_SIZE + Phaser.Math.Between(8, TILE_SIZE - 8);
+    const cy = r * TILE_SIZE + Phaser.Math.Between(8, TILE_SIZE - 8);
+    const marks = Phaser.Math.Between(5, 13);
+    const spreadX = Phaser.Math.Between(18, 68);
+    const spreadY = Phaser.Math.Between(10, 34);
+    for (let i = 0; i < marks; i++) {
+      const x = cx + Phaser.Math.Between(-spreadX, spreadX);
+      const y = cy + Phaser.Math.Between(-spreadY, spreadY);
+      const len = Phaser.Math.Between(5, 26);
+      const angle = Phaser.Math.FloatBetween(-1.1, 1.1);
+      const dx = Math.cos(angle) * len;
+      const dy = Math.sin(angle) * len * 0.42;
+      const color = Phaser.Utils.Array.GetRandom(patchColors);
+      const alpha = color === 0xc3b06f ? Phaser.Math.FloatBetween(0.07, 0.13) : Phaser.Math.FloatBetween(0.08, 0.18);
+      g.lineStyle(1, color, alpha);
+      g.lineBetween(x - dx * 0.5, y - dy * 0.5, x + dx * 0.5, y + dy * 0.5);
+      if (Phaser.Math.Between(0, 5) === 0) {
+        g.fillStyle(0xb8b08a, 0.08);
+        g.fillRect(x + Phaser.Math.Between(-4, 4), y + Phaser.Math.Between(-4, 4), 2, 2);
+      }
+    }
+  }
 }
 
 function addTerrainSeamBlends(scene) {

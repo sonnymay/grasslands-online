@@ -4,18 +4,40 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 92 side tent asset wiring pass.**
+**State as of 2026-05-19 — post session 93 ragged ground polish pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 92 continues `MAP_VISION_PLAN.md` Phase 2
-  by generating, alpha-cleaning, moving, and wiring
-  `tent_canvas_side_01.png`. The spawn camp now uses real transparent PNG art
-  for all three tent placements.
-- **Cache version live in `project-grasslands/index.html`:** `?v=196`.
-- **Next change must use:** `?v=197`.
+- **Latest completed work:** session 93 responds to the latest review that the
+  world is alive but the ground still feels too flat/airbrushed. Dirt paths now
+  get a hard ragged edge layer of dirt chips and grass intrusions, and
+  grasslands get extra tiny blade/scuff/pebble micro-clusters in world space.
+- **Cache version live in `project-grasslands/index.html`:** `?v=197`.
+- **Next change must use:** `?v=198`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 93):**
+- Goal: act on the new review feedback without undoing the no-decoration-shadow
+  decision. Priority chosen: ground texture/paths first, because the reviewer
+  called out airbrushed path edges and billiard-table grass as the main gap.
+- `addPathWashes()` still keeps the soft broad dirt underpaint, but now layers
+  hard-edged dirt chips and green grass intrusions along both sides of path
+  segments and around path nodes. This is meant to make path borders feel
+  ragged and hand-painted instead of smooth airbrush fades.
+- `addGrassTones()` now adds 520 small world-space micro patches made from
+  short blade strokes, dry-grass scratches, and occasional 2px pebbles. This
+  avoids per-tile grass variants, broad circular washes, or visible grid seams.
+- Static decoration shadows remain disabled. Do not re-enable
+  `addPropShadow()`. Future grounding should be baked into prop art or runtime
+  canvas textures only.
+- Cache bumped to `game.js?v=197`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md`
+  passed, and Chrome preview at `http://localhost:8002/?codex=ground-v197b`
+  loaded `game.js?v=197` with no current console warnings/errors. Wide and
+  cropped screenshots showed less airbrushed path edges and more subtle grass
+  micro-texture without visible tile seams or circular lawn spots.
 
 **Where we left off (session 92):**
 - Goal: keep improving automatically after the front tent pass. The browser
