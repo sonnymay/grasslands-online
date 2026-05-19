@@ -4,19 +4,41 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 91 front tent asset wiring pass.**
+**State as of 2026-05-19 — post session 92 side tent asset wiring pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 91 continues `MAP_VISION_PLAN.md` Phase 2
-  by moving/wiring the generated `tent_canvas_front_01.png` asset into the
-  spawn camp. Two front-facing tent placements now use the real transparent
-  PNG when available; one canvas tent remains as the temporary side-angle
-  placeholder until `tent_canvas_side_01.png` lands.
-- **Cache version live in `project-grasslands/index.html`:** `?v=195`.
-- **Next change must use:** `?v=196`.
+- **Latest completed work:** session 92 continues `MAP_VISION_PLAN.md` Phase 2
+  by generating, alpha-cleaning, moving, and wiring
+  `tent_canvas_side_01.png`. The spawn camp now uses real transparent PNG art
+  for all three tent placements.
+- **Cache version live in `project-grasslands/index.html`:** `?v=196`.
+- **Next change must use:** `?v=197`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 92):**
+- Goal: keep improving automatically after the front tent pass. The browser
+  screenshot showed the old center canvas tent was now the weakest placeholder,
+  so the next highest-impact step was the side-angle tent.
+- Generated source art:
+  `/Users/santipapmay/.codex/generated_images/019e3de4-7b61-7630-b2d1-3562982e5616/ig_0ea3fcdce4c32f28016a0ce37924fc819a92299a06c9cf6058.png`.
+- Processed output:
+  `/Users/santipapmay/Downloads/tent_canvas_side_01.png` and
+  `project-grasslands/assets/decorations/tent_canvas_side_01.png`. Final
+  asset is 360x280 RGBA with alpha.
+- `preload()` now loads `tent_canvas_side_01`.
+- `addSpawnCamp()` now chooses `tent_canvas_side_01` for the middle long tent
+  when present, falling back to the old runtime `camp_tent_canvas` if missing.
+- Static decoration shadows remain disabled. Baked-in art contact shadows are
+  allowed and are part of the tent PNG itself.
+- Cache bumped to `game.js?v=196`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md`
+  passed, PNG alpha/dimensions were confirmed, and Chrome preview at
+  `http://localhost:8002/?codex=tent-side-v196` loaded `game.js?v=196`
+  with no current console warnings/errors. The center side tent was visible in
+  the spawn camp and no runtime canvas tent placeholder remains in the camp.
 
 **Where we left off (session 91):**
 - Goal: continue autonomously from `MAP_VISION_PLAN.md` Phase 2, starting with
