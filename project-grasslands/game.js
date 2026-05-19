@@ -1553,70 +1553,80 @@ function pickNaturalGroundTile(zone, r, c, type) {
 }
 
 function buildMap(scene) {
+  // RO-style approach (Sonny called this out): every grass cell draws the
+  // SAME uniform TILE.GRASS frame from grass_tileset, no per-cell variant,
+  // no biome tileset swap, no per-cell tint. Biome identity comes from
+  // large feathered blob overlays in addBiomeWash() — the same approach
+  // that makes the pond look organic. Per-tile tile selection always
+  // reads as a grid no matter how the noise is tuned.
   for (let r = 0; r < MAP_ROWS; r++) {
     for (let c = 0; c < MAP_COLS; c++) {
       const type = getCellType(r, c);
-      const zone = getZone(r, c);
-      const boundaryInfo = type === 'grass' ? terrainBoundaryInfo(r, c, 3) : null;
-      const inTransitionBand = !!boundaryInfo && boundaryInfo.distance !== null && boundaryInfo.distance <= 3;
-      const idx = inTransitionBand
-        ? transitionGroundTile(zone, boundaryInfo.zones, r, c)
-        : pickNaturalGroundTile(zone, r, c, type);
-
-      const zoneTileset = {
-        desert: 'sand_tileset',
-        forest: 'forest_tileset',
-        ruins: 'ruins_tileset',
-        riverside: 'riverside_tileset',
-      }[zone];
-      const transitionBase = inTransitionBand;
-      const transitionTint = transitionBase
-        ? terrainTransitionBaseTint(zone, boundaryInfo.zones, boundaryInfo.distance)
-        : null;
-      const tilesetKey = !transitionBase && zoneTileset && scene.textures.exists(zoneTileset)
-        ? zoneTileset : 'grass_tileset';
+      let idx;
+      if (type === 'path_cross' || type === 'path_open') idx = TILE.DIRT_OPEN;
+      else if (type === 'path_h') idx = Math.random() < 0.55 ? TILE.DIRT_H : TILE.DIRT_H2;
+      else if (type === 'path_v') idx = Math.random() < 0.55 ? TILE.DIRT_V : TILE.DIRT_V2;
+      else if (type === 'path_loop') idx = Math.random() < 0.5 ? TILE.DIRT_WIDE : TILE.DIRT_PATCH;
+      else if (type === 'path_diag') idx = Math.random() < 0.5 ? TILE.DIRT_CORNER : TILE.DIRT_HEAVY;
+      else idx = TILE.GRASS; // uniform neutral grass everywhere
 
       const img = scene.add.image(
         c * TILE_SIZE + TILE_SIZE / 2,
         r * TILE_SIZE + TILE_SIZE / 2,
-        tilesetKey, `tile_${idx}`
+        'grass_tileset', `tile_${idx}`
       );
       img.setDisplaySize(TILE_SIZE + 2, TILE_SIZE + 2);
-      // Gentle flip variation is enough for organic grass. Random 90°
-      // rotations made v2's directional lighting read as square patchwork.
       if (type === 'grass') {
         if (Math.random() < 0.5) img.setFlipX(true);
         if (Math.random() < 0.5) img.setFlipY(true);
-      }
-      // Zone tint only when we're still drawing the grass tileset for a
-      // non-grasslands biome. Real biome tiles are already the right palette.
-      // Per-tile RGB jitter stays tiny. Larger jitter and alpha variance
-      // create obvious bright/dark rectangles on large grass fields.
-      const jitterTint = (base) => {
-        const r = (base >> 16) & 0xff, g = (base >> 8) & 0xff, b = base & 0xff;
-        const j = () => Phaser.Math.Between(-2, 2);
-        const cl = (v) => Math.max(0, Math.min(255, v + j()));
-        return (cl(r) << 16) | (cl(g) << 8) | cl(b);
-      };
-      if (type === 'grass') {
-        if (tilesetKey === 'grass_tileset') {
-          const tint = transitionTint || ZONE_TINTS[zone] || 0xffffff;
-          img.setTint(jitterTint(tint));
-        } else {
-          // Biome tilesets still need a shared painterly wash so they don't
-          // read as harsh, saturated squares next to the grass base.
-          img.setTint(jitterTint(FLOOR_TILE_TINTS[zone] || 0xffffff));
-        }
-        img.setAlpha(1);
-      } else if (tilesetKey === 'grass_tileset') {
-        const tint = ZONE_TINTS[zone];
-        if (tint && tint !== 0xffffff) img.setTint(tint);
       }
       img.setDepth(-1000);
     }
   }
 
-  addTerrainSeamBlends(scene);
+  addBiomeWash(scene);
+}
+
+// Biome identity = large irregular feathered blobs painted on the neutral
+// grass base, like the pond. Each non-grasslands zone gets clusters of
+// overlapping radial-alpha circles. This is a graphics-only proof until
+// proper biome_*_blob.png art ships (see asset list in HANDOFF.md).
+function addBiomeWash(scene) {
+  const biomes = {
+    forest:    { color: 0x4d7a3e, peakAlpha: 0.36, stamps: 18 },
+    desert:    { color: 0xd9aa5c, peakAlpha: 0.46, stamps: 18 },
+    ruins:     { color: 0x9b8e72, peakAlpha: 0.32, stamps: 14 },
+    riverside: { color: 0x6db5cc, peakAlpha: 0.32, stamps: 16 },
+  };
+  Object.keys(biomes).forEach((zone) => {
+    const { color, peakAlpha, stamps } = biomes[zone];
+    const g = scene.add.graphics().setDepth(-980);
+    let placed = 0;
+    let attempts = 0;
+    while (placed < stamps && attempts < 1200) {
+      attempts++;
+      const r = Phaser.Math.Between(0, MAP_ROWS - 1);
+      const c = Phaser.Math.Between(0, MAP_COLS - 1);
+      if (getZone(r, c) !== zone) continue;
+      placed++;
+      const cx = c * TILE_SIZE + TILE_SIZE / 2;
+      const cy = r * TILE_SIZE + TILE_SIZE / 2;
+      // 4 overlapping circles per stamp → irregular blob silhouette.
+      for (let k = 0; k < 4; k++) {
+        const ox = Phaser.Math.Between(-280, 280);
+        const oy = Phaser.Math.Between(-280, 280);
+        const radius = Phaser.Math.Between(420, 720);
+        // 9-layer radial alpha falloff = feathered edge.
+        const layers = 9;
+        for (let j = 0; j < layers; j++) {
+          const t = j / (layers - 1);
+          const a = peakAlpha * (1 - t * t);
+          g.fillStyle(color, a);
+          g.fillCircle(cx + ox, cy + oy, radius * (1 - t * 0.9));
+        }
+      }
+    }
+  });
 }
 
 function addTerrainSeamBlends(scene) {
