@@ -749,7 +749,7 @@ function preload() {
   this.load.image('campfire_01', 'assets/decorations/campfire_01.png');
   this.load.image('tent_canvas_front_01', 'assets/decorations/tent_canvas_front_01.png');
   this.load.image('tent_canvas_side_01', 'assets/decorations/tent_canvas_side_01.png');
-  this.load.image('wooden_cart_01', 'assets/decorations/wooden_cart_01.png');
+  this.load.image('wooden_cart_01', 'assets/decorations/wooden_cart_01.png?v=199');
   // Decorations
   for (let i = 1; i <= 4; i++) this.load.image(`deco_flower_cluster_0${i}`, `assets/decorations/deco_flower_cluster_0${i}.png`);
   for (let i = 1; i <= 3; i++) this.load.image(`deco_rock_0${i}`, `assets/decorations/deco_rock_0${i}.png`);
@@ -1811,9 +1811,9 @@ function addPathWashes(scene) {
       g.lineBetween(a.x, a.y, cx, cy);
       g.lineBetween(cx, cy, b.x, b.y);
     };
-    stroke(outer, 0x6f5a34, 0.12);
-    stroke(mid, 0x94723f, 0.11);
-    stroke(inner, 0xb1894f, 0.045);
+    stroke(outer, 0x6f5a34, 0.075);
+    stroke(mid, 0x94723f, 0.105);
+    stroke(inner, 0xb1894f, 0.058);
     const pointAt = (t) => {
       if (t < 0.5) {
         const u = t * 2;
@@ -1840,7 +1840,7 @@ function addPathWashes(scene) {
         addPathEdgeFleck(
           x, y,
           dirt ? Phaser.Utils.Array.GetRandom([0x7a5d36, 0xa9824c, 0x5f4c31]) : Phaser.Utils.Array.GetRandom([0x567642, 0x739452]),
-          dirt ? Phaser.Math.FloatBetween(0.20, 0.34) : Phaser.Math.FloatBetween(0.14, 0.24),
+          dirt ? Phaser.Math.FloatBetween(0.24, 0.40) : Phaser.Math.FloatBetween(0.18, 0.30),
           tangent,
           side,
         );
@@ -1856,7 +1856,7 @@ function addPathWashes(scene) {
         const p1 = pointAt(t1);
         const edge = outer * 0.48 + Phaser.Math.Between(-12, 18);
         const side = { x: normal.x * sign, y: normal.y * sign };
-        g.lineStyle(Phaser.Math.Between(1, 3), Phaser.Utils.Array.GetRandom([0x5b4a30, 0x8a683c, 0x587240]), Phaser.Math.FloatBetween(0.16, 0.28));
+        g.lineStyle(Phaser.Math.Between(1, 3), Phaser.Utils.Array.GetRandom([0x5b4a30, 0x8a683c, 0x587240]), Phaser.Math.FloatBetween(0.20, 0.34));
         g.lineBetween(
           p0.x + side.x * edge + Phaser.Math.Between(-5, 5),
           p0.y + side.y * edge + Phaser.Math.Between(-4, 4),
@@ -1869,11 +1869,30 @@ function addPathWashes(scene) {
   const roadNode = (r, c) => {
     const p = pathPoint(r, c);
     const radius = p.wide ? 72 : 58;
-    g.fillStyle(0x80613a, p.wide ? 0.13 : 0.11);
-    g.fillCircle(p.x, p.y, radius);
-    g.fillStyle(0xa17a43, 0.09);
-    g.fillCircle(p.x + (tileNoise(r, c, 1421) - 0.5) * 24,
-      p.y + (tileNoise(r, c, 1422) - 0.5) * 18, radius * 0.54);
+    const blob = (cx, cy, rx, ry, color, alpha, salt) => {
+      g.fillStyle(color, alpha);
+      g.beginPath();
+      for (let i = 0; i < 18; i++) {
+        const a = (i / 18) * Math.PI * 2;
+        const n = 0.76 + tileNoise(r + i, c + salt, 1470 + i) * 0.34;
+        const x = cx + Math.cos(a) * rx * n;
+        const y = cy + Math.sin(a) * ry * n;
+        if (i === 0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+      }
+      g.closePath();
+      g.fillPath();
+    };
+    blob(p.x, p.y, radius, radius * 0.72, 0x80613a, p.wide ? 0.15 : 0.13, 1);
+    blob(
+      p.x + (tileNoise(r, c, 1421) - 0.5) * 24,
+      p.y + (tileNoise(r, c, 1422) - 0.5) * 18,
+      radius * 0.54,
+      radius * 0.38,
+      0xa17a43,
+      0.10,
+      2,
+    );
     for (let i = 0; i < 3; i++) {
       if (tileNoise(r, c, 1430 + i) < 0.46) continue;
       const a = tileNoise(r, c, 1440 + i) * Math.PI * 2;
@@ -1894,7 +1913,7 @@ function addPathWashes(scene) {
       addPathEdgeFleck(
         x, y,
         Phaser.Utils.Array.GetRandom([0x6b5433, 0x8a6a3d, 0x658347]),
-        Phaser.Math.FloatBetween(0.15, 0.28),
+        Phaser.Math.FloatBetween(0.18, 0.34),
         tangent,
         side,
       );
@@ -2484,6 +2503,49 @@ function buildDecorations(scene) {
   // flattened field art. Keep this helper a no-op; player/monster shadows
   // use separate code paths and still ground moving characters.
   const addPropShadow = (_img, _x, _y, _opts = {}) => null;
+  const addStructureContact = (img, x, y, opts = {}) => {
+    if (!opts.contact) return;
+    const cfg = opts.contact === true ? {} : opts.contact;
+    const width = cfg.width ?? Math.max(44, img.displayWidth * 0.82);
+    const height = cfg.height ?? Math.max(14, Math.min(54, img.displayHeight * 0.18));
+    const angle = Phaser.Math.DegToRad(cfg.angle ?? opts.angle ?? img.angle ?? 0);
+    const cx = x + (cfg.xOffset ?? 0);
+    const cy = y + (cfg.yOffset ?? (opts.alignBottom ? -height * 0.18 : height * 0.16));
+    const depth = cfg.depth ?? (opts.alignBottom ? y - 0.65 : (opts.depth ?? -560) - 0.35);
+    const ux = Math.cos(angle);
+    const uy = Math.sin(angle);
+    const vx = -Math.sin(angle);
+    const vy = Math.cos(angle);
+    const g = scene.add.graphics().setDepth(depth);
+    for (let layer = 0; layer < 2; layer++) {
+      const rx = width * (layer === 0 ? 0.52 : 0.38);
+      const ry = height * (layer === 0 ? 0.52 : 0.36);
+      const alpha = (cfg.alpha ?? 0.11) * (layer === 0 ? 1 : 0.72);
+      g.fillStyle(layer === 0 ? 0x2b2117 : 0x6b5331, alpha);
+      g.beginPath();
+      for (let i = 0; i < 14; i++) {
+        const a = (i / 14) * Math.PI * 2;
+        const n = Phaser.Math.FloatBetween(0.78, 1.10);
+        const lx = Math.cos(a) * rx * n;
+        const ly = Math.sin(a) * ry * n;
+        const px = cx + ux * lx + vx * ly;
+        const py = cy + uy * lx + vy * ly;
+        if (i === 0) g.moveTo(px, py);
+        else g.lineTo(px, py);
+      }
+      g.closePath();
+      g.fillPath();
+    }
+    for (let i = 0; i < (cfg.scuffs ?? 9); i++) {
+      const lx = Phaser.Math.FloatBetween(-width * 0.44, width * 0.44);
+      const ly = Phaser.Math.FloatBetween(-height * 0.38, height * 0.38);
+      const len = Phaser.Math.Between(6, 24);
+      const px = cx + ux * lx + vx * ly;
+      const py = cy + uy * lx + vy * ly;
+      g.lineStyle(1, Phaser.Utils.Array.GetRandom([0x1d160f, 0x59472b, 0x758342]), Phaser.Math.FloatBetween(0.07, 0.16));
+      g.lineBetween(px - ux * len * 0.5, py - uy * len * 0.5, px + ux * len * 0.5, py + uy * len * 0.5);
+    }
+  };
   const addBaseOverlapCluster = (x, y, opts = {}, countRange = [1, 3]) => {
     const baseClusterChance = opts.baseCluster ?? 0;
     if (!baseClusterChance || !opts.alignBottom || Math.random() >= baseClusterChance) return;
@@ -2752,6 +2814,7 @@ function buildDecorations(scene) {
     img.setAlpha(opts.alpha ?? 1);
     if (opts.tint) img.setTint(opts.tint);
     if (opts.shadow) addPropShadow(img, x, y, opts);
+    addStructureContact(img, x, y, opts);
     addBaseOverlapCluster(x, y, opts, [1, 3]);
     if (opts.blockRadius) blockCells(x, y, opts.blockRadius);
     if (opts.sway) {
@@ -3180,6 +3243,7 @@ function buildDecorations(scene) {
         allowFlip: false,
         angle: tent.angle,
         baseCluster: 0,
+        contact: { width: tent.key === sideTentKey ? 150 : 104, height: 28, yOffset: -8, alpha: 0.075, angle: tent.angle },
       });
       blockCells(x, y, 2);
     }
@@ -3224,6 +3288,7 @@ function buildDecorations(scene) {
         allowFlip: false,
         angle: f.angle,
         baseCluster: 0,
+        contact: { width: 112, height: 16, yOffset: -6, alpha: 0.08, angle: f.angle, scuffs: 5 },
       });
     }
     const cartKey = scene.textures.exists('wooden_cart_01') ? 'wooden_cart_01' : 'camp_wagon_canvas';
@@ -3241,6 +3306,14 @@ function buildDecorations(scene) {
         allowFlip: false,
         angle: item.angle,
         baseCluster: 0,
+        contact: {
+          width: item.key === cartKey ? 178 : (item.key === 'camp_pot_canvas' ? 44 : 116),
+          height: item.key === cartKey ? 42 : (item.key === 'camp_pot_canvas' ? 18 : 20),
+          yOffset: item.key === cartKey ? -16 : -5,
+          alpha: item.key === cartKey ? 0.085 : 0.07,
+          angle: item.angle,
+          scuffs: item.key === cartKey ? 12 : 5,
+        },
       });
       if (item.block) blockCells(x, y, item.block);
     }
@@ -3276,6 +3349,7 @@ function buildDecorations(scene) {
       allowFlip: false,
       angle: -3,
       alpha: 0.94,
+      contact: { width: 230, height: 58, yOffset: 30, alpha: 0.105, angle: -3, depth: -773, scuffs: 12 },
     });
     const ancientTree = placeLandmarkDeco('tree_oak_01', ruinX + 16, ruinY + 34, 326, {
       alignBottom: true,
@@ -3297,6 +3371,7 @@ function buildDecorations(scene) {
         angle: p.angle,
         tint: 0xd4ccb2,
         baseCluster: 0.18,
+        contact: { width: 48, height: 18, yOffset: -5, alpha: 0.10, angle: p.angle, scuffs: 4 },
       });
       blockCells(x, y, 1);
     }
@@ -3320,6 +3395,7 @@ function buildDecorations(scene) {
       allowFlip: false,
       angle: 4,
       baseCluster: 0.55,
+      contact: { width: 150, height: 42, yOffset: -12, alpha: 0.09, angle: 4, scuffs: 10 },
     });
     blockCells(rockX, rockY, 2);
     for (const p of [

@@ -4,17 +4,45 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 94 wooden cart asset wiring pass.**
+**State as of 2026-05-19 — post session 95 terrain/contact polish pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 94 wires Sonny-generated
-  `wooden_cart_01.png` into the spawn camp, replacing the flat runtime canvas
-  wagon when the real PNG is available.
-- **Cache version live in `project-grasslands/index.html`:** `?v=198`.
-- **Next change must use:** `?v=199`.
+- **Latest completed work:** session 95 responds to the latest review that
+  paths still looked airbrushed and structures still read slightly stickered.
+  It sharpens the dirt path rendering and adds structure-only painted contact
+  marks for camp/ruin anchor props without re-enabling generic decoration
+  shadows.
+- **Cache version live in `project-grasslands/index.html`:** `?v=199`.
+- **Next change must use:** `?v=200`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 95):**
+- Goal: act on the new review feedback without violating Sonny's earlier
+  instruction that generic decoration shadows made props look like they were
+  floating.
+- `addPropShadow()` remains a no-op. Do not re-enable it.
+- Added a separate `addStructureContact()` helper in `buildDecorations()` that
+  paints small irregular dark/dirt/grass contact marks under selected
+  architectural props only. This is not applied to normal flowers, bushes,
+  trees, monsters, or general scatter.
+- Applied contact marks to spawn-camp tents, fences, cart, benches, and pot,
+  plus the prompt-inspired ruins base, ruin pillars, and boulder anchor.
+- Cleaned the project copy of `wooden_cart_01.png` again so its baked contact
+  patch reads less pale/white in-game. The original Downloads file remains
+  untouched.
+- `addPathWashes()` now uses lower-alpha broad path underpaint, stronger hard
+  edge chips/stitches, and irregular polygon path nodes instead of smooth
+  circular node fills. The intent is less airbrush and more ragged terrain
+  boundary while keeping the existing organic road network.
+- Cache bumped to `game.js?v=199`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md`
+  passed, and Chrome preview at `http://localhost:8002/?codex=contact-v199b`
+  loaded `game.js?v=199` with no current console warnings/errors. The camp
+  structures and cart show darker contact with the ground, and the path edges
+  are more ragged without restoring generic decoration shadows.
 
 **Where we left off (session 94):**
 - Goal: use Sonny's generated cart asset from Downloads while preserving the
