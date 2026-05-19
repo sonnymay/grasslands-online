@@ -4,16 +4,53 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 10:19 PM CDT — post floor-first terrain blend pass.**
+**State as of 2026-05-18 10:45 PM CDT — post painterly floor overlay pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 62 responds to Claude Browser feedback
-  by improving floor/tile blending rather than adding more props.
-- **Cache version live in `project-grasslands/index.html`:** `?v=153`.
-- **Next change must use:** `?v=154`.
+- **Latest completed work:** session 64 adds real painterly floor overlay PNGs
+  and wires terrain blending to prefer those broad soft washes, making grass,
+  forest, riverside, desert, and ruins floors read less tiled and more organic.
+- **Cache version live in `project-grasslands/index.html`:** `?v=155`.
+- **Next change must use:** `?v=156`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 64):**
+- Goal: make the floor itself feel closer to Ragnarok Online by adding actual
+  soft painted terrain overlays instead of relying only on tinted prop sprites.
+- Added five new transparent PNG floor washes in `assets/decorations/`:
+  grass blob, forest moss, wet mud, sand wash, and stone dust.
+- `buildDecorations()` now prefers those `floor_*` assets for normal ground
+  overlays, road shoulders, biome transitions, and the broad floor-wash pass.
+- Increased the soft/macro floor-overlay counts slightly and made `floor_*`
+  sprites larger/clearer, while keeping them low-alpha and non-interactive.
+- Cache bumped to `game.js?v=155`; committed and pushed as
+  `925c0f2 tweak: add painterly floor overlays`.
+- No gameplay, combat, controls, map dimensions, saves, monsters, collision,
+  class selection, or sprite assets changed.
+- Verification: `node -c project-grasslands/game.js` passed, `git diff --check`
+  passed, local HTTP smoke served `index.html` with `game.js?v=155`, and
+  `floor_grass_blob_soft_01.png` returned HTTP 200.
+
+**Where we left off (session 63):**
+- Goal: improve the "Choose Your Path" class cards because they looked rough
+  and were hard to click.
+- `showClassSelect()` now wraps each class option in one interactive
+  `cardGroup`, so the art, text, backing, and bottom action label all share a
+  single full-card hit area.
+- Cards are slightly larger, use a drawn frame/shadow/art well/text backing,
+  and show a bottom `CHOOSE` / `SWAP CLASS` affordance.
+- Hover now moves/scales the whole card and repaints the border/glow together,
+  instead of only moving individual child objects.
+- No class-selection rules, zeny swap cost, save fields, combat, movement,
+  map, sprite assets, or progression changed.
+- Verification: `node --check project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html`
+  passed, and local `python3 -m http.server 8000` served `index.html` with
+  HTTP 200 after sandbox escalation. Automated screenshot verification was
+  not completed because Playwright is not installed and Computer Use timed
+  out.
 
 **Where we left off (session 62):**
 - Goal: make the ground/floor less flat, grid-like, and saturated after Sonny
@@ -458,7 +495,45 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 62 (latest)
+## 3. What we did in session 63 (latest)
+
+Cache now at **`?v=154`**. Sonny pointed out that the "Choose Your Path"
+class cards were hard to click and did not look good. This session targets
+only the class-selection overlay UI.
+
+1. **Full-card hit target.** Replaced the rectangle-only click handling with
+   one interactive `cardGroup` per class card, so clicking the art, text,
+   frame, or bottom label selects the class.
+2. **Clearer button affordance.** Added a bottom `CHOOSE` / `SWAP CLASS`
+   label inside each card so the chooser reads as clickable at a glance.
+3. **Polished card frame.** Redrew each card with a shadow, rounded colored
+   frame, pale art well, darker text backing, and stronger hover border.
+4. **Unified hover feedback.** Hover now lifts and slightly scales the whole
+   card while repainting the glow, instead of animating scattered child
+   elements independently.
+5. **Asset and gameplay scope preserved.** No sprite assets changed. No
+   class rules, zeny swap costs, save schema, combat, movement, progression,
+   map, or monster logic changed.
+6. **Verification.** `node --check project-grasslands/game.js` exited 0.
+   `git diff --check -- project-grasslands/game.js project-grasslands/index.html`
+   exited 0. Local `python3 -m http.server 8000` served `index.html` with
+   HTTP 200 after sandbox escalation. Automated screenshot verification was
+   blocked because Playwright is not installed and Computer Use timed out.
+7. **Cache bump.** `?v=153` -> `?v=154`.
+
+### Next UI suggestions
+
+1. **Browser-check the card picker manually.** Use the running local preview
+   or production after deploy to confirm hover/click feel on desktop and
+   small laptop widths.
+2. **Mobile/compact layout pass.** If the picker is ever played on narrow
+   screens, stack or shrink cards instead of relying on the current
+   three-column desktop layout.
+3. **Replace checkerboard card art backgrounds.** The current `*_card.png`
+   files still show transparent-grid backgrounds; transparent cutouts or
+   proper illustrated cards would make the chooser feel much more finished.
+
+## 3.1. What we did in session 62
 
 Cache now at **`?v=153`**. Sonny and Claude Browser called out the floor as
 the biggest visual problem: too flat, too tile-grid obvious, too saturated,
