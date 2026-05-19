@@ -612,7 +612,24 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 80 (latest)
+## 3. What we did in session 81 (latest)
+
+Cache now at **`?v=175`**. Sonny: hard to click Bigfoot / T-Rex /
+Kaiju Titan despite their giant bodies — only specific areas register.
+
+1. **Diagnosis.** Both pointerdown and pointermove used fixed-radius
+   circle tests: `Math.hypot(wx - sprite.x, wy - sprite.y) < 80`
+   (click) and `< 70` (hover). Boss `scaleMult: 6.6` produces sprites
+   500+ px tall, so most of the visible body fell outside the 80 px
+   radius.
+2. **Fix.** Replaced both circular tests with axis-aligned rectangle
+   tests scaled to `sprite.displayWidth / 2` and
+   `sprite.displayHeight / 2`, floored at 80 / 70 px so small mobs
+   keep their generous tap target. Anywhere on a giant boss's
+   visible body now registers as a target.
+3. **Cache bump.** `?v=174` → `?v=175`.
+
+## 3.1. What we did in session 80
 
 Cache now at **`?v=174`**. Sonny added `hitting sound2.mp3` and
 `hitting sound3.mp3` next to `hitthemonster.mp3`. Randomize across all
@@ -3365,7 +3382,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=174`**. Next change should use `?v=175`.
+  change. Current: **`?v=175`**. Next change should use `?v=176`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
