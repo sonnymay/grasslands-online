@@ -595,7 +595,44 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 73 (latest)
+## 3. What we did in session 74 (latest)
+
+Cache now at **`?v=167`**. Sonny scored the game 4.5/10 with three
+biggest visual drags: grass reads as flat snooker table, yellow-green
+"bleach" ovals around props, map still empty. Three code-only fixes.
+
+1. **Killed grass-zone overlay bleach.** Session-45/47 soft + macro
+   overlay scatters used `groundOverlayTint('grasslands') = 0xe0edbf`
+   (pale yellow-green). They were grid-breakers; obsolete now that
+   uniform `TILE.GRASS` + biome-blob handles the field. Both loops
+   now skip when `z === 'grasslands'`. Other biomes keep them so the
+   biome blob has texture variance on top.
+2. **`addGrassTones(scene)`** — new Graphics-only pass with **280
+   feathered radial-alpha circles** across grasslands tiles in three
+   pure-green tones:
+   - `0x3e6a32` dark mossy, peakAlpha 0.22, 110 stamps, r 320–540
+   - `0x7fa75d` mid green, peakAlpha 0.18, 90 stamps, r 260–460
+   - `0xa6c87a` light highlight, peakAlpha 0.14, 80 stamps, r 220–420
+   Depth -960 (between biome wash -980 and props -500/-620). 7-layer
+   radial alpha falloff = feathered edge like the pond/biome blobs.
+3. **Grasslands decoration density 1.5×.** Grass tufts 820→1300,
+   flowers 450→720, mushrooms 260→380, bushes 190→280, trees
+   120→180. Fills the dead zones.
+4. **Verification.** Preview boots clean. Grass now has dark/light
+   tonal depth, bleach gone. Density visibly higher.
+5. **Cache bump.** `?v=166` → `?v=167`.
+
+### Next session priorities (queued)
+
+- Fantasy UI re-skin: replace plain dark rectangles in HUD/quest/gear
+  panels and toolbar buttons with a parchment/wood/brass frame style
+  to match the pixel-art aesthetic.
+- Notification text stack cleanup: floating combat text, banners,
+  boss bar, quest tracker — group + style consistently.
+- More biome-specific props in forest/ruins/desert/riverside to
+  match grasslands density bump.
+
+## 3.1. What we did in session 73
 
 Cache now at **`?v=165`**. The latest pass fixes the seven browser-review
 issues that made the map still feel prototype-like.
@@ -3202,7 +3239,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=163`**. Next change should use `?v=164`.
+  change. Current: **`?v=167`**. Next change should use `?v=168`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
