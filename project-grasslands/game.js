@@ -1622,7 +1622,6 @@ function buildMap(scene) {
       .setOrigin(0, 0)
       .setDepth(-1010);
   }
-  addGrassWorldWashes(scene);
   addPathWashes(scene);
   addBiomeWash(scene);
   addGrassTones(scene);
@@ -1830,18 +1829,16 @@ function addBiomeWash(scene) {
   });
 }
 
-// Grass texture stipple — many SMALL dark/light green specks across the
-// grasslands floor for organic noise. Previous pass used 280 large radial
-// blobs which read as camouflage swirls, not grass. Specks are 18-58 px
-// radius, alpha 0.16-0.28, so the eye reads them as ground texture, not
-// patches.
+// Grass texture marks — tiny blade-like strokes and pin specks across the
+// grasslands floor. Circular tone stamps read like bokeh/lawn spots at this
+// zoom, so keep each mark small and directional.
 function addGrassTones(scene) {
   const tones = [
-    { color: 0x3a5d2b, alphaRange: [0.18, 0.28], stamps: 2200, radius: [22, 48] }, // dark moss specks
-    { color: 0xa8c878, alphaRange: [0.14, 0.22], stamps: 1500, radius: [20, 44] }, // light highlight specks
-    { color: 0x6b8a4a, alphaRange: [0.16, 0.24], stamps: 1800, radius: [26, 58] }, // mid tone specks
+    { color: 0x2f582b, alphaRange: [0.16, 0.24], stamps: 4200, length: [8, 22] },
+    { color: 0x8fb86a, alphaRange: [0.10, 0.18], stamps: 3000, length: [6, 18] },
+    { color: 0x5f8444, alphaRange: [0.12, 0.20], stamps: 3600, length: [7, 20] },
   ];
-  tones.forEach(({ color, alphaRange, stamps, radius }) => {
+  tones.forEach(({ color, alphaRange, stamps, length }) => {
     const g = scene.add.graphics().setDepth(-960);
     let placed = 0, attempts = 0;
     while (placed < stamps && attempts < stamps * 6) {
@@ -1853,14 +1850,17 @@ function addGrassTones(scene) {
       placed++;
       const cx = c * TILE_SIZE + Phaser.Math.Between(0, TILE_SIZE);
       const cy = r * TILE_SIZE + Phaser.Math.Between(0, TILE_SIZE);
-      const rad = Phaser.Math.Between(radius[0], radius[1]);
+      const len = Phaser.Math.Between(length[0], length[1]);
       const a = Phaser.Math.FloatBetween(alphaRange[0], alphaRange[1]);
-      // 3-layer falloff = soft speck edge, much smaller than session-74
-      // blobs so the eye reads texture, not swirls.
-      g.fillStyle(color, a);
-      g.fillCircle(cx, cy, rad);
-      g.fillStyle(color, a * 0.5);
-      g.fillCircle(cx, cy, rad * 1.5);
+      const angle = Phaser.Math.FloatBetween(-0.95, 0.95);
+      const dx = Math.cos(angle) * len;
+      const dy = Math.sin(angle) * len * 0.42;
+      g.lineStyle(1, color, a);
+      g.lineBetween(cx - dx * 0.5, cy - dy * 0.5, cx + dx * 0.5, cy + dy * 0.5);
+      if (Phaser.Math.Between(0, 4) === 0) {
+        g.fillStyle(color, a * 0.55);
+        g.fillRect(cx, cy, 2, 2);
+      }
     }
   });
 }
@@ -2082,12 +2082,12 @@ function buildDecorations(scene) {
   const addLandmarkHalo = (tile_r, tile_c, color) => {
     const x = tile_c * TILE_SIZE + TILE_SIZE / 2;
     const y = tile_r * TILE_SIZE + TILE_SIZE / 2;
-    const halo = scene.add.ellipse(x, y + 6, 150, 56, color, 0.08)
-      .setStrokeStyle(2, color, 0.18)
+    const halo = scene.add.ellipse(x, y + 6, 132, 44, color, 0.025)
+      .setStrokeStyle(1, color, 0.08)
       .setDepth(-620);
     scene.tweens.add({
       targets: halo,
-      alpha: 0.12,
+      alpha: 0.05,
       scaleX: 1.05,
       scaleY: 1.08,
       duration: 1600,

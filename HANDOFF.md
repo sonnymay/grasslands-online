@@ -4,18 +4,35 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 12:41 AM CDT — post world-map visual cleanup.**
+**State as of 2026-05-19 1:46 AM CDT — post grass spot cleanup.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 73 fixes the seven blunt browser-review
-  issues: grass tile seams, empty field density, stacked announcement clutter,
-  placeholder HUD panels, noisy minimap dots, disconnected monster labels, and
-  weak ground-contact shadows.
-- **Cache version live in `project-grasslands/index.html`:** `?v=165`.
-- **Next change must use:** `?v=166`.
+- **Latest completed work:** session 76 removes the visible circular/bokeh
+  grass-tone spots introduced by the stipple pass. Grass variation now uses
+  tiny directional blade marks instead of circles, and the broad grass wash
+  layer is no longer drawn.
+- **Cache version live in `project-grasslands/index.html`:** `?v=170`.
+- **Next change must use:** `?v=171`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 76):**
+- Goal: continue improving the game after the user said the grass still looked
+  wrong.
+- Root issue in preview: session 75's circular tone stamps still read as
+  translucent bubbles/lawn spots across the field, especially at zoom 0.85.
+- `addGrassTones(scene)` now draws thousands of short blade-like line marks
+  plus occasional 2px pin specks instead of 20–58 px circles.
+- `buildMap(scene)` no longer calls `addGrassWorldWashes(scene)`, removing
+  the broad repeating circle/bokeh wash layer from grasslands.
+- Landmark halos were toned down so spawn/plaza areas do not create obvious
+  pale rings on the floor.
+- Cache bumped to `game.js?v=170`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check` passed, and Chrome preview at
+  `http://127.0.0.1:8000/index.html` showed the circular spots removed while
+  keeping dense props and the cleaner HUD/minimap from prior sessions.
 
 **Where we left off (session 73):**
 - Goal: respond to the latest honest feedback and fix all seven highest-impact
@@ -595,7 +612,27 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 75 (latest)
+## 3. What we did in session 76 (latest)
+
+Cache now at **`?v=170`**. User said "Improve this game" after rejecting the
+grass direction. Current preview showed the remaining grass problem: circular
+tone stamps still read like translucent bubbles/lawn spots.
+
+1. **Circular grass spots removed.** `buildMap()` no longer calls
+   `addGrassWorldWashes(scene)`, so the broad world-space circle/bokeh wash
+   layer is gone.
+2. **`addGrassTones(scene)` rewritten.** Replaced 20–58 px circular stamps
+   with thousands of short directional blade marks plus occasional 2px pin
+   specks. The floor now reads as grass texture, not bubbles.
+3. **Landmark halos reduced.** Spawn/plaza halo fill and stroke alpha were
+   cut down so they no longer create obvious pale rings on the floor.
+4. **Verification.** `node -c project-grasslands/game.js` and
+   `git diff --check` passed. Chrome preview at
+   `http://127.0.0.1:8000/index.html` showed the circular spots removed while
+   preserving dense props, toast queue, framed HUD, and readable minimap.
+5. **Cache bump.** `?v=168` → `?v=170`.
+
+## 3.1. What we did in session 75
 
 Cache now at **`?v=168`**. Score 5.5/10 feedback: grass tones read as
 camouflage swirls, map barren, camera too zoomed out. Keep biome
