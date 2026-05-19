@@ -495,7 +495,31 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 65 (latest)
+## 3. What we did in session 66 (latest)
+
+Cache now at **`?v=157`**. Sonny identified the #1 remaining visual problem:
+terrain tile transitions were still harsh, square, and blocky, especially
+riverside/grass and biome edges. This session targets that problem directly.
+
+1. **Dense seam masks.** Added `addTerrainSeamBlends(scene)` after base tile
+   rendering, so biome-edge tiles get soft overlay strips instead of relying
+   on sparse random decorations.
+2. **Edge-aware placement.** Each grass tile checks north/south/east/west
+   neighbor zones; when a neighbor zone differs, a stretched soft floor wash is
+   placed across the exact seam.
+3. **Corner softening.** Multi-zone joins get larger low-alpha corner blobs so
+   diagonal and corner edges no longer read as clean square cuts.
+4. **Biome-specific blend art.** New helpers `terrainBlendAsset()` and
+   `terrainBlendTint()` pick sand, stone, mud, moss, or grass floor washes
+   based on the touching zones.
+5. **Layering.** Seam masks draw above base tiles (`depth -940`) but below
+   props and later decorative floor washes, keeping the fix cosmetic and
+   non-interactive.
+6. **Cache bump.** `?v=156` → `?v=157`.
+7. **Verification.** `node -c project-grasslands/game.js` passed and
+   `git diff --check` passed.
+
+## 3.1. What we did in session 65
 
 Cache now at **`?v=156`**. Sonny: "Improve the Choose Your Path
 character cards so they are easier to click and look more polished."
@@ -525,7 +549,7 @@ behavior changed.
    Open + close the preview cleanly to confirm next session.
 9. **Cache bump.** `?v=155` → `?v=156`.
 
-## 3.1. What we did in session 63
+## 3.2. What we did in session 63
 
 Cache now at **`?v=154`**. Sonny pointed out that the "Choose Your Path"
 class cards were hard to click and did not look good. This session targets
@@ -2823,7 +2847,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=156`**. Next change should use `?v=157`.
+  change. Current: **`?v=157`**. Next change should use `?v=158`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
