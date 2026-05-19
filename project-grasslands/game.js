@@ -1938,10 +1938,23 @@ function buildDecorations(scene) {
     }
   };
 
-  // Decoration shadow ellipses were reading as bleach ovals around props
-  // on the new uniform grass base. Disable entirely. Monster/player drop
-  // shadows use a separate code path and are untouched.
-  const addPropShadow = (_img, _x, _y, _opts = {}) => null;
+  // Small dark contact shadows give props ground contact without bringing
+  // back the pale oval "lawn spot" problem from the old floor pass.
+  const addPropShadow = (img, x, y, opts = {}) => {
+    const h = img.displayHeight || 48;
+    const w = img.displayWidth || h;
+    if (h < 58 && tileNoise(Math.floor(y / TILE_SIZE), Math.floor(x / TILE_SIZE), 941) < 0.62) return null;
+    const shadow = scene.add.ellipse(
+      x,
+      y + (opts.shadowOffsetY ?? Math.max(4, h * 0.22)),
+      opts.shadowW ?? Math.max(18, w * (opts.shadowScaleX ?? 0.48)),
+      opts.shadowH ?? Math.max(4, h * (opts.shadowScaleY ?? 0.055)),
+      0x120e08,
+      opts.shadowAlpha ?? (h > 120 ? 0.18 : 0.12)
+    ).setOrigin(0.5);
+    shadow.setDepth(opts.alignBottom ? y - 2 : ((opts.depth ?? -560) - 1));
+    return shadow;
+  };
 
   // Generic scatter. By default decorations are flat overlays under entities.
   // `alignBottom` lets us anchor the base of a sprite (trees/bushes/pond) so the
@@ -2112,14 +2125,14 @@ function buildDecorations(scene) {
   const addLandmarkHalo = (tile_r, tile_c, color) => {
     const x = tile_c * TILE_SIZE + TILE_SIZE / 2;
     const y = tile_r * TILE_SIZE + TILE_SIZE / 2;
-    const halo = scene.add.ellipse(x, y + 6, 132, 44, color, 0.025)
-      .setStrokeStyle(1, color, 0.08)
+    const halo = scene.add.ellipse(x, y + 6, 118, 36, color, 0.012)
+      .setStrokeStyle(1, color, 0.035)
       .setDepth(-620);
     scene.tweens.add({
       targets: halo,
-      alpha: 0.05,
-      scaleX: 1.05,
-      scaleY: 1.08,
+      alpha: 0.028,
+      scaleX: 1.04,
+      scaleY: 1.06,
       duration: 1600,
       yoyo: true,
       repeat: -1,
@@ -2336,13 +2349,13 @@ function buildDecorations(scene) {
       placeLandmarkDeco(pick(), px, py, 48, { maxAngle: 12, sway: zone !== 'desert' && zone !== 'ruins', swayAmp: 2 });
     }
     // Warm lantern centerpiece (reuse spawn-lantern style, single).
-    const glow = scene.add.ellipse(cx, cy + 4, 56, 26, 0xc58d34, 0.12)
+    const glow = scene.add.ellipse(cx, cy + 4, 42, 18, 0xc58d34, 0.055)
       .setDepth(-620);
-    scene.tweens.add({ targets: glow, alpha: 0.18, scaleX: 1.05, scaleY: 1.05,
+    scene.tweens.add({ targets: glow, alpha: 0.09, scaleX: 1.05, scaleY: 1.05,
       duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-    const core = scene.add.ellipse(cx, cy - 4, 14, 14, 0xfff2a8, 0.95)
+    const core = scene.add.ellipse(cx, cy - 4, 9, 9, 0xfff2a8, 0.68)
       .setDepth(cy);
-    scene.tweens.add({ targets: core, alpha: 0.65, scaleX: 1.15, scaleY: 1.15,
+    scene.tweens.add({ targets: core, alpha: 0.42, scaleX: 1.12, scaleY: 1.12,
       duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
   };
 
@@ -2369,14 +2382,14 @@ function buildDecorations(scene) {
   for (const off of lanternOffsets) {
     const lx = spX + off.dx, ly = spY + off.dy;
     // Warm glow disc (under feet depth).
-    const glow = scene.add.ellipse(lx, ly + 4, 62, 30, 0xc58d34, 0.13)
+    const glow = scene.add.ellipse(lx, ly + 4, 46, 20, 0xc58d34, 0.06)
       .setDepth(-620);
-    scene.tweens.add({ targets: glow, alpha: 0.20, scaleX: 1.05, scaleY: 1.05,
+    scene.tweens.add({ targets: glow, alpha: 0.10, scaleX: 1.05, scaleY: 1.05,
       duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     // Small bright core.
-    const core = scene.add.ellipse(lx, ly - 6, 18, 18, 0xfff2a8, 0.95)
+    const core = scene.add.ellipse(lx, ly - 6, 10, 10, 0xfff2a8, 0.66)
       .setDepth(ly);
-    scene.tweens.add({ targets: core, alpha: 0.65, scaleX: 1.15, scaleY: 1.15,
+    scene.tweens.add({ targets: core, alpha: 0.42, scaleX: 1.12, scaleY: 1.12,
       duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
   }
 
@@ -2401,7 +2414,7 @@ function buildDecorations(scene) {
       for (const dist of [105, 190, 280, 370]) {
         const cx = spX + dx * dist;
         const cy = spY + dy * dist;
-        placeGround(cx, cy, groundKey, Phaser.Math.Between(120, 210), 0xd8e0b8, 0.10);
+        placeGround(cx, cy, groundKey, Phaser.Math.Between(86, 145), 0xd8e0b8, 0.035);
         for (const side of [-1, 1]) {
           const px = cx + nx * side * Phaser.Math.Between(44, 62);
           const py = cy + ny * side * Phaser.Math.Between(24, 38);
@@ -2418,7 +2431,7 @@ function buildDecorations(scene) {
           }
         }
         if (tileNoise(Math.floor(cy / TILE_SIZE), Math.floor(cx / TILE_SIZE), 502) > 0.70) {
-          placeGround(cx + nx * 18, cy + ny * 10, pebbleKey, Phaser.Math.Between(42, 74), 0xc8c0a8, 0.14);
+          placeGround(cx + nx * 18, cy + ny * 10, pebbleKey, Phaser.Math.Between(38, 64), 0xc8c0a8, 0.10);
         }
       }
     };
@@ -2434,7 +2447,7 @@ function buildDecorations(scene) {
       { dx:  245, dy:  175 },
     ];
     for (const p of cornerClusters) {
-      placeGround(spX + p.dx, spY + p.dy, groundKey, 190, 0xd8e0b8, 0.10);
+      placeGround(spX + p.dx, spY + p.dy, groundKey, 125, 0xd8e0b8, 0.04);
       placeLandmarkDeco(Phaser.Utils.Array.GetRandom(bushKeys), spX + p.dx, spY + p.dy + 8, 64, {
         alignBottom: true,
         shadow: true,
@@ -2698,7 +2711,7 @@ function buildDecorations(scene) {
       return;
     }
 
-    ground(0, 0, 'deco_sand_scuff_soft_01', 155, { tint: 0xd8e0b8, alpha: 0.09 });
+    ground(0, 0, 'deco_sand_scuff_soft_01', 112, { tint: 0xd8e0b8, alpha: 0.035 });
     add(-36, 12, Phaser.Utils.Array.GetRandom(flowerKeys), 50, { maxAngle: 14, sway: true, swayAmp: 2 });
     add(24, -18, Phaser.Utils.Array.GetRandom(grassKeys), 50, { alpha: 0.88, maxAngle: 16, sway: true, swayAmp: 2 });
     add(42, 22, Phaser.Utils.Array.GetRandom(mushroomKeys), 38, { maxAngle: 8 });
@@ -2748,7 +2761,7 @@ function buildDecorations(scene) {
       return;
     }
 
-    ground(0, 0, 'deco_sand_scuff_soft_01', 210, 0xd8e0b8, 0.10);
+    ground(0, 0, 'deco_sand_scuff_soft_01', 138, 0xd8e0b8, 0.04);
     item(-54, 14, Phaser.Utils.Array.GetRandom(flowerKeys), 64, { maxAngle: 14, sway: true, swayAmp: 2 });
     item(34, -22, Phaser.Utils.Array.GetRandom(bushKeys), 72, { alignBottom: true, shadow: true, maxAngle: 6 });
     item(78, 28, Phaser.Utils.Array.GetRandom(mushroomKeys), 44, { maxAngle: 8 });
@@ -2940,7 +2953,7 @@ function buildDecorations(scene) {
   let floorWashCount = 0;
   for (let r = 1; r < MAP_ROWS - 1; r++) {
     for (let c = 1; c < MAP_COLS - 1; c++) {
-      if (getCellType(r, c) !== 'grass' || floorWashCount >= 220) continue;
+      if (getCellType(r, c) !== 'grass' || floorWashCount >= 150) continue;
       const zone = getZone(r, c);
       const nearRoad = !!adjacentPathDir(r, c);
       const nearEdge = nearZoneBoundary(r, c);
@@ -2951,8 +2964,12 @@ function buildDecorations(scene) {
           r,
           c,
           zone,
-          dry ? Phaser.Math.Between(260, 460) : Phaser.Math.Between(360, 620),
-          dry ? Phaser.Math.FloatBetween(0.06, 0.12) : Phaser.Math.FloatBetween(0.08, 0.15)
+          zone === 'grasslands'
+            ? Phaser.Math.Between(170, 300)
+            : (dry ? Phaser.Math.Between(240, 420) : Phaser.Math.Between(300, 520)),
+          zone === 'grasslands'
+            ? Phaser.Math.FloatBetween(0.022, 0.045)
+            : (dry ? Phaser.Math.FloatBetween(0.045, 0.09) : Phaser.Math.FloatBetween(0.05, 0.10))
         );
         floorWashCount++;
       }
@@ -2972,7 +2989,7 @@ function buildDecorations(scene) {
           dir: pathDir,
           edgeOffset: 42,
           h: Phaser.Math.Between(120, 230),
-          alpha: Phaser.Math.FloatBetween(0.16, 0.28),
+          alpha: zone === 'grasslands' ? Phaser.Math.FloatBetween(0.07, 0.14) : Phaser.Math.FloatBetween(0.16, 0.28),
           tint: blendTint(zone, zone),
           depth: -790,
         });
@@ -2981,7 +2998,7 @@ function buildDecorations(scene) {
             dir: pathDir,
             edgeOffset: 18,
             h: Phaser.Math.Between(38, 74),
-            alpha: Phaser.Math.FloatBetween(0.12, 0.22),
+            alpha: zone === 'grasslands' ? Phaser.Math.FloatBetween(0.05, 0.10) : Phaser.Math.FloatBetween(0.12, 0.22),
             tint: blendTint(zone, zone),
             depth: -775,
           });
@@ -3008,10 +3025,15 @@ function buildDecorations(scene) {
   // These give the world "map designer touched this" moments without changing
   // movement or combat rules; every prop here is non-blocking.
   const sceneTiles = [];
+  const sceneZoneCaps = { grasslands: 56, forest: 34, desert: 34, ruins: 34, riverside: 34 };
+  const sceneZoneCounts = { grasslands: 0, forest: 0, desert: 0, ruins: 0, riverside: 0 };
   const queueScene = (r, c, zoneHint = null) => {
     if (r <= 0 || c <= 0 || r >= MAP_ROWS - 1 || c >= MAP_COLS - 1) return;
     if (getCellType(r, c) !== 'grass') return;
-    sceneTiles.push({ r, c, zone: zoneHint || getZone(r, c) });
+    const zone = zoneHint || getZone(r, c);
+    if ((sceneZoneCounts[zone] || 0) >= (sceneZoneCaps[zone] || 24)) return;
+    sceneZoneCounts[zone] = (sceneZoneCounts[zone] || 0) + 1;
+    sceneTiles.push({ r, c, zone });
   };
   for (const lm of landmarkTiles()) {
     const zone = getZone(lm.r, lm.c);
@@ -3020,10 +3042,19 @@ function buildDecorations(scene) {
     queueScene(lm.r, lm.c - 2, zone);
     queueScene(lm.r, lm.c + 2, zone);
   }
-  for (let r = 2; r < MAP_ROWS - 2 && sceneTiles.length < 56; r++) {
-    for (let c = 2; c < MAP_COLS - 2 && sceneTiles.length < 56; c++) {
+  for (let r = 2; r < MAP_ROWS - 2 && sceneTiles.length < 86; r++) {
+    for (let c = 2; c < MAP_COLS - 2 && sceneTiles.length < 86; c++) {
       if (getCellType(r, c) !== 'grass' || !adjacentPathDir(r, c)) continue;
       if (tileNoise(r, c, 461) > 0.990) queueScene(r, c);
+    }
+  }
+  for (let r = 3; r < MAP_ROWS - 3 && sceneTiles.length < 142; r++) {
+    for (let c = 3; c < MAP_COLS - 3 && sceneTiles.length < 142; c++) {
+      if (getCellType(r, c) !== 'grass') continue;
+      if (adjacentPathDir(r, c) || nearZoneBoundary(r, c)) continue;
+      const zone = getZone(r, c);
+      const threshold = zone === 'grasslands' ? 0.985 : 0.992;
+      if (tileNoise(r, c, 462) > threshold) queueScene(r, c, zone);
     }
   }
   const usedSceneTiles = new Set();
@@ -4161,18 +4192,20 @@ class MonsterController {
       0.38
     ).setOrigin(0.5);
 
-    const nameFontSize = isBossCfg(cfg) ? '21px' : '19px';
+    this._labelImportant = isBossCfg(cfg) || !!cfg.rare;
+    this._hpBarW = isBossCfg(cfg) ? 52 : (cfg.rare ? 44 : 34);
+    const nameFontSize = isBossCfg(cfg) ? '21px' : (cfg.rare ? '16px' : '13px');
     this.nameTag = scene.add.text(x, y, `${cfg.name} Lv.${this.level}`, {
       fontSize: nameFontSize,
       fontStyle: 'bold',
       color: cfg.nameColor,
       stroke: '#000000',
-      strokeThickness: 6,
+      strokeThickness: isBossCfg(cfg) ? 6 : (cfg.rare ? 4 : 3),
       resolution: 2,
-    }).setOrigin(0.5, 1);
+    }).setOrigin(0.5, 1).setAlpha(this._labelImportant ? 1 : 0.74);
 
-    this.hpBarBg = scene.add.rectangle(x, y, 40, 5, 0x000000).setOrigin(0.5);
-    this.hpBar = scene.add.rectangle(x, y, 40, 5, 0xff3333).setOrigin(0, 0.5);
+    this.hpBarBg = scene.add.rectangle(x, y, this._hpBarW, 4, 0x000000, this._labelImportant ? 0.82 : 0.62).setOrigin(0.5);
+    this.hpBar = scene.add.rectangle(x, y, this._hpBarW, 4, 0xff3333, this._labelImportant ? 0.95 : 0.74).setOrigin(0, 0.5);
   }
 
   _syncShadow() {
@@ -4242,13 +4275,18 @@ class MonsterController {
     const topY = this.sprite.y - this.sprite.displayHeight / 2;
     const nameY = topY + 3;
     const labelDepth = this.sprite.y + 90;
+    const showDetail = this._labelImportant || this.provoked || dist < 520;
+    const labelAlpha = this._labelImportant ? 1 : Phaser.Math.Clamp(1 - ((dist - 160) / 520), 0.28, 0.74);
+    this.nameTag.setVisible(showDetail).setAlpha(labelAlpha);
+    this.hpBarBg.setVisible(showDetail);
+    this.hpBar.setVisible(showDetail);
     this.nameTag.setPosition(this.sprite.x, nameY);
     this.nameTag.setDepth(labelDepth);
     this.hpBarBg.setPosition(this.sprite.x, topY + 16);
-    this.hpBar.setPosition(this.sprite.x - 20, topY + 16);
+    this.hpBar.setPosition(this.sprite.x - this._hpBarW / 2, topY + 16);
     this.hpBarBg.setDepth(labelDepth - 2);
     this.hpBar.setDepth(labelDepth - 1);
-    this.hpBar.width = 40 * Math.max(0, this.hp / this.maxHP);
+    this.hpBar.width = this._hpBarW * Math.max(0, this.hp / this.maxHP);
   }
 
   takeDamage(amount, opts = {}) {
@@ -5534,6 +5572,8 @@ class UIManager {
     this.bar = scene.add.rectangle(0, GAME_H - this.bottomH, GAME_W, this.bottomH, 0x17100a, 0.90)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10000)
       .setStrokeStyle(2, PANEL_STROKE, 0.95);
+    this.barTopTrim = scene.add.rectangle(0, GAME_H - this.bottomH + 3, GAME_W, 1, PANEL_GOLD, 0.34)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10001);
     this.hpBarW = Math.max(220, Math.min(320, GAME_W * 0.22));
     const bottomY = GAME_H - this.bottomH;
     const hpX = 20;
@@ -5601,15 +5641,18 @@ class UIManager {
     }).setOrigin(0.5).setScrollFactor(0).setDepth(12501).setVisible(false);
 
     // Mini-map top-right — anchored to viewport right edge.
-    this.miniW = Math.max(150, Math.min(180, Math.floor(GAME_W * 0.14)));
+    this.miniW = Math.max(132, Math.min(160, Math.floor(GAME_W * 0.12)));
     this.miniH = this.miniW;
     this.miniX = GAME_W - this.miniW - 12;
     this.miniY = 12;
-    this.miniBg = scene.add.rectangle(this.miniX, this.miniY, this.miniW, this.miniH, PANEL_FILL, 0.82)
+    this.miniBg = scene.add.rectangle(this.miniX, this.miniY, this.miniW, this.miniH, PANEL_FILL, 0.72)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10010);
     this.miniBorder = scene.add.rectangle(this.miniX, this.miniY, this.miniW, this.miniH)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10012)
-      .setStrokeStyle(3, PANEL_GOLD, 0.96).setFillStyle();
+      .setStrokeStyle(2, PANEL_GOLD, 0.88).setFillStyle();
+    this.miniInnerBorder = scene.add.rectangle(this.miniX + 4, this.miniY + 4, this.miniW - 8, this.miniH - 8)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(10012)
+      .setStrokeStyle(1, 0xf0c66c, 0.32).setFillStyle();
     this.miniGfx = scene.add.graphics().setScrollFactor(0).setDepth(10011);
     // Duplicate HP bar under the minimap was removed — the player HUD at the
     // bottom of the screen is the single source of truth for HP.
@@ -5651,6 +5694,8 @@ class UIManager {
         fontSize: '10px', fontStyle: 'bold', color: '#d8e7bd',
         stroke: '#000', strokeThickness: 2,
       }).setOrigin(0, 0).setScrollFactor(0).setDepth(10011));
+      scene.add.rectangle(btnX, toolbarY + 12, btnW, 1, PANEL_GOLD, 0.28)
+        .setOrigin(0, 0).setScrollFactor(0).setDepth(10010);
       toolbarY += 14;
     };
     const addToolbarButton = (label, role = 'passive') => {
@@ -5667,6 +5712,10 @@ class UIManager {
         stroke: '#000',
         strokeThickness: 2,
       }).setOrigin(0.5).setScrollFactor(0).setDepth(10011));
+      scene.add.rectangle(btnX + 3, y + 2, btnW - 6, 1, 0xf0c66c, isAction ? 0.40 : 0.24)
+        .setOrigin(0, 0).setScrollFactor(0).setDepth(10011);
+      scene.add.rectangle(btnX + 3, y + btnH - 3, btnW - 6, 1, 0x000000, 0.32)
+        .setOrigin(0, 0).setScrollFactor(0).setDepth(10011);
       toolbarY += btnH + 4;
       return { bg, text, y };
     };
@@ -6053,6 +6102,11 @@ class UIManager {
     this.bar.setSize(w, this.bottomH);
     this.bar.x = 0;
     this.bar.y = bottomY;
+    if (this.barTopTrim) {
+      this.barTopTrim.setSize(w, 1);
+      this.barTopTrim.x = 0;
+      this.barTopTrim.y = bottomY + 3;
+    }
     // Bottom-bar items.
     const hpX = 20;
     const statusW = 290;
@@ -6280,7 +6334,7 @@ class UIManager {
         const tile_r = Math.floor(wy / TILE_SIZE);
         const tile_c = Math.floor(wx / TILE_SIZE);
         const z = getZone(tile_r, tile_c);
-        g.fillStyle(zoneColor[z] || 0x555555, 0.55);
+        g.fillStyle(zoneColor[z] || 0x555555, 0.38);
         g.fillRect(this.miniX + sc * cellW, this.miniY + sr * cellH, cellW + 1, cellH + 1);
       }
     }
@@ -6295,7 +6349,7 @@ class UIManager {
       }
       UIManager._roadCells = cells;
     }
-    g.fillStyle(0xd0a35a, 0.72);
+    g.fillStyle(0xd0a35a, 0.54);
     for (const rc of UIManager._roadCells) {
       const r = rc >>> 16;
       const c = rc & 0xffff;
@@ -6308,7 +6362,7 @@ class UIManager {
       const h = Math.max(2, Math.min(this.miniY + this.miniH, q.y) - y);
       g.fillRect(x, y, w + 0.5, h + 0.5);
     }
-    g.lineStyle(1, 0xffe0a0, 0.75);
+    g.lineStyle(1, 0xffe0a0, 0.58);
     for (const p of landmarkTiles()) {
       const pos = toMini((p.c + 0.5) * TILE_SIZE, (p.r + 0.5) * TILE_SIZE);
       if (inMini(pos, 5)) g.strokeCircle(pos.x, pos.y, 4);
@@ -6324,9 +6378,9 @@ class UIManager {
         const priority = (isBossCfg(m.cfg) || m.cfg.rare) ? 0 : dist;
         return { m, dist, priority };
       })
-      .filter(row => row.priority === 0 || row.dist < 1700)
+      .filter(row => row.priority === 0 || row.dist < 1300)
       .sort((a, b) => a.priority - b.priority)
-      .slice(0, 28);
+      .slice(0, 20);
     for (const row of monsterDots) {
       const m = row.m;
       let color = 0xff5555;
@@ -6342,7 +6396,7 @@ class UIManager {
       else if (isBossCfg(m.cfg)) { color = m.cfg.tint || 0xffff44; r = 4; outline = 0x000000; }
       const pos = toMini(m.sprite.x, m.sprite.y);
       if (!inMini(pos, r + 3)) continue;
-      g.fillStyle(color, outline === null ? 0.72 : 1);
+      g.fillStyle(color, outline === null ? 0.48 : 0.96);
       g.fillCircle(pos.x, pos.y, r);
       if (outline !== null) {
         g.lineStyle(2, outline, 1);
@@ -6350,7 +6404,7 @@ class UIManager {
       }
     }
     // Loot.
-    g.fillStyle(0xffd24a, 1);
+    g.fillStyle(0xffd24a, 0.76);
     for (const l of loots) {
       const pos = toMini(l.x, l.y);
       if (inMini(pos, 2)) g.fillCircle(pos.x, pos.y, 2);
@@ -6358,11 +6412,11 @@ class UIManager {
     // Player on top. A second outer ring + larger dot makes the player
     // easy to spot now that the minimap covers a 9× larger world.
     const playerPos = toMini(player.sprite.x, player.sprite.y);
-    g.lineStyle(2, 0xffff66, 0.9);
-    g.strokeCircle(playerPos.x, playerPos.y, 9);
+    g.lineStyle(2, 0xffff66, 0.82);
+    g.strokeCircle(playerPos.x, playerPos.y, 8);
     g.lineStyle(2, 0x000000, 1);
     g.fillStyle(0xffffff, 1);
-    g.fillCircle(playerPos.x, playerPos.y, 5);
-    g.strokeCircle(playerPos.x, playerPos.y, 5);
+    g.fillCircle(playerPos.x, playerPos.y, 4);
+    g.strokeCircle(playerPos.x, playerPos.y, 4);
   }
 }

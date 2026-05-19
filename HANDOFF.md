@@ -4,18 +4,44 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 1:46 AM CDT — post grass spot cleanup.**
+**State as of 2026-05-19 — post session 84 map beauty loop.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 76 removes the visible circular/bokeh
-  grass-tone spots introduced by the stipple pass. Grass variation now uses
-  tiny directional blade marks instead of circles, and the broad grass wash
-  layer is no longer drawn.
-- **Cache version live in `project-grasslands/index.html`:** `?v=170`.
-- **Next change must use:** `?v=171`.
+- **Latest completed work:** session 84 continues the Ragnarok-style map polish
+  loop after live Chrome review. It restores dark contact shadows under props,
+  expands authored micro-scenes into empty open fields, reduces circular
+  grassland floor wash/lantern spots, makes normal monster labels quieter, and
+  lightens the minimap/HUD framing.
+- **Cache version live in `project-grasslands/index.html`:** `?v=180`.
+- **Next change must use:** `?v=181`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 84):**
+- Goal: keep improving the map after the user asked to review, implement,
+  review again, and keep making the world more impressive.
+- Live Chrome review of `localhost:8001` showed session 83's field was much
+  better than the old checkerboard, but still had circular floor wash spots,
+  weak prop grounding, loud normal monster labels, and a visually heavy minimap.
+- `addPropShadow()` is active again with small dark contact ellipses only; it
+  avoids the old pale/bleached oval problem while grounding trees, bushes,
+  rocks, cacti, cattails, and set-piece props.
+- Grasslands wash strength was reduced: spawn lantern cores/halos are smaller,
+  grassland floor washes and road shoulders are lower-alpha, and grassland
+  micro-scene ground scuffs are smaller so flowers/grass/trees do the beauty
+  work instead of circular blobs.
+- Authored micro-scenes now reach beyond roads into open fields with per-zone
+  caps, making empty stretches feel more hand-placed without blocking movement.
+- Normal monster labels/HP bars now show only when the enemy is close or
+  provoked. Bosses and rares stay visible.
+- Minimap is smaller/lighter, normal monster dots are capped harder, and the
+  visible HUD got extra warm-gold trim/highlight lines.
+- Cache bumped to `game.js?v=180`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html`
+  passed, and Chrome preview at `http://localhost:8001/?codex=polish-v180`
+  loaded with no console warnings/errors after walking around.
 
 **Where we left off (session 76):**
 - Goal: continue improving the game after the user said the grass still looked
@@ -612,7 +638,48 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 83 (latest)
+## 3. What we did in session 84 (latest)
+
+Cache now at **`?v=180`**. Sonny asked to keep reviewing and doing the
+map-beauty work, with no mistakes. This pass used Chrome review first,
+patched the weakest visible map/UI issues, reviewed again, then made one more
+label-noise pass.
+
+1. **Prop depth restored without bleach ovals.** `addPropShadow()` is no
+   longer a no-op. It now draws small dark contact shadows under grounded
+   props, with low alpha and small-prop throttling so it does not recreate the
+   old pale circular floor problem.
+2. **Circular floor spots reduced.** Landmark halos, spawn lantern glows,
+   grassland floor washes, road shoulder washes, and grassland micro-scene
+   ground scuffs are smaller and lower-alpha. The grass field now leans on
+   sprites/clusters for beauty rather than visible round wash stamps.
+3. **More authored open-field clusters.** The micro-scene queue now has
+   per-zone caps and a second pass for open grass away from roads/borders, so
+   field stretches get hand-placed flower/grass/mushroom/bush moments.
+4. **Monster label clutter reduced.** Normal monster labels/HP bars only show
+   when close or provoked. Bosses and rares remain visible.
+5. **Minimap/HUD lighter.** Minimap size and alpha reduced, normal mob dots
+   capped harder, player dot slightly smaller, and visible HUD panels/buttons
+   got subtle gold trim/highlight lines.
+6. **Verification.** `node -c project-grasslands/game.js` clean.
+   `git diff --check -- project-grasslands/game.js project-grasslands/index.html`
+   clean. Chrome v180 loaded with no console warnings/errors after walking.
+7. **Cache bump.** `?v=177` → `?v=180` over the review/fix loop.
+
+### Critique points still queued
+
+- Grass texture still wants higher-quality authored ground art eventually; the
+  code-only pass is cleaner, but not yet true RO painterly tile craft.
+- Some large monster sprites still carry visible round source-art/selection
+  softness; replacing or cleaning those source sprites would help.
+- Riverbank ecosystem can still get denser: cattail clumps, lily pads, and mud
+  texture right at water edges.
+- Add topography markers next: raised banks, little ledges, worn path posts,
+  and tiny cliff-shadow strips at biome borders.
+- HUD can keep moving toward RO-style windows with actual frame PNGs instead
+  of procedural rectangles.
+
+## 3. What we did in session 83
 
 Cache now at **`?v=177`**. Sonny did a walking tour and flagged the
 three biggest map/world wins as (#3) water animation, (#4) weather
