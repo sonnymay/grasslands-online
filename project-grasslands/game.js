@@ -983,7 +983,7 @@ function create() {
   // Camera follow
   scene.cameras.main.startFollow(player.followTarget, true, 0.1, 0.1);
   // RO camera reveals ~12-15 tiles wide — zoom out a touch.
-  scene.cameras.main.setZoom(0.65);
+  scene.cameras.main.setZoom(0.85);
 
   // ------- Mouse-wheel zoom -------
   // Wheel up zooms in, wheel down zooms out. The main camera follows the
@@ -1830,36 +1830,37 @@ function addBiomeWash(scene) {
   });
 }
 
-// Grasslands tone variation — feathered dark + light green radial-alpha
-// circles painted across grasslands tiles so the field stops reading as a
-// flat snooker table. Pure greens only (no yellow-green) to avoid the
-// "bleach patch" look the tinted overlay scatter caused.
+// Grass texture stipple — many SMALL dark/light green specks across the
+// grasslands floor for organic noise. Previous pass used 280 large radial
+// blobs which read as camouflage swirls, not grass. Specks are 18-58 px
+// radius, alpha 0.16-0.28, so the eye reads them as ground texture, not
+// patches.
 function addGrassTones(scene) {
   const tones = [
-    { color: 0x3e6a32, peakAlpha: 0.22, stamps: 110, radius: [320, 540] },
-    { color: 0x7fa75d, peakAlpha: 0.18, stamps:  90, radius: [260, 460] },
-    { color: 0xa6c87a, peakAlpha: 0.14, stamps:  80, radius: [220, 420] },
+    { color: 0x3a5d2b, alphaRange: [0.18, 0.28], stamps: 2200, radius: [22, 48] }, // dark moss specks
+    { color: 0xa8c878, alphaRange: [0.14, 0.22], stamps: 1500, radius: [20, 44] }, // light highlight specks
+    { color: 0x6b8a4a, alphaRange: [0.16, 0.24], stamps: 1800, radius: [26, 58] }, // mid tone specks
   ];
-  tones.forEach(({ color, peakAlpha, stamps, radius }) => {
+  tones.forEach(({ color, alphaRange, stamps, radius }) => {
     const g = scene.add.graphics().setDepth(-960);
     let placed = 0, attempts = 0;
-    while (placed < stamps && attempts < 1500) {
+    while (placed < stamps && attempts < stamps * 6) {
       attempts++;
       const r = Phaser.Math.Between(0, MAP_ROWS - 1);
       const c = Phaser.Math.Between(0, MAP_COLS - 1);
       if (getZone(r, c) !== 'grasslands') continue;
       if (getCellType(r, c) !== 'grass') continue;
       placed++;
-      const cx = c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-60, 60);
-      const cy = r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-60, 60);
+      const cx = c * TILE_SIZE + Phaser.Math.Between(0, TILE_SIZE);
+      const cy = r * TILE_SIZE + Phaser.Math.Between(0, TILE_SIZE);
       const rad = Phaser.Math.Between(radius[0], radius[1]);
-      const layers = 7;
-      for (let j = 0; j < layers; j++) {
-        const t = j / (layers - 1);
-        const a = peakAlpha * (1 - t * t);
-        g.fillStyle(color, a);
-        g.fillCircle(cx, cy, rad * (1 - t * 0.9));
-      }
+      const a = Phaser.Math.FloatBetween(alphaRange[0], alphaRange[1]);
+      // 3-layer falloff = soft speck edge, much smaller than session-74
+      // blobs so the eye reads texture, not swirls.
+      g.fillStyle(color, a);
+      g.fillCircle(cx, cy, rad);
+      g.fillStyle(color, a * 0.5);
+      g.fillCircle(cx, cy, rad * 1.5);
     }
   });
 }
@@ -2423,11 +2424,11 @@ function buildDecorations(scene) {
   // Grasslands (center) — dense ground cover + scattered focal trees.
   // Counts ~2.5× the pre-19200 baseline so the 9× area doesn't read as
   // sparse, plus cluster passes for the RO-style thicket feel.
-  for (let i = 0; i < 1300; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),    52, { alpha: 0.95, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3 });
-  for (let i = 0; i < 720; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),    60, { maxAngle: 15, zoneFilter: 'grasslands', sway: true, swayAmp: 2 });
-  for (let i = 0; i < 380; i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  44, { maxAngle: 10, zoneFilter: 'grasslands' });
-  for (let i = 0; i < 280; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      72, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'grasslands', shadow: true });
-  for (let i = 0; i < 180; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'grasslands', shadow: true });
+  for (let i = 0; i < 2000; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),    52, { alpha: 0.95, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3 });
+  for (let i = 0; i < 1100; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),   60, { maxAngle: 15, zoneFilter: 'grasslands', sway: true, swayAmp: 2 });
+  for (let i = 0; i < 580; i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  44, { maxAngle: 10, zoneFilter: 'grasslands' });
+  for (let i = 0; i < 420; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      72, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'grasslands', shadow: true });
+  for (let i = 0; i < 280; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'grasslands', shadow: true });
   for (let i = 0; i <  14; i++) place('pond_01',                                  220, { maxAngle:  0, alignBottom: true, blockRadius: 6, allowFlip: false, zoneFilter: 'grasslands', shimmer: true });
   // Grasslands clusters: grass-tuft thickets + flower patches.
   for (let i = 0; i < 130; i++) placeCluster(Phaser.Utils.Array.GetRandom(grassKeys),  52, Phaser.Math.Between(5, 9), { alpha: 0.95, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3 });
