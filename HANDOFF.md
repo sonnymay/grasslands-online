@@ -612,7 +612,20 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 81 (latest)
+## 3. What we did in session 82 (latest)
+
+Cache now at **`?v=176`**. Sonny: Lv and Zeny boxes overlap. Caused by
+session-78 font bump (Lv 17→24, Zeny 15→19) outgrowing the 210 px
+`statusPanel`.
+
+1. **`statusW 210 → 290`** in both constructor and `relayout()`. With
+   the 0.42 divider split this gives Lv ~121 px and Zeny ~169 px,
+   enough for "Lv.999" and "9,999,999z" with breathing room.
+2. **Inner padding 14 → 18** on Lv left edge so the Lv text isn't
+   kissing the panel border.
+3. **Cache bump.** `?v=175` → `?v=176`.
+
+## 3.1. What we did in session 81
 
 Cache now at **`?v=175`**. Sonny: hard to click Bigfoot / T-Rex /
 Kaiju Titan despite their giant bodies — only specific areas register.
@@ -3382,7 +3395,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=175`**. Next change should use `?v=176`.
+  change. Current: **`?v=176`**. Next change should use `?v=177`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
