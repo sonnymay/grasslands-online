@@ -612,7 +612,21 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 78 (latest)
+## 3. What we did in session 79 (latest)
+
+Cache now at **`?v=173`**. Sonny dropped
+`project-grasslands/assets/audio/hitthemonster.mp3` and wants it to
+play on every landed monster hit.
+
+1. **Preload.** `this.load.audio('hitthemonster', 'assets/audio/hitthemonster.mp3')`.
+2. **Play hook.** In `attemptPlayerAttack()` right after
+   `target.takeDamage(...)` and the existing `sfxHit/sfxCrit` calls,
+   `scene.sound.play('hitthemonster', { volume: 0.7 })` inside a
+   try/catch so an audio decode failure can't crash combat. Plays on
+   every landed hit including crits, skipped on misses.
+3. **Cache bump.** `?v=172` → `?v=173`.
+
+## 3.1. What we did in session 78
 
 Cache now at **`?v=172`**. Sonny: bigger HP/EXP/Lv readouts; rename
 "Auto" to "Autopilot."
@@ -3337,7 +3351,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=172`**. Next change should use `?v=173`.
+  change. Current: **`?v=173`**. Next change should use `?v=174`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
