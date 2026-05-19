@@ -567,7 +567,69 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 70 (latest)
+## 3. What we did in session 71 (latest)
+
+Cache now at **`?v=162`**. Sonny correctly diagnosed the architectural
+bug: per-cell biome tile selection always produces a grid no matter
+how noise/transition logic is tuned, because the unit of rendering is
+a 128 px square. The pond looks good because it's a single large
+feathered PNG stamped over terrain. Adopt that approach for biomes.
+
+1. **`buildMap()` simplified.** Every grass cell now draws the SAME
+   uniform `TILE.GRASS` frame from `grass_tileset`. No biome tileset
+   swap, no `transitionGroundTile()` band, no per-cell tint, no
+   variant frame selection. Path tiles untouched. Flip-only variance.
+2. **`addBiomeWash()` replaces `addTerrainSeamBlends()`.** Biome
+   identity is now painted as large irregular feathered blob clusters
+   on a single `Graphics` per zone at depth -980 (above tiles -1000,
+   below props -500). Each zone gets 14–18 stamps; each stamp = 4
+   overlapping circles with 9-layer radial alpha falloff so edges
+   feather like the pond water's green ring. Tints:
+   - **forest** `#4d7a3e`, peakAlpha 0.36, 18 stamps
+   - **desert** `#d9aa5c`, peakAlpha 0.46, 18 stamps
+   - **ruins**  `#9b8e72`, peakAlpha 0.32, 14 stamps
+   - **riverside** `#6db5cc`, peakAlpha 0.32, 16 stamps
+3. **Decorations untouched** — trees, cacti, rocks, pillars, cattails,
+   ponds, lanterns still carry biome identity at decoration scale.
+4. **Now orphaned** (kept per CLAUDE.md surgical rule, flag for
+   future cleanup): `pickNaturalGroundTile`, `transitionGroundTile`,
+   `terrainBoundaryInfo`, `addTerrainSeamBlends`, `FLOOR_TILE_TINTS`.
+5. **Verification.** Preview boots clean. Grasslands center reads as
+   a continuous field — checkerboard gone. Biome washes are graphics-
+   only placeholder; they tint correctly but lack art-level feathered
+   irregular silhouettes.
+6. **Cache bump.** `?v=161` → `?v=162`.
+
+### Asset plan to fully match pond approach
+
+The graphics blob wash is a proof of concept. For real RO-style
+biome identity, generate ONE image per biome — feathered irregular
+blob PNGs with transparent alpha, drawn over the neutral grass base
+the same way `pond_01.png` is. Order by impact:
+
+1. **`biome_riverside_blob.png` (1024×1024)** — irregular teal/blue
+   water-region blob, feathered alpha edge bleeding to transparent
+   at silhouette. Mirrors pond ring style at scene scale.
+2. **`biome_desert_blob.png` (1024×1024)** — irregular sandy/yellow
+   biome blob, feathered.
+3. **`biome_forest_blob.png` (1024×1024)** — irregular deep-green
+   blob, feathered.
+4. **`biome_ruins_blob.png` (1024×1024)** — irregular grey-tan biome
+   blob, feathered, slightly broken/scuffed silhouette.
+
+Prompt suffix: *"top-down anime / Ragnarok Online style biome ground
+texture, soft feathered alpha edges blending to fully transparent at
+the silhouette, no hard outline, no grid, no text, original art,
+transparent background PNG."*
+
+Wire flow when first PNG lands:
+- `this.load.image('biome_<zone>_blob', 'assets/decorations/biome_<zone>_blob.png');`
+- Replace the per-zone graphics block in `addBiomeWash()` with 4–6
+  `scene.add.image()` placements per zone at random offsets, alpha
+  0.85, depth -980, scaled to 1400–2200 px width.
+- Bump cache, `node -c`, commit.
+
+## 3.1. What we did in session 70
 
 Cache now at **`?v=161`**. Claude Browser said the map was still a three-color
 checkerboard because the transition system was still changing full tile colors
@@ -3015,7 +3077,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=161`**. Next change should use `?v=162`.
+  change. Current: **`?v=162`**. Next change should use `?v=163`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
