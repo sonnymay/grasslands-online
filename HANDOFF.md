@@ -4,16 +4,28 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 8:25 PM CDT — post biome identity set-piece pass.**
+**State as of 2026-05-18 8:41 PM CDT — post riverside shoreline dressing pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 57 reduces broad random scatter and adds
-  stronger biome identity set pieces with existing assets.
-- **Cache version live in `project-grasslands/index.html`:** `?v=148`.
-- **Next change must use:** `?v=149`.
+- **Latest completed work:** session 58 adds capped riverside shoreline
+  dressing around bridge/path approaches with existing assets.
+- **Cache version live in `project-grasslands/index.html`:** `?v=149`.
+- **Next change must use:** `?v=150`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 58):**
+- Goal: make the riverside feel more hand-authored without adding new art or
+  returning to broad scatter spam.
+- Added `addShorelineScene()` inside `buildDecorations()` and capped it at 18
+  placed scenes.
+- Shoreline scenes appear around riverside bridge/path approaches and rare
+  riverside edge tiles, using low-alpha stone dust, pebbles, soft scuffs,
+  cattails, flowers, and grass.
+- All new shoreline dressing is cosmetic and non-blocking. No gameplay,
+  combat, progression, controls, UI layout, map dimensions, saves, or monster
+  logic changed.
 
 **Where we left off (session 57):**
 - Goal: make the world prettier and less laggy by relying on fewer, stronger
@@ -398,7 +410,36 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 57 (latest)
+## 3. What we did in session 58 (latest)
+
+Cache now at **`?v=149`**. No new downloaded hero prop was present, so this
+session continued the hand-authored-map direction with existing art and a
+small capped riverside pass.
+
+1. **Added riverside shoreline dressing.** Added `addShorelineScene()` inside
+   `buildDecorations()` to compose small wet-edge scenes.
+2. **Kept placement capped.** Shoreline scenes are capped at 18 and appear
+   around riverside bridge/path approaches plus rare riverside edge tiles.
+3. **Used existing art only.** Scenes combine low-alpha stone dust, pebble
+   clusters, soft scuffs, cattails, flowers, and grass.
+4. **Performance scope preserved.** This is a small authored set-piece pass,
+   not broad scatter. No blockers were added.
+5. **Scope preserved.** No gameplay, combat, progression, controls, UI
+   layout, monster logic, saves, map size, or lighting changed.
+6. **Verification.** `node -c project-grasslands/game.js` exited 0.
+7. **Cache bump.** `?v=148` -> `?v=149`.
+
+### Next beauty suggestions
+
+1. **Generate true biome hero props.** Highest impact now: ruined wall,
+   desert bone pile, dry bush, cactus flower, riverside stepping stones, and
+   shoreline mud/stone overlays.
+2. **Prop style harmonization.** Normalize generated prop scale, tint, shadow,
+   and alpha-keying so new art reads as one cohesive RO-like tileset.
+3. **Add viewport-aware decoration culling later** if lag persists: keep
+   far-away decorative overlay groups hidden/paused outside camera range.
+
+## 3.1. What we did in session 57
 
 Cache now at **`?v=148`**. Sonny approved the next two visual/performance
 ideas: use fewer, stronger assets/details and give each biome clearer identity.

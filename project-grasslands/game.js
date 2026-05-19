@@ -2316,6 +2316,30 @@ function buildDecorations(scene) {
     item(-86, 46, Phaser.Utils.Array.GetRandom(grassKeys), 56, { alpha: 0.86, maxAngle: 16, sway: true, swayAmp: 2 });
   };
 
+  const addShorelineScene = (tile_r, tile_c, variant = 0) => {
+    if (getCellType(tile_r, tile_c) !== 'grass' || getZone(tile_r, tile_c) !== 'riverside') return;
+    const dir = adjacentPathDir(tile_r, tile_c) || { dr: 0, dc: -1 };
+    const cx = tile_c * TILE_SIZE + TILE_SIZE / 2 + dir.dc * 18 + Phaser.Math.Between(-12, 12);
+    const cy = tile_r * TILE_SIZE + TILE_SIZE / 2 + dir.dr * 16 + Phaser.Math.Between(-10, 10);
+    const flip = variant % 2 === 1 ? -1 : 1;
+    const sideX = dir.dr ? flip : -dir.dc || flip;
+    const sideY = dir.dc ? flip : -dir.dr || flip;
+    const ground = (dx, dy, key, h, tint, alpha) =>
+      placeSceneGround(cx + dx * sideX, cy + dy * sideY, key, h, { tint, alpha });
+    const item = (dx, dy, key, h, opts = {}) =>
+      placeSceneItem(cx, cy, dx * sideX, dy * sideY, key, h, opts);
+
+    ground(0, 0, 'deco_stone_dust_soft_01', 190, 0xbfd8c8, 0.12);
+    ground(-34, 18, 'deco_pebble_cluster_01', 82, 0xb8d8c8, 0.18);
+    ground(32, -18, 'deco_sand_scuff_soft_01', 140, 0xc8e8d8, 0.08);
+    item(-48, -4, Phaser.Utils.Array.GetRandom(riversideCattailKeys), 74, { alignBottom: true, shadow: true, maxAngle: 8, sway: true, swayAmp: 1.4 });
+    item(-18, 24, Phaser.Utils.Array.GetRandom(riversideCattailKeys), 58, { alignBottom: true, shadow: true, maxAngle: 8, sway: true, swayAmp: 1.2 });
+    item(34, 20, Phaser.Utils.Array.GetRandom(flowerKeys), 52, { maxAngle: 14, sway: true, swayAmp: 1.8 });
+    if (tileNoise(tile_r, tile_c, 531) > 0.46) {
+      item(54, -18, Phaser.Utils.Array.GetRandom(grassKeys), 52, { alpha: 0.84, maxAngle: 16, sway: true, swayAmp: 1.8 });
+    }
+  };
+
   const identityTiles = [];
   const identityCounts = { grasslands: 0, forest: 0, desert: 0, ruins: 0, riverside: 0 };
   const queueIdentity = (r, c, zoneHint = null) => {
@@ -2345,6 +2369,33 @@ function buildDecorations(scene) {
     if (usedIdentityTiles.has(key)) continue;
     usedIdentityTiles.add(key);
     addIdentitySetPiece(s.r, s.c, s.zone, Math.floor(tileNoise(s.r, s.c, 491) * 4));
+  }
+
+  const shorelineTiles = [];
+  const queueShoreline = (r, c) => {
+    if (r <= 1 || c <= 1 || r >= MAP_ROWS - 2 || c >= MAP_COLS - 2) return;
+    if (shorelineTiles.length >= 18) return;
+    if (getCellType(r, c) !== 'grass' || getZone(r, c) !== 'riverside') return;
+    if (!adjacentPathDir(r, c) && !nearZoneBoundary(r, c)) return;
+    shorelineTiles.push({ r, c });
+  };
+  for (const lm of landmarkTiles().filter((p) => getZone(p.r, p.c) === 'riverside')) {
+    queueShoreline(lm.r - 1, lm.c - 2);
+    queueShoreline(lm.r + 1, lm.c - 2);
+    queueShoreline(lm.r - 2, lm.c - 1);
+    queueShoreline(lm.r + 2, lm.c - 1);
+  }
+  for (let r = 2; r < MAP_ROWS - 2 && shorelineTiles.length < 18; r++) {
+    for (let c = 2; c < MAP_COLS - 2 && shorelineTiles.length < 18; c++) {
+      if (tileNoise(r, c, 521) > 0.992) queueShoreline(r, c);
+    }
+  }
+  const usedShorelineTiles = new Set();
+  for (const s of shorelineTiles) {
+    const key = `${s.r},${s.c}`;
+    if (usedShorelineTiles.has(key)) continue;
+    usedShorelineTiles.add(key);
+    addShorelineScene(s.r, s.c, Math.floor(tileNoise(s.r, s.c, 541) * 4));
   }
 
   let roadBlendCount = 0;
