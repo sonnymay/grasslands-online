@@ -1605,6 +1605,18 @@ function buildMap(scene) {
     scene.add.tileSprite(0, 0, WORLD_W, WORLD_H, 'grass_field_texture')
       .setOrigin(0, 0)
       .setDepth(-1010);
+    scene.add.tileSprite(0, 0, WORLD_W, WORLD_H, 'grass_field_texture')
+      .setOrigin(0, 0)
+      .setDepth(-1009.8)
+      .setAlpha(0.34)
+      .setTilePosition(713, 389)
+      .setTileScale(1.37, 1.19);
+    scene.add.tileSprite(0, 0, WORLD_W, WORLD_H, 'grass_field_texture')
+      .setOrigin(0, 0)
+      .setDepth(-1009.7)
+      .setAlpha(0.18)
+      .setTilePosition(231, 947)
+      .setTileScale(0.73, 0.91);
   } else {
     scene.add.rectangle(0, 0, WORLD_W, WORLD_H, 0x79a94e, 1)
       .setOrigin(0, 0)
@@ -1613,11 +1625,12 @@ function buildMap(scene) {
   addGrassWorldWashes(scene);
   addPathWashes(scene);
   addBiomeWash(scene);
+  addGrassTones(scene);
 }
 
 function createGrassFieldTexture(scene) {
   if (scene.textures.exists('grass_field_texture')) return;
-  const size = 1024;
+  const size = 2048;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -1657,30 +1670,31 @@ function createGrassFieldTexture(scene) {
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
-      const small = tileNoise2d(x, y, 160, 2);
-      const medium = tileNoise2d(x, y, 78, 7);
+      const small = tileNoise2d(x, y, 320, 2);
+      const medium = tileNoise2d(x, y, 142, 7);
+      const micro = hash(Math.floor(x / 3), Math.floor(y / 3), 23);
       const nx = (x / size) * Math.PI * 2;
       const ny = (y / size) * Math.PI * 2;
-      const blade = Math.sin(nx * 17 + Math.cos(ny * 7) * 1.6) * 0.5 + 0.5;
-      const shade = -9 + small * 13 + medium * 8 + blade * 4;
-      data[i] = Phaser.Math.Clamp(118 + shade, 82, 164);
-      data[i + 1] = Phaser.Math.Clamp(164 + shade * 0.82, 120, 205);
-      data[i + 2] = Phaser.Math.Clamp(78 + shade * 0.5, 52, 118);
+      const blade = Math.sin(nx * 45 + Math.cos(ny * 21) * 1.4) * 0.5 + 0.5;
+      const shade = -17 + small * 15 + medium * 8 + micro * 10 + blade * 5;
+      data[i] = Phaser.Math.Clamp(80 + shade, 54, 118);
+      data[i + 1] = Phaser.Math.Clamp(135 + shade * 0.92, 96, 176);
+      data[i + 2] = Phaser.Math.Clamp(59 + shade * 0.58, 38, 96);
       data[i + 3] = 255;
     }
   }
   ctx.putImageData(img, 0, 0);
   ctx.globalCompositeOperation = 'source-over';
-  for (let i = 0; i < 720; i++) {
+  for (let i = 0; i < 1600; i++) {
     const x = hash(i, 9, 1) * size;
     const y = hash(i, 17, 2) * size;
-    const rx = 8 + hash(i, 21, 3) * 26;
-    const ry = 5 + hash(i, 29, 4) * 18;
+    const rx = 6 + hash(i, 21, 3) * 18;
+    const ry = 4 + hash(i, 29, 4) * 12;
     const margin = Math.max(rx, ry);
     wrapped(x, y, margin, (wx, wy) => {
       const g = ctx.createRadialGradient(wx, wy, 0, wx, wy, margin);
-      g.addColorStop(0, `rgba(210, 226, 128, ${0.025 + hash(i, 35, 5) * 0.025})`);
-      g.addColorStop(1, 'rgba(210, 226, 128, 0)');
+      g.addColorStop(0, `rgba(150, 188, 92, ${0.018 + hash(i, 35, 5) * 0.018})`);
+      g.addColorStop(1, 'rgba(150, 188, 92, 0)');
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.ellipse(wx, wy, rx, ry, hash(i, 43, 6) * Math.PI, 0, Math.PI * 2);
@@ -1688,13 +1702,13 @@ function createGrassFieldTexture(scene) {
     });
   }
   ctx.lineCap = 'round';
-  for (let i = 0; i < 6500; i++) {
+  for (let i = 0; i < 32000; i++) {
     const x = hash(i, 53, 7) * size;
     const y = hash(i, 61, 8) * size;
-    const len = 4 + hash(i, 67, 9) * 13;
+    const len = 5 + hash(i, 67, 9) * 18;
     const angle = -0.8 + hash(i, 71, 10) * 1.6;
     const light = hash(i, 79, 11) > 0.55;
-    ctx.strokeStyle = light ? 'rgba(221, 232, 150, 0.075)' : 'rgba(54, 103, 45, 0.08)';
+    ctx.strokeStyle = light ? 'rgba(176, 207, 108, 0.09)' : 'rgba(29, 72, 34, 0.14)';
     ctx.lineWidth = 1;
     wrapped(x, y, len + 2, (wx, wy) => {
       ctx.beginPath();
@@ -1712,21 +1726,21 @@ function addGrassWorldWashes(scene) {
     return n - Math.floor(n);
   };
   const g = scene.add.graphics().setDepth(-1009);
-  for (let i = 0; i < 620; i++) {
+  for (let i = 0; i < 320; i++) {
     const x = rand(i, 1201) * WORLD_W;
     const y = rand(i, 1202) * WORLD_H;
-    const w = 220 + rand(i, 1203) * 760;
-    const h = 120 + rand(i, 1204) * 420;
+    const w = 180 + rand(i, 1203) * 540;
+    const h = 90 + rand(i, 1204) * 280;
     const light = rand(i, 1205) > 0.48;
-    g.fillStyle(light ? 0xcbdc83 : 0x4f7c3b, light ? 0.030 : 0.026);
+    g.fillStyle(light ? 0x89aa55 : 0x345f31, light ? 0.012 : 0.018);
     g.fillEllipse(x, y, w, h);
   }
-  for (let i = 0; i < 900; i++) {
+  for (let i = 0; i < 1300; i++) {
     const x = rand(i, 1301) * WORLD_W;
     const y = rand(i, 1302) * WORLD_H;
-    const w = 52 + rand(i, 1303) * 160;
-    const h = 22 + rand(i, 1304) * 86;
-    g.fillStyle(0xe0e89b, 0.025);
+    const w = 34 + rand(i, 1303) * 100;
+    const h = 14 + rand(i, 1304) * 52;
+    g.fillStyle(0x7fa854, 0.014);
     g.fillEllipse(x, y, w, h);
   }
 }
@@ -1743,12 +1757,12 @@ function addPathWashes(scene) {
       const wide = type === 'path_cross' || type === 'path_open';
       const baseW = wide ? 172 : 150;
       const baseH = wide ? 104 : 88;
-      g.fillStyle(0xbca35d, 0.065);
+      g.fillStyle(0x7f6a39, 0.038);
       g.fillEllipse(x, y, baseW + n * 42, baseH + n * 24);
-      g.fillStyle(0x6f8f45, 0.060);
+      g.fillStyle(0x4f743d, 0.045);
       g.fillEllipse(x + (tileNoise(r, c, 1412) - 0.5) * 38, y + (tileNoise(r, c, 1413) - 0.5) * 26, baseW * 0.82, baseH * 0.62);
       if (tileNoise(r, c, 1414) > 0.74) {
-        g.fillStyle(0xe0d28a, 0.070);
+        g.fillStyle(0x8f7845, 0.035);
         g.fillEllipse(x + (tileNoise(r, c, 1415) - 0.5) * 70, y + (tileNoise(r, c, 1416) - 0.5) * 48, 42, 18);
       }
     }
@@ -1816,6 +1830,40 @@ function addBiomeWash(scene) {
   });
 }
 
+// Grasslands tone variation — feathered dark + light green radial-alpha
+// circles painted across grasslands tiles so the field stops reading as a
+// flat snooker table. Pure greens only (no yellow-green) to avoid the
+// "bleach patch" look the tinted overlay scatter caused.
+function addGrassTones(scene) {
+  const tones = [
+    { color: 0x3e6a32, peakAlpha: 0.22, stamps: 110, radius: [320, 540] },
+    { color: 0x7fa75d, peakAlpha: 0.18, stamps:  90, radius: [260, 460] },
+    { color: 0xa6c87a, peakAlpha: 0.14, stamps:  80, radius: [220, 420] },
+  ];
+  tones.forEach(({ color, peakAlpha, stamps, radius }) => {
+    const g = scene.add.graphics().setDepth(-960);
+    let placed = 0, attempts = 0;
+    while (placed < stamps && attempts < 1500) {
+      attempts++;
+      const r = Phaser.Math.Between(0, MAP_ROWS - 1);
+      const c = Phaser.Math.Between(0, MAP_COLS - 1);
+      if (getZone(r, c) !== 'grasslands') continue;
+      if (getCellType(r, c) !== 'grass') continue;
+      placed++;
+      const cx = c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-60, 60);
+      const cy = r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-60, 60);
+      const rad = Phaser.Math.Between(radius[0], radius[1]);
+      const layers = 7;
+      for (let j = 0; j < layers; j++) {
+        const t = j / (layers - 1);
+        const a = peakAlpha * (1 - t * t);
+        g.fillStyle(color, a);
+        g.fillCircle(cx, cy, rad * (1 - t * 0.9));
+      }
+    }
+  });
+}
+
 function addTerrainSeamBlends(scene) {
   let blendCount = 0;
 
@@ -1878,11 +1926,11 @@ function buildDecorations(scene) {
   const addPropShadow = (img, x, y, opts = {}) => {
     const shadow = scene.add.ellipse(
       x,
-      y + (opts.shadowOffsetY ?? 5),
-      img.displayWidth * (opts.shadowW ?? 0.72),
-      Math.max(8, img.displayHeight * (opts.shadowH ?? 0.12)),
+      y + (opts.shadowOffsetY ?? 4),
+      img.displayWidth * (opts.shadowW ?? 0.56),
+      Math.max(6, img.displayHeight * (opts.shadowH ?? 0.085)),
       0x000000,
-      opts.shadowAlpha ?? 0.22
+      opts.shadowAlpha ?? 0.34
     );
     shadow.setDepth((opts.alignBottom ? y : (opts.depth ?? -500)) - 2);
     shadow.setAngle((img.angle || 0) * 0.25);
@@ -2033,12 +2081,12 @@ function buildDecorations(scene) {
   const addLandmarkHalo = (tile_r, tile_c, color) => {
     const x = tile_c * TILE_SIZE + TILE_SIZE / 2;
     const y = tile_r * TILE_SIZE + TILE_SIZE / 2;
-    const halo = scene.add.ellipse(x, y + 6, 190, 86, color, 0.16)
-      .setStrokeStyle(3, color, 0.35)
+    const halo = scene.add.ellipse(x, y + 6, 150, 56, color, 0.08)
+      .setStrokeStyle(2, color, 0.18)
       .setDepth(-620);
     scene.tweens.add({
       targets: halo,
-      alpha: 0.23,
+      alpha: 0.12,
       scaleX: 1.05,
       scaleY: 1.08,
       duration: 1600,
@@ -2103,7 +2151,7 @@ function buildDecorations(scene) {
       tint: opts.tint,
       alignBottom: opts.alignBottom,
       shadow: opts.shadow,
-      shadowAlpha: opts.shadowAlpha ?? 0.10,
+      shadowAlpha: opts.shadowAlpha ?? 0.24,
       allowFlip: opts.allowFlip,
     });
   };
@@ -2257,9 +2305,9 @@ function buildDecorations(scene) {
       placeLandmarkDeco(pick(), px, py, 48, { maxAngle: 12, sway: zone !== 'desert' && zone !== 'ruins', swayAmp: 2 });
     }
     // Warm lantern centerpiece (reuse spawn-lantern style, single).
-    const glow = scene.add.ellipse(cx, cy + 4, 100, 48, 0xffd060, 0.30)
+    const glow = scene.add.ellipse(cx, cy + 4, 56, 26, 0xc58d34, 0.12)
       .setDepth(-620);
-    scene.tweens.add({ targets: glow, alpha: 0.48, scaleX: 1.08, scaleY: 1.08,
+    scene.tweens.add({ targets: glow, alpha: 0.18, scaleX: 1.05, scaleY: 1.05,
       duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     const core = scene.add.ellipse(cx, cy - 4, 14, 14, 0xfff2a8, 0.95)
       .setDepth(cy);
@@ -2290,9 +2338,9 @@ function buildDecorations(scene) {
   for (const off of lanternOffsets) {
     const lx = spX + off.dx, ly = spY + off.dy;
     // Warm glow disc (under feet depth).
-    const glow = scene.add.ellipse(lx, ly + 4, 120, 56, 0xffd060, 0.32)
+    const glow = scene.add.ellipse(lx, ly + 4, 62, 30, 0xc58d34, 0.13)
       .setDepth(-620);
-    scene.tweens.add({ targets: glow, alpha: 0.5, scaleX: 1.08, scaleY: 1.08,
+    scene.tweens.add({ targets: glow, alpha: 0.20, scaleX: 1.05, scaleY: 1.05,
       duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     // Small bright core.
     const core = scene.add.ellipse(lx, ly - 6, 18, 18, 0xfff2a8, 0.95)
@@ -2375,11 +2423,11 @@ function buildDecorations(scene) {
   // Grasslands (center) — dense ground cover + scattered focal trees.
   // Counts ~2.5× the pre-19200 baseline so the 9× area doesn't read as
   // sparse, plus cluster passes for the RO-style thicket feel.
-  for (let i = 0; i < 820; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     52, { alpha: 0.95, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3 });
-  for (let i = 0; i < 450; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),    60, { maxAngle: 15, zoneFilter: 'grasslands', sway: true, swayAmp: 2 });
-  for (let i = 0; i < 260; i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  44, { maxAngle: 10, zoneFilter: 'grasslands' });
-  for (let i = 0; i < 190; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      72, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'grasslands', shadow: true });
-  for (let i = 0; i < 120; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'grasslands', shadow: true });
+  for (let i = 0; i < 1300; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),    52, { alpha: 0.95, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3 });
+  for (let i = 0; i < 720; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),    60, { maxAngle: 15, zoneFilter: 'grasslands', sway: true, swayAmp: 2 });
+  for (let i = 0; i < 380; i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  44, { maxAngle: 10, zoneFilter: 'grasslands' });
+  for (let i = 0; i < 280; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      72, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'grasslands', shadow: true });
+  for (let i = 0; i < 180; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'grasslands', shadow: true });
   for (let i = 0; i <  14; i++) place('pond_01',                                  220, { maxAngle:  0, alignBottom: true, blockRadius: 6, allowFlip: false, zoneFilter: 'grasslands', shimmer: true });
   // Grasslands clusters: grass-tuft thickets + flower patches.
   for (let i = 0; i < 130; i++) placeCluster(Phaser.Utils.Array.GetRandom(grassKeys),  52, Phaser.Math.Between(5, 9), { alpha: 0.95, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3 });
@@ -2546,7 +2594,7 @@ function buildDecorations(scene) {
       tint: opts.tint,
       alignBottom: opts.alignBottom,
       shadow: opts.shadow,
-      shadowAlpha: opts.shadowAlpha ?? 0.12,
+      shadowAlpha: opts.shadowAlpha ?? 0.24,
       sway: opts.sway,
       swayAmp: opts.swayAmp,
       allowFlip: opts.allowFlip,
@@ -2969,6 +3017,11 @@ function buildDecorations(scene) {
     const tile_r = Math.floor(y / TILE_SIZE), tile_c = Math.floor(x / TILE_SIZE);
     const z = getZone(tile_r, tile_c);
     if (getCellType(tile_r, tile_c) !== 'grass') continue;
+    // Grasslands: skip the tinted-overlay scatter. After the uniform
+    // grass + biome-blob refactor, the pale-green soft overlays read as
+    // bleach patches on the uniform green base. Other biomes still get
+    // them since they layer over the biome blob, not bare grass.
+    if (z === 'grasslands') continue;
     const key = groundOverlayKey(z, false) || Phaser.Utils.Array.GetRandom(softKeys);
     if (!scene.textures.exists(key)) continue;
     const img = scene.add.image(x, y, key);
@@ -2995,6 +3048,9 @@ function buildDecorations(scene) {
     const tile_r = Math.floor(y / TILE_SIZE), tile_c = Math.floor(x / TILE_SIZE);
     const z = getZone(tile_r, tile_c);
     if (getCellType(tile_r, tile_c) !== 'grass') continue;
+    // Same skip as soft layer — pale yellow-green macro blobs were
+    // reading as bleach patches on uniform grasslands grass.
+    if (z === 'grasslands') continue;
     const key = groundOverlayKey(z, true) || Phaser.Utils.Array.GetRandom(softKeys);
     if (!scene.textures.exists(key)) continue;
     const img = scene.add.image(x, y, key);
@@ -3122,10 +3178,10 @@ class PlayerController {
     this.shadow = scene.add.ellipse(
       x,
       y + this.sprite.displayHeight * 0.36,
-      this.sprite.displayWidth * 0.70,
-      Math.max(9, this.sprite.displayHeight * 0.15),
+      this.sprite.displayWidth * 0.54,
+      Math.max(6, this.sprite.displayHeight * 0.09),
       0x000000,
-      0.30
+      0.40
     ).setOrigin(0.5);
 
     // Player name/level — slightly larger with a heavier outline and a
@@ -3308,7 +3364,7 @@ class PlayerController {
 
   _syncShadow() {
     this.shadow.setPosition(this.sprite.x, this.groundY + this.sprite.displayHeight * 0.36);
-    this.shadow.setDisplaySize(this.sprite.displayWidth * 0.70, Math.max(9, this.sprite.displayHeight * 0.15));
+    this.shadow.setDisplaySize(this.sprite.displayWidth * 0.54, Math.max(6, this.sprite.displayHeight * 0.09));
   }
 
   _syncFollowTarget() {
@@ -4068,10 +4124,10 @@ class MonsterController {
     this.shadow = scene.add.ellipse(
       x,
       y + this.sprite.displayHeight * 0.34,
-      this.sprite.displayWidth * 0.88,
-      Math.max(8, this.sprite.displayHeight * 0.17),
+      this.sprite.displayWidth * 0.62,
+      Math.max(6, this.sprite.displayHeight * 0.10),
       0x000000,
-      0.30
+      0.38
     ).setOrigin(0.5);
 
     const nameFontSize = isBossCfg(cfg) ? '21px' : '19px';
@@ -4091,7 +4147,7 @@ class MonsterController {
   _syncShadow() {
     this.shadow.setPosition(this.sprite.x, this.sprite.y + this.sprite.displayHeight * 0.34);
     if (this.auraRing) this.auraRing.setPosition(this.sprite.x, this.sprite.y + 8);
-    this.shadow.setDisplaySize(this.sprite.displayWidth * 0.88, Math.max(8, this.sprite.displayHeight * 0.17));
+    this.shadow.setDisplaySize(this.sprite.displayWidth * 0.62, Math.max(6, this.sprite.displayHeight * 0.10));
   }
 
   update(time, delta) {
