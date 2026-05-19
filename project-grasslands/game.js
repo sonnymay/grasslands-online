@@ -736,6 +736,11 @@ function preload() {
   this.load.image('deco_cracked_earth_01', 'assets/decorations/deco_cracked_earth_01.png');
   this.load.image('deco_pebble_cluster_01', 'assets/decorations/deco_pebble_cluster_01.png');
   this.load.image('deco_dry_grass_tuft_01', 'assets/decorations/deco_dry_grass_tuft_01.png');
+  this.load.image('floor_grass_blob_soft_01', 'assets/decorations/floor_grass_blob_soft_01.png');
+  this.load.image('floor_forest_moss_soft_01', 'assets/decorations/floor_forest_moss_soft_01.png');
+  this.load.image('floor_wet_mud_soft_01', 'assets/decorations/floor_wet_mud_soft_01.png');
+  this.load.image('floor_sand_wash_soft_01', 'assets/decorations/floor_sand_wash_soft_01.png');
+  this.load.image('floor_stone_dust_soft_01', 'assets/decorations/floor_stone_dust_soft_01.png');
   this.load.image('landmark_spawn_signpost', 'assets/decorations/landmark_spawn_signpost.png');
   this.load.image('landmark_forest_shrine', 'assets/decorations/landmark_forest_shrine.png');
   this.load.image('landmark_desert_obelisk', 'assets/decorations/landmark_desert_obelisk.png');
@@ -838,6 +843,8 @@ function create() {
     'deco_tallgrass_01','deco_tallgrass_02','deco_tallgrass_03',
     'deco_sand_scuff_soft_01','deco_stone_dust_soft_01',
     'deco_cracked_earth_01','deco_pebble_cluster_01','deco_dry_grass_tuft_01',
+    'floor_grass_blob_soft_01','floor_forest_moss_soft_01',
+    'floor_wet_mud_soft_01','floor_sand_wash_soft_01','floor_stone_dust_soft_01',
     'tree_oak_01','tree_pine_02','tree_round_03',
     'bush_01','bush_02',
     'mushroom_red_01','mushroom_brown_02',
@@ -2110,6 +2117,7 @@ function buildDecorations(scene) {
   const groundOverlayKey = (zone, large = false) => {
     if (zone === 'desert') {
       return firstExisting([
+        'floor_sand_wash_soft_01',
         'deco_sand_scuff_soft_01',
         large ? 'deco_sand_dune' : 'deco_dry_grass_tuft_01',
         'deco_sand_dune',
@@ -2118,15 +2126,16 @@ function buildDecorations(scene) {
     }
     if (zone === 'ruins') {
       return firstExisting([
+        'floor_stone_dust_soft_01',
         'deco_stone_dust_soft_01',
         large ? 'deco_pebble_cluster_01' : 'deco_cracked_earth_01',
         Phaser.Utils.Array.GetRandom(rockKeys),
         Phaser.Utils.Array.GetRandom(grassKeys),
       ]);
     }
-    if (zone === 'forest') return firstExisting([Phaser.Utils.Array.GetRandom(forestFernKeys), Phaser.Utils.Array.GetRandom(grassKeys)]);
-    if (zone === 'riverside') return firstExisting([Phaser.Utils.Array.GetRandom(riversideCattailKeys), Phaser.Utils.Array.GetRandom(grassKeys)]);
-    return firstExisting([...flowerKeys, ...grassKeys]);
+    if (zone === 'forest') return firstExisting(['floor_forest_moss_soft_01', 'floor_grass_blob_soft_01', Phaser.Utils.Array.GetRandom(forestFernKeys), Phaser.Utils.Array.GetRandom(grassKeys)]);
+    if (zone === 'riverside') return firstExisting(['floor_wet_mud_soft_01', 'floor_grass_blob_soft_01', Phaser.Utils.Array.GetRandom(riversideCattailKeys), Phaser.Utils.Array.GetRandom(grassKeys)]);
+    return firstExisting(['floor_grass_blob_soft_01', ...flowerKeys, ...grassKeys]);
   };
   const groundOverlayTint = (zone, large = false) => ({
     desert: large ? 0xe0c07a : 0xd8bd78,
@@ -2138,21 +2147,21 @@ function buildDecorations(scene) {
 
   const transitionOverlayKey = (zone, neighborZone = zone, pathShoulder = false) => {
     if (zone === 'desert' || neighborZone === 'desert') {
-      return firstExisting(['deco_sand_scuff_soft_01', 'deco_dry_grass_tuft_01', 'deco_cracked_earth_01']);
+      return firstExisting(['floor_sand_wash_soft_01', 'deco_sand_scuff_soft_01', 'deco_dry_grass_tuft_01', 'deco_cracked_earth_01']);
     }
     if (zone === 'ruins' || neighborZone === 'ruins') {
-      return firstExisting(['deco_stone_dust_soft_01', 'deco_pebble_cluster_01', 'deco_cracked_earth_01']);
+      return firstExisting(['floor_stone_dust_soft_01', 'deco_stone_dust_soft_01', 'deco_pebble_cluster_01', 'deco_cracked_earth_01']);
     }
     if (pathShoulder) {
-      return firstExisting(['deco_pebble_cluster_01', 'deco_sand_scuff_soft_01', Phaser.Utils.Array.GetRandom(grassKeys)]);
+      return firstExisting(['floor_grass_blob_soft_01', 'deco_pebble_cluster_01', 'deco_sand_scuff_soft_01', Phaser.Utils.Array.GetRandom(grassKeys)]);
     }
     if (zone === 'riverside' || neighborZone === 'riverside') {
-      return firstExisting(['deco_stone_dust_soft_01', Phaser.Utils.Array.GetRandom(riversideCattailKeys), Phaser.Utils.Array.GetRandom(grassKeys)]);
+      return firstExisting(['floor_wet_mud_soft_01', 'deco_stone_dust_soft_01', Phaser.Utils.Array.GetRandom(riversideCattailKeys), Phaser.Utils.Array.GetRandom(grassKeys)]);
     }
     if (zone === 'forest' || neighborZone === 'forest') {
-      return firstExisting(['deco_dry_grass_tuft_01', Phaser.Utils.Array.GetRandom(forestFernKeys), Phaser.Utils.Array.GetRandom(grassKeys)]);
+      return firstExisting(['floor_forest_moss_soft_01', 'deco_dry_grass_tuft_01', Phaser.Utils.Array.GetRandom(forestFernKeys), Phaser.Utils.Array.GetRandom(grassKeys)]);
     }
-    return firstExisting(['deco_pebble_cluster_01', Phaser.Utils.Array.GetRandom(flowerKeys), Phaser.Utils.Array.GetRandom(grassKeys)]);
+    return firstExisting(['floor_grass_blob_soft_01', 'deco_pebble_cluster_01', Phaser.Utils.Array.GetRandom(flowerKeys), Phaser.Utils.Array.GetRandom(grassKeys)]);
   };
 
   const blendTint = (zone, neighborZone) => {
@@ -2164,11 +2173,11 @@ function buildDecorations(scene) {
   };
 
   const floorWashKey = (zone) => {
-    if (zone === 'desert') return firstExisting(['deco_sand_scuff_soft_01', 'deco_dry_grass_tuft_01']);
-    if (zone === 'ruins') return firstExisting(['deco_stone_dust_soft_01', 'deco_pebble_cluster_01']);
-    if (zone === 'riverside') return firstExisting(['deco_stone_dust_soft_01', 'deco_sand_scuff_soft_01']);
-    if (zone === 'forest') return firstExisting(['deco_sand_scuff_soft_01', Phaser.Utils.Array.GetRandom(forestFernKeys)]);
-    return firstExisting(['deco_sand_scuff_soft_01', Phaser.Utils.Array.GetRandom(grassKeys)]);
+    if (zone === 'desert') return firstExisting(['floor_sand_wash_soft_01', 'deco_sand_scuff_soft_01', 'deco_dry_grass_tuft_01']);
+    if (zone === 'ruins') return firstExisting(['floor_stone_dust_soft_01', 'deco_stone_dust_soft_01', 'deco_pebble_cluster_01']);
+    if (zone === 'riverside') return firstExisting(['floor_wet_mud_soft_01', 'deco_stone_dust_soft_01', 'deco_sand_scuff_soft_01']);
+    if (zone === 'forest') return firstExisting(['floor_forest_moss_soft_01', 'floor_grass_blob_soft_01', 'deco_sand_scuff_soft_01']);
+    return firstExisting(['floor_grass_blob_soft_01', 'deco_sand_scuff_soft_01', Phaser.Utils.Array.GetRandom(grassKeys)]);
   };
 
   const adjacentPathDir = (r, c) => {
@@ -2631,7 +2640,7 @@ function buildDecorations(scene) {
   const softKeys = [...flowerKeys, ...grassKeys];
   // Mid-size overlay layer — sparse and low-alpha so it adds organic
   // variation without drawing attention as another large patch pattern.
-  const softCount = 640;
+  const softCount = 720;
   for (let i = 0; i < softCount; i++) {
     const x = Phaser.Math.Between(0, WORLD_W);
     const y = Phaser.Math.Between(0, WORLD_H);
@@ -2642,9 +2651,14 @@ function buildDecorations(scene) {
     if (!scene.textures.exists(key)) continue;
     const img = scene.add.image(x, y, key);
     const dry = z === 'desert' || z === 'ruins';
-    const baseH = dry ? Phaser.Math.Between(150, 260) : Phaser.Math.Between(210, 340);
+    const floorKey = key.startsWith('floor_');
+    const baseH = floorKey
+      ? Phaser.Math.Between(280, 520)
+      : (dry ? Phaser.Math.Between(150, 260) : Phaser.Math.Between(210, 340));
     img.setScale(baseH / img.height);
-    img.setAlpha(dry ? Phaser.Math.FloatBetween(0.06, 0.11) : Phaser.Math.FloatBetween(0.09, 0.16));
+    img.setAlpha(floorKey
+      ? Phaser.Math.FloatBetween(0.12, 0.22)
+      : (dry ? Phaser.Math.FloatBetween(0.06, 0.11) : Phaser.Math.FloatBetween(0.09, 0.16)));
     img.setAngle(Phaser.Math.Between(0, 359));
     img.setDepth(-800);
     img.setTint(groundOverlayTint(z, false));
@@ -2652,7 +2666,7 @@ function buildDecorations(scene) {
 
   // Macro-blob layer — larger, fainter sprites that span multiple tiles,
   // adding broad value variance and breaking long axis-aligned tile rows.
-  const macroCount = 170;
+  const macroCount = 220;
   for (let i = 0; i < macroCount; i++) {
     const x = Phaser.Math.Between(0, WORLD_W);
     const y = Phaser.Math.Between(0, WORLD_H);
@@ -2663,9 +2677,14 @@ function buildDecorations(scene) {
     if (!scene.textures.exists(key)) continue;
     const img = scene.add.image(x, y, key);
     const dry = z === 'desert' || z === 'ruins';
-    const baseH = dry ? Phaser.Math.Between(300, 520) : Phaser.Math.Between(440, 720);
+    const floorKey = key.startsWith('floor_');
+    const baseH = floorKey
+      ? Phaser.Math.Between(560, 980)
+      : (dry ? Phaser.Math.Between(300, 520) : Phaser.Math.Between(440, 720));
     img.setScale(baseH / img.height);
-    img.setAlpha(dry ? Phaser.Math.FloatBetween(0.04, 0.08) : Phaser.Math.FloatBetween(0.055, 0.11));
+    img.setAlpha(floorKey
+      ? Phaser.Math.FloatBetween(0.08, 0.16)
+      : (dry ? Phaser.Math.FloatBetween(0.04, 0.08) : Phaser.Math.FloatBetween(0.055, 0.11)));
     img.setAngle(Phaser.Math.Between(0, 359));
     img.setDepth(-820);
     img.setTint(groundOverlayTint(z, true));
