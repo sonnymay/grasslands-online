@@ -1924,19 +1924,10 @@ function buildDecorations(scene) {
     }
   };
 
-  const addPropShadow = (img, x, y, opts = {}) => {
-    const shadow = scene.add.ellipse(
-      x,
-      y + (opts.shadowOffsetY ?? 4),
-      img.displayWidth * (opts.shadowW ?? 0.56),
-      Math.max(6, img.displayHeight * (opts.shadowH ?? 0.085)),
-      0x000000,
-      opts.shadowAlpha ?? 0.34
-    );
-    shadow.setDepth((opts.alignBottom ? y : (opts.depth ?? -500)) - 2);
-    shadow.setAngle((img.angle || 0) * 0.25);
-    return shadow;
-  };
+  // Decoration shadow ellipses were reading as bleach ovals around props
+  // on the new uniform grass base. Disable entirely. Monster/player drop
+  // shadows use a separate code path and are untouched.
+  const addPropShadow = (_img, _x, _y, _opts = {}) => null;
 
   // Generic scatter. By default decorations are flat overlays under entities.
   // `alignBottom` lets us anchor the base of a sprite (trees/bushes/pond) so the
