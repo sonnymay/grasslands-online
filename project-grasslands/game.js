@@ -759,6 +759,13 @@ function preload() {
   this.load.image('mushroom_red_01',   'assets/decorations/mushroom_red_01.png');
   this.load.image('mushroom_brown_02', 'assets/decorations/mushroom_brown_02.png');
   this.load.image('pond_01', 'assets/decorations/pond_01.png');
+  // Biome blob washes — 1254×1254 PNGs that shipped with a baked
+  // transparency-checker background. keyOutCheckerboard() strips it at
+  // runtime in create() so the silhouettes feather over the grass base.
+  this.load.image('biome_forest_blob',    'assets/decorations/biome_forest_blob.png');
+  this.load.image('biome_desert_blob',    'assets/decorations/biome_desert_blob.png');
+  this.load.image('biome_ruins_blob',     'assets/decorations/biome_ruins_blob.png');
+  this.load.image('biome_riverside_blob', 'assets/decorations/biome_riverside_blob.png');
   this.load.image('grass_tileset', 'assets/tiles/grass_tileset_v2.png');
 
   // Background music — optional. Loader tolerates missing file (silent if absent).
@@ -851,6 +858,11 @@ function create() {
     'pond_01',
   ];
   for (const k of spriteKeys) keyOutWhite(scene, k);
+  // Biome blob PNGs use Photoshop transparency checker as background —
+  // strip it to real alpha so they paint cleanly over the grass base.
+  for (const k of ['biome_forest_blob', 'biome_desert_blob', 'biome_ruins_blob', 'biome_riverside_blob']) {
+    keyOutCheckerboard(scene, k);
+  }
 
   // Slice every 4x4 tileset into 16 frames named `tile_0`..`tile_15` on that
   // texture key. buildMap picks which tileset key to draw from per zone.
@@ -1327,6 +1339,38 @@ function keyOutWhite(scene, key) {
   scene.textures.addCanvas(key, canvas);
 }
 
+// Convert Photoshop-style transparency checkerboard (greys ~204/255) into
+// real alpha for source PNGs that shipped without an alpha channel. Strips
+// near-greyscale + high-value pixels, with a partial-fade band so soft
+// edges between the blob and checker don't read as a hard outline.
+function keyOutCheckerboard(scene, key) {
+  if (!scene.textures.exists(key)) return;
+  const src = scene.textures.get(key).getSourceImage();
+  if (!src) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = src.width;
+  canvas.height = src.height;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(src, 0, 0);
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = imgData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    const sat = Math.max(r, g, b) - Math.min(r, g, b);
+    const val = (r + g + b) / 3;
+    if (val >= 195 && sat < 12) {
+      d[i + 3] = 0; // pure checker pixel → transparent
+    } else if (val >= 180 && sat < 22) {
+      // Anti-aliased edge between blob and checker — fade proportional to
+      // how colored the pixel is. Keeps the silhouette feathered.
+      d[i + 3] = Math.floor(d[i + 3] * (sat / 22));
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+  scene.textures.remove(key);
+  scene.textures.addCanvas(key, canvas);
+}
+
 // ---------- Map ----------
 function mapCenter() {
   const midRow = Math.floor(MAP_ROWS / 2);
@@ -1593,14 +1637,16 @@ function buildMap(scene) {
 // proper biome_*_blob.png art ships (see asset list in HANDOFF.md).
 function addBiomeWash(scene) {
   const biomes = {
-    forest:    { color: 0x4d7a3e, peakAlpha: 0.36, stamps: 18 },
-    desert:    { color: 0xd9aa5c, peakAlpha: 0.46, stamps: 18 },
-    ruins:     { color: 0x9b8e72, peakAlpha: 0.32, stamps: 14 },
-    riverside: { color: 0x6db5cc, peakAlpha: 0.32, stamps: 16 },
+    forest:    { textureKey: 'biome_forest_blob',    color: 0x4d7a3e, peakAlpha: 0.36, stamps: 8 },
+    desert:    { textureKey: 'biome_desert_blob',    color: 0xd9aa5c, peakAlpha: 0.46, stamps: 8 },
+    ruins:     { textureKey: 'biome_ruins_blob',     color: 0x9b8e72, peakAlpha: 0.32, stamps: 6 },
+    riverside: { textureKey: 'biome_riverside_blob', color: 0x6db5cc, peakAlpha: 0.32, stamps: 7 },
   };
   Object.keys(biomes).forEach((zone) => {
-    const { color, peakAlpha, stamps } = biomes[zone];
-    const g = scene.add.graphics().setDepth(-980);
+    const { textureKey, color, peakAlpha, stamps } = biomes[zone];
+    const useImage = textureKey && scene.textures.exists(textureKey);
+    // Shared graphics object for the fallback path (no image asset).
+    const g = !useImage ? scene.add.graphics().setDepth(-980) : null;
     let placed = 0;
     let attempts = 0;
     while (placed < stamps && attempts < 1200) {
@@ -1611,18 +1657,35 @@ function addBiomeWash(scene) {
       placed++;
       const cx = c * TILE_SIZE + TILE_SIZE / 2;
       const cy = r * TILE_SIZE + TILE_SIZE / 2;
-      // 4 overlapping circles per stamp → irregular blob silhouette.
-      for (let k = 0; k < 4; k++) {
-        const ox = Phaser.Math.Between(-280, 280);
-        const oy = Phaser.Math.Between(-280, 280);
-        const radius = Phaser.Math.Between(420, 720);
-        // 9-layer radial alpha falloff = feathered edge.
-        const layers = 9;
-        for (let j = 0; j < layers; j++) {
-          const t = j / (layers - 1);
-          const a = peakAlpha * (1 - t * t);
-          g.fillStyle(color, a);
-          g.fillCircle(cx + ox, cy + oy, radius * (1 - t * 0.9));
+      if (useImage) {
+        // Pond-style: one large feathered PNG stamped on the grass.
+        // Two overlapping placements per stamp for irregular silhouette
+        // and full zone coverage.
+        for (let k = 0; k < 2; k++) {
+          const ox = Phaser.Math.Between(-260, 260);
+          const oy = Phaser.Math.Between(-260, 260);
+          const img = scene.add.image(cx + ox, cy + oy, textureKey);
+          const widthPx = Phaser.Math.Between(1400, 2200);
+          img.setScale(widthPx / img.width);
+          img.setAlpha(Phaser.Math.FloatBetween(0.65, 0.85));
+          img.setAngle(Phaser.Math.Between(0, 359));
+          if (Math.random() < 0.5) img.setFlipX(true);
+          if (Math.random() < 0.5) img.setFlipY(true);
+          img.setDepth(-980);
+        }
+      } else {
+        // Fallback: graphics-only feathered radial-alpha blob clusters.
+        for (let k = 0; k < 4; k++) {
+          const ox = Phaser.Math.Between(-280, 280);
+          const oy = Phaser.Math.Between(-280, 280);
+          const radius = Phaser.Math.Between(420, 720);
+          const layers = 9;
+          for (let j = 0; j < layers; j++) {
+            const t = j / (layers - 1);
+            const a = peakAlpha * (1 - t * t);
+            g.fillStyle(color, a);
+            g.fillCircle(cx + ox, cy + oy, radius * (1 - t * 0.9));
+          }
         }
       }
     }
