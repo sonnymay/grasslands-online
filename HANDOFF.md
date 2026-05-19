@@ -612,7 +612,20 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 77 (latest)
+## 3. What we did in session 78 (latest)
+
+Cache now at **`?v=172`**. Sonny: bigger HP/EXP/Lv readouts; rename
+"Auto" to "Autopilot."
+
+1. **Bottom HUD bar bumped.** `bottomH 56 → 76`, bar height 16 → 24,
+   panel height 30 → 40. HP/EXP text 15 → 20 px (stroke 3 → 4). Lv
+   text 17 → 24 px. Zeny text 15 → 19 px. Status panel 36 → 48,
+   divider 22 → 30. `relayout()` constants updated to match.
+2. **Right toolbar label.** "⚙ Auto: ON/OFF" → "⚙ Autopilot: ON/OFF".
+   Behavior unchanged.
+3. **Cache bump.** `?v=171` → `?v=172`.
+
+## 3.1. What we did in session 77
 
 Cache now at **`?v=171`**. Sonny: "All decorations should not have
 shadow." The shadow ellipses under trees / bushes / cacti / ponds
@@ -3324,7 +3337,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=171`**. Next change should use `?v=172`.
+  change. Current: **`?v=172`**. Next change should use `?v=173`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
