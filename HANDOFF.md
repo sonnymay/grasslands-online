@@ -4,19 +4,31 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 84 map beauty loop.**
+**State as of 2026-05-19 — post session 85 decoration-shadow fix.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 84 continues the Ragnarok-style map polish
-  loop after live Chrome review. It restores dark contact shadows under props,
-  expands authored micro-scenes into empty open fields, reduces circular
-  grassland floor wash/lantern spots, makes normal monster labels quieter, and
-  lightens the minimap/HUD framing.
-- **Cache version live in `project-grasslands/index.html`:** `?v=180`.
-- **Next change must use:** `?v=181`.
+- **Latest completed work:** session 85 removes decoration shadows again after
+  Sonny reported they make props look like they are floating. Player and
+  monster shadows are still untouched because they ground moving characters.
+- **Cache version live in `project-grasslands/index.html`:** `?v=181`.
+- **Next change must use:** `?v=182`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 85):**
+- Goal: respond to Sonny's correction that decoration shadows make map props
+  look like they are hovering/floating.
+- `addPropShadow()` is a no-op again inside `buildDecorations()`. This disables
+  all decoration/prop shadows even when existing placement calls pass
+  `shadow: true`.
+- Player and monster shadows remain on their separate code paths.
+- This supersedes the session 84 note about restored prop contact shadows.
+- Cache bumped to `game.js?v=181`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md`
+  passed, and Chrome preview at `http://localhost:8001/?codex=no-prop-shadow-v181`
+  loaded `game.js?v=181` with no console warnings/errors.
 
 **Where we left off (session 84):**
 - Goal: keep improving the map after the user asked to review, implement,
@@ -24,9 +36,8 @@
 - Live Chrome review of `localhost:8001` showed session 83's field was much
   better than the old checkerboard, but still had circular floor wash spots,
   weak prop grounding, loud normal monster labels, and a visually heavy minimap.
-- `addPropShadow()` is active again with small dark contact ellipses only; it
-  avoids the old pale/bleached oval problem while grounding trees, bushes,
-  rocks, cacti, cattails, and set-piece props.
+- Superseded in session 85: `addPropShadow()` is now a no-op again because
+  decoration shadows made props look like they were floating.
 - Grasslands wash strength was reduced: spawn lantern cores/halos are smaller,
   grassland floor washes and road shoulders are lower-alpha, and grassland
   micro-scene ground scuffs are smaller so flowers/grass/trees do the beauty
@@ -638,7 +649,23 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 84 (latest)
+## 3. What we did in session 85 (latest)
+
+Cache now at **`?v=181`**. Sonny corrected the previous pass: decoration
+shadows make props look like they are floating. This pass restores the no-prop
+shadow rule.
+
+1. **Decoration shadows disabled.** `addPropShadow()` in `buildDecorations()`
+   returns `null` immediately again. Existing `shadow: true` options are
+   harmless because the helper no-ops.
+2. **Character shadows preserved.** Player and monster shadows are untouched;
+   only static map decorations are affected.
+3. **Verification.** `node -c project-grasslands/game.js` clean.
+   `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md`
+   clean. Chrome v181 loaded with no console warnings/errors.
+4. **Cache bump.** `?v=180` → `?v=181`.
+
+## 3. What we did in session 84
 
 Cache now at **`?v=180`**. Sonny asked to keep reviewing and doing the
 map-beauty work, with no mistakes. This pass used Chrome review first,

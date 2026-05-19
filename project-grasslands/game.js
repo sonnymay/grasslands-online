@@ -1938,23 +1938,10 @@ function buildDecorations(scene) {
     }
   };
 
-  // Small dark contact shadows give props ground contact without bringing
-  // back the pale oval "lawn spot" problem from the old floor pass.
-  const addPropShadow = (img, x, y, opts = {}) => {
-    const h = img.displayHeight || 48;
-    const w = img.displayWidth || h;
-    if (h < 58 && tileNoise(Math.floor(y / TILE_SIZE), Math.floor(x / TILE_SIZE), 941) < 0.62) return null;
-    const shadow = scene.add.ellipse(
-      x,
-      y + (opts.shadowOffsetY ?? Math.max(4, h * 0.22)),
-      opts.shadowW ?? Math.max(18, w * (opts.shadowScaleX ?? 0.48)),
-      opts.shadowH ?? Math.max(4, h * (opts.shadowScaleY ?? 0.055)),
-      0x120e08,
-      opts.shadowAlpha ?? (h > 120 ? 0.18 : 0.12)
-    ).setOrigin(0.5);
-    shadow.setDepth(opts.alignBottom ? y - 2 : ((opts.depth ?? -560) - 1));
-    return shadow;
-  };
+  // Decoration shadows make props look like they are hovering on this
+  // flattened field art. Keep this helper a no-op; player/monster shadows
+  // use separate code paths and still ground moving characters.
+  const addPropShadow = (_img, _x, _y, _opts = {}) => null;
 
   // Generic scatter. By default decorations are flat overlays under entities.
   // `alignBottom` lets us anchor the base of a sprite (trees/bushes/pond) so the
