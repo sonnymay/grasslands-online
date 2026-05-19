@@ -4,18 +4,44 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 88 organic path/structure pass.**
+**State as of 2026-05-19 — post session 89 prompt-inspired landmark pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 88 responds to the "too organized"
-  feedback. It replaces stamped oval road decals with a connected ragged
-  path renderer, adds automatic base-overlap micro-clusters to standing props,
-  and adds a small spawn camp plus tree-line choke cues for world structure.
-- **Cache version live in `project-grasslands/index.html`:** `?v=191`.
-- **Next change must use:** `?v=192`.
+- **Latest completed work:** session 89 uses Sonny's detailed reconstruction
+  prompt as the next visual target. It upgrades the spawn camp with wagon,
+  benches, cooking pot, and richer prop staging; adds a ruin/tree anchor and
+  a boulder landmark; and spawns one small low-level monster pod so the nearby
+  road has a clear encounter pocket.
+- **Cache version live in `project-grasslands/index.html`:** `?v=193`.
+- **Next change must use:** `?v=194`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 89):**
+- Goal: respond to the new "Grasslands Online JRPG" reconstruction prompt with
+  more environmental storytelling and screenshot composition, not a Three.js
+  rewrite.
+- Added runtime canvas textures for `camp_wagon_canvas`,
+  `camp_logbench_canvas`, `camp_pot_canvas`, `ruin_base_canvas`, and
+  `boulder_anchor_canvas`. No new external PNG files were added.
+- Upgraded the camp so it now has tents, fences, fire, pot, benches, wagon,
+  and the `Guide` / `Forager` NPCs. The camp reads more like a small lived-in
+  encampment instead of only tents on grass.
+- Added `addPromptInspiredLandmarks()` with an ancient-tree ruin scene and a
+  boulder anchor scene near spawn. The ruin base was softened after browser
+  review because the first version looked too rectangular.
+- Added `spawnShowcaseMobPod(scene)` after normal monster spawning. It creates
+  one deliberate low-level grasslands encounter pocket near the camp road
+  without changing boss rules or global monster counts.
+- Static decoration shadows remain disabled. Player and monster shadows remain
+  separate.
+- Cache bumped to `game.js?v=193`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md`
+  passed, and Chrome preview at `http://localhost:8002/?codex=landmarks-v193`
+  loaded `game.js?v=193` with no current console warnings/errors. Walked the
+  camp/ruin area and confirmed the prompt-inspired scene is visible.
 
 **Where we left off (session 88):**
 - Goal: answer the feedback that the map still looked organized/artificial:
@@ -726,7 +752,36 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 88 (latest)
+## 3. What we did in session 89 (latest)
+
+Cache now at **`?v=193`**. Sonny provided a detailed visual target prompt:
+retro JRPG/RO-inspired grassland with a central camp, ruin/tree landmark,
+rock anchor, clustered enemies, rich flowers, and the existing HUD preserved.
+This pass implements the strongest parts of that target in the current Phaser
+renderer.
+
+1. **Camp storytelling upgraded.** Added runtime canvas props for a wagon, log
+   benches, and a cooking pot, then integrated them into the existing spawn
+   camp with tents, fire, fences, `Guide`, and `Forager`.
+2. **Ruin/tree landmark added.** Added a prompt-inspired ruin base with an
+   ancient oak, broken pillar pieces, and surrounding flowers/mushrooms. The
+   first browser preview looked too blocky, so the stone base was revised into
+   irregular polygon slabs before shipping.
+3. **Boulder anchor added.** Added a second landmark with a painted boulder
+   cluster and surrounding plant accents so the field has another memorable
+   point of interest.
+4. **Intentional mob pod added.** Added `spawnShowcaseMobPod(scene)` to create
+   one low-level grasslands monster pocket near the camp road, matching the
+   target prompt's clustered-enemy composition without touching boss rules.
+5. **No external asset churn.** All new props are runtime canvas textures; no
+   PNG files were added, and the existing knight/wizard sprite dirt was left
+   untouched.
+6. **Verification.** `node -c project-grasslands/game.js` clean.
+   `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md`
+   clean. Chrome v193 loaded with no current console warnings/errors and the
+   camp/ruin scene was walked visually.
+
+## 3. What we did in session 88
 
 Cache now at **`?v=191`**. The latest feedback was that the map still looked
 organized and artificial: stamped oval paths, snap-to-grid prop placement,

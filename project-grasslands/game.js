@@ -982,6 +982,7 @@ function create() {
     const cfg = MONSTER_TYPES[typeId];
     for (let i = 0; i < cfg.count; i++) spawnMonster(scene, typeId);
   }
+  spawnShowcaseMobPod(scene);
 
   // Camera follow
   scene.cameras.main.startFollow(player.followTarget, true, 0.1, 0.1);
@@ -2187,6 +2188,164 @@ function buildDecorations(scene) {
         ctx.stroke();
       }
     });
+
+    addCanvasTexture('camp_wagon_canvas', 210, 130, (ctx) => {
+      ctx.clearRect(0, 0, 210, 130);
+      ctx.fillStyle = '#8a5a2f';
+      ctx.strokeStyle = '#3c291c';
+      ctx.lineWidth = 5;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(42, 72);
+      ctx.lineTo(144, 50);
+      ctx.lineTo(170, 76);
+      ctx.lineTo(65, 102);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = '#d0a060';
+      ctx.lineWidth = 4;
+      for (const off of [0, 28, 56]) {
+        ctx.beginPath();
+        ctx.moveTo(58 + off, 70 - off * 0.18);
+        ctx.lineTo(80 + off, 94 - off * 0.18);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = '#604020';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(142, 62);
+      ctx.lineTo(196, 38);
+      ctx.stroke();
+      for (const wheel of [{ x: 72, y: 100 }, { x: 154, y: 80 }]) {
+        ctx.fillStyle = '#2b2118';
+        ctx.beginPath();
+        ctx.ellipse(wheel.x, wheel.y, 18, 14, -0.18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#b8874a';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+      }
+    });
+
+    addCanvasTexture('camp_logbench_canvas', 170, 72, (ctx) => {
+      ctx.clearRect(0, 0, 170, 72);
+      ctx.lineCap = 'round';
+      for (const row of [
+        { y: 30, color: '#8a5428', light: '#d39b58' },
+        { y: 44, color: '#67411f', light: '#b87a3d' },
+      ]) {
+        ctx.strokeStyle = '#2e2017';
+        ctx.lineWidth = 14;
+        ctx.beginPath();
+        ctx.moveTo(28, row.y + 5);
+        ctx.lineTo(140, row.y - 9);
+        ctx.stroke();
+        ctx.strokeStyle = row.color;
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.moveTo(28, row.y + 5);
+        ctx.lineTo(140, row.y - 9);
+        ctx.stroke();
+        ctx.strokeStyle = row.light;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(36, row.y + 1);
+        ctx.lineTo(132, row.y - 11);
+        ctx.stroke();
+      }
+    });
+
+    addCanvasTexture('camp_pot_canvas', 90, 92, (ctx) => {
+      ctx.clearRect(0, 0, 90, 92);
+      ctx.strokeStyle = '#3a3029';
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(22, 58);
+      ctx.quadraticCurveTo(45, 18, 68, 58);
+      ctx.stroke();
+      ctx.fillStyle = '#332a27';
+      ctx.beginPath();
+      ctx.ellipse(45, 62, 27, 19, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#5a5046';
+      ctx.beginPath();
+      ctx.ellipse(45, 52, 25, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 244, 170, 0.55)';
+      ctx.beginPath();
+      ctx.ellipse(45, 49, 14, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    addCanvasTexture('ruin_base_canvas', 300, 210, (ctx) => {
+      ctx.clearRect(0, 0, 300, 210);
+      ctx.fillStyle = 'rgba(94, 84, 68, 0.18)';
+      ctx.beginPath();
+      ctx.ellipse(150, 154, 120, 30, -0.05, 0, Math.PI * 2);
+      ctx.fill();
+      const stonePoly = (points, fill, stroke = '#57513f') => {
+        ctx.fillStyle = fill;
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 4;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(points[0][0], points[0][1]);
+        for (const p of points.slice(1)) ctx.lineTo(p[0], p[1]);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(230, 224, 190, 0.20)';
+        ctx.beginPath();
+        ctx.ellipse(points[0][0] + 20, points[0][1] + 8, 22, 4, -0.16, 0, Math.PI * 2);
+        ctx.fill();
+      };
+      const stones = [
+        [[54, 128], [114, 116], [133, 144], [63, 154]],
+        [[126, 112], [186, 103], [202, 129], [134, 145]],
+        [[194, 124], [244, 116], [266, 139], [210, 154]],
+        [[84, 157], [142, 146], [159, 169], [91, 181]],
+        [[153, 148], [218, 143], [231, 168], [166, 179]],
+        [[48, 171], [92, 164], [103, 185], [57, 190]],
+      ];
+      stones.forEach((points, i) => stonePoly(points, i % 2 ? '#8f927d' : '#a6a18a'));
+      ctx.strokeStyle = '#6e644d';
+      ctx.lineWidth = 9;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(70, 122);
+      ctx.lineTo(91, 82);
+      ctx.lineTo(113, 118);
+      ctx.moveTo(215, 120);
+      ctx.lineTo(232, 78);
+      ctx.lineTo(251, 117);
+      ctx.moveTo(118, 98);
+      ctx.lineTo(149, 72);
+      ctx.lineTo(181, 101);
+      ctx.stroke();
+    });
+
+    addCanvasTexture('boulder_anchor_canvas', 260, 180, (ctx) => {
+      ctx.clearRect(0, 0, 260, 180);
+      const rocks = [
+        [86, 106, 66, 44, '#8f9484'], [136, 90, 78, 58, '#a4a18d'],
+        [176, 122, 64, 42, '#77796d'], [92, 135, 96, 36, '#6e7468'],
+      ];
+      for (const [x, y, w, h, color] of rocks) {
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#45483d';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.ellipse(x, y, w / 2, h / 2, -0.12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(238, 235, 204, 0.22)';
+        ctx.beginPath();
+        ctx.ellipse(x - w * 0.12, y - h * 0.16, w * 0.22, h * 0.08, -0.1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
   };
   ensureStructureTextures();
 
@@ -2937,6 +3096,23 @@ function buildDecorations(scene) {
         baseCluster: 0,
       });
     }
+    const campDetails = [
+      { key: 'camp_wagon_canvas', dx: 278, dy: 4, h: 136, angle: -7, block: 1 },
+      { key: 'camp_logbench_canvas', dx: -92, dy: 120, h: 76, angle: -5, block: 0 },
+      { key: 'camp_logbench_canvas', dx: 92, dy: 98, h: 68, angle: 7, block: 0 },
+      { key: 'camp_pot_canvas', dx: -4, dy: 62, h: 62, angle: 0, block: 0 },
+    ];
+    for (const item of campDetails) {
+      const x = campX + item.dx;
+      const y = campY + item.dy;
+      placeLandmarkDeco(item.key, x, y, item.h, {
+        alignBottom: true,
+        allowFlip: false,
+        angle: item.angle,
+        baseCluster: 0,
+      });
+      if (item.block) blockCells(x, y, item.block);
+    }
     const npcs = [
       { key: 'rookie_idle_south', dx: -76, dy: 64, name: 'Guide' },
       { key: scene.textures.exists('mage_idle_south') ? 'mage_idle_south' : 'rookie_idle_south', dx: 78, dy: 48, name: 'Forager' },
@@ -2958,6 +3134,75 @@ function buildDecorations(scene) {
         stroke: '#2a1c12',
         strokeThickness: 4,
       }).setOrigin(0.5, 1).setDepth(y + 1).setResolution(UI_TEXT_RESOLUTION);
+    }
+  };
+
+  const addPromptInspiredLandmarks = () => {
+    const ruinX = spX - 760;
+    const ruinY = spY - 215;
+    placeLandmarkDeco('ruin_base_canvas', ruinX, ruinY + 48, 210, {
+      depth: -772,
+      allowFlip: false,
+      angle: -3,
+      alpha: 0.94,
+    });
+    const ancientTree = placeLandmarkDeco('tree_oak_01', ruinX + 16, ruinY + 34, 326, {
+      alignBottom: true,
+      allowFlip: false,
+      maxAngle: 2,
+      baseCluster: 0.82,
+    });
+    if (ancientTree) blockCells(ruinX + 16, ruinY + 34, 3);
+    for (const p of [
+      { dx: -132, dy: 72, h: 96, angle: -8 },
+      { dx:  128, dy: 50, h: 112, angle: 5 },
+    ]) {
+      if (!ruinsPillarKeys.length) continue;
+      const x = ruinX + p.dx;
+      const y = ruinY + p.dy;
+      placeLandmarkDeco(Phaser.Utils.Array.GetRandom(ruinsPillarKeys), x, y, p.h, {
+        alignBottom: true,
+        allowFlip: false,
+        angle: p.angle,
+        tint: 0xd4ccb2,
+        baseCluster: 0.18,
+      });
+      blockCells(x, y, 1);
+    }
+    for (let i = 0; i < 9; i++) {
+      const a = -2.7 + i * 0.46 + Phaser.Math.FloatBetween(-0.12, 0.12);
+      const x = ruinX + Math.cos(a) * Phaser.Math.Between(118, 196);
+      const y = ruinY + 66 + Math.sin(a) * Phaser.Math.Between(44, 82);
+      const key = i % 3 === 0 ? Phaser.Utils.Array.GetRandom(mushroomKeys) : Phaser.Utils.Array.GetRandom(flowerKeys);
+      placeLandmarkDeco(key, x, y, Phaser.Math.Between(42, 60), {
+        alpha: 0.90,
+        maxAngle: 16,
+        sway: i % 3 !== 0,
+        swayAmp: 1.6,
+      });
+    }
+
+    const rockX = spX + 610;
+    const rockY = spY - 325;
+    placeLandmarkDeco('boulder_anchor_canvas', rockX, rockY, 190, {
+      alignBottom: true,
+      allowFlip: false,
+      angle: 4,
+      baseCluster: 0.55,
+    });
+    blockCells(rockX, rockY, 2);
+    for (const p of [
+      { dx: -96, dy: 62, key: Phaser.Utils.Array.GetRandom(bushKeys), h: 74 },
+      { dx:  94, dy: 56, key: Phaser.Utils.Array.GetRandom(grassKeys), h: 58 },
+      { dx:  24, dy: 88, key: Phaser.Utils.Array.GetRandom(flowerKeys), h: 56 },
+      { dx: -28, dy: 98, key: Phaser.Utils.Array.GetRandom(mushroomKeys), h: 44 },
+    ]) {
+      placeLandmarkDeco(p.key, rockX + p.dx, rockY + p.dy, p.h, {
+        alignBottom: bushKeys.includes(p.key),
+        maxAngle: 16,
+        alpha: 0.92,
+        baseCluster: bushKeys.includes(p.key) ? 0.36 : 0,
+      });
     }
   };
 
@@ -3010,6 +3255,7 @@ function buildDecorations(scene) {
   addSpawnHubDressing();
   addOcclusionTestGrove();
   addSpawnCamp();
+  addPromptInspiredLandmarks();
   addGrasslandsChokeLines();
 
   const addAnchorCompositions = () => {
@@ -5958,30 +6204,34 @@ function checkClassTierUpgrade(player) {
 const RARE_VARIANTS = { mooham: 'rare_mooham', moowaan: 'rare_moowaan' };
 const RARE_SPAWN_CHANCE = 0.01;
 
-function spawnMonster(scene, typeId) {
-  if (RARE_VARIANTS[typeId] && Math.random() < RARE_SPAWN_CHANCE) {
+function spawnMonster(scene, typeId, opts = {}) {
+  if (!opts.noRare && RARE_VARIANTS[typeId] && Math.random() < RARE_SPAWN_CHANCE) {
     typeId = RARE_VARIANTS[typeId];
   }
   const cfg = MONSTER_TYPES[typeId];
   if (cfg.count === 1 && bloblings.some(m => m.typeId === typeId && m.alive)) return;
   const allowedZones = cfg && cfg.zones;
-  let x, y, tries = 0;
-  let ok = false;
-  while (!ok && tries++ < 60) {
-    x = 200 + Math.random() * (WORLD_W - 400);
-    y = 200 + Math.random() * (WORLD_H - 400);
-    const minDist = cfg.minSpawnDistance || 300;
-    if (player && Math.hypot(x - player.sprite.x, y - player.sprite.y) < minDist) continue;
-    if (allowedZones) {
-      const tile_c = Math.floor(x / TILE_SIZE);
-      const tile_r = Math.floor(y / TILE_SIZE);
-      if (!allowedZones.includes(getZone(tile_r, tile_c))) continue;
+  let x = opts.x;
+  let y = opts.y;
+  let tries = 0;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    let ok = false;
+    while (!ok && tries++ < 60) {
+      x = 200 + Math.random() * (WORLD_W - 400);
+      y = 200 + Math.random() * (WORLD_H - 400);
+      const minDist = cfg.minSpawnDistance || 300;
+      if (player && Math.hypot(x - player.sprite.x, y - player.sprite.y) < minDist) continue;
+      if (allowedZones) {
+        const tile_c = Math.floor(x / TILE_SIZE);
+        const tile_r = Math.floor(y / TILE_SIZE);
+        if (!allowedZones.includes(getZone(tile_r, tile_c))) continue;
+      }
+      ok = true;
     }
-    ok = true;
   }
   bloblings.push(new MonsterController(scene, x, y, typeId));
   delete bossRespawns[typeId];
-  spawnPuff(scene, x, y);
+  if (!opts.skipPuff) spawnPuff(scene, x, y);
   // Boss respawn callout: when a boss-tier monster appears, broadcast a
   // top-screen toast + chime so the player knows the world just refilled.
   if (isBossCfg(cfg) && !cfg.rare && typeof ui !== 'undefined' && ui) {
@@ -5993,6 +6243,26 @@ function spawnMonster(scene, typeId) {
     scene.tweens.add({ targets: toast, alpha: 1, duration: 250, yoyo: true,
       hold: 1300, onComplete: () => toast.destroy() });
     if (typeof sfxLevelUp === 'function') sfxLevelUp();
+  }
+}
+
+function spawnShowcaseMobPod(scene) {
+  if (!player) return;
+  const baseX = WORLD_W / 2 + 540;
+  const baseY = WORLD_H / 2 + 180;
+  const pod = [
+    { type: 'blobling', dx: -72, dy: -18 },
+    { type: 'blobling', dx:  12, dy: -58 },
+    { type: 'blobling', dx:  86, dy:  10 },
+    { type: 'mooham',   dx: -18, dy:  58 },
+  ];
+  for (const p of pod) {
+    const x = baseX + p.dx + Phaser.Math.Between(-10, 10);
+    const y = baseY + p.dy + Phaser.Math.Between(-8, 8);
+    const tile_c = Math.floor(x / TILE_SIZE);
+    const tile_r = Math.floor(y / TILE_SIZE);
+    if (getZone(tile_r, tile_c) !== 'grasslands' || getCellType(tile_r, tile_c) !== 'grass') continue;
+    spawnMonster(scene, p.type, { x, y, noRare: true, skipPuff: true });
   }
 }
 
