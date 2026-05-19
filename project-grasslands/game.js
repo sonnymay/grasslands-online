@@ -1965,6 +1965,85 @@ function buildDecorations(scene) {
       duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
   }
 
+  const addSpawnHubDressing = () => {
+    const groundKey = scene.textures.exists('deco_sand_scuff_soft_01')
+      ? 'deco_sand_scuff_soft_01' : Phaser.Utils.Array.GetRandom(grassKeys);
+    const pebbleKey = scene.textures.exists('deco_pebble_cluster_01')
+      ? 'deco_pebble_cluster_01' : Phaser.Utils.Array.GetRandom(rockKeys);
+    const placeGround = (x, y, key, h, tint, alpha = 0.12) => {
+      if (!scene.textures.exists(key)) return;
+      const img = scene.add.image(x, y, key);
+      img.setScale(h / img.height);
+      img.setAlpha(alpha);
+      img.setAngle(Phaser.Math.Between(0, 359));
+      img.setDepth(-782);
+      img.setTint(tint);
+    };
+    const approach = (dx, dy) => {
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len;
+      const ny = dx / len;
+      for (const dist of [105, 190, 280, 370]) {
+        const cx = spX + dx * dist;
+        const cy = spY + dy * dist;
+        placeGround(cx, cy, groundKey, Phaser.Math.Between(120, 210), 0xd8e0b8, 0.10);
+        for (const side of [-1, 1]) {
+          const px = cx + nx * side * Phaser.Math.Between(44, 62);
+          const py = cy + ny * side * Phaser.Math.Between(24, 38);
+          const flower = Phaser.Utils.Array.GetRandom(flowerKeys);
+          placeLandmarkDeco(flower, px, py, Phaser.Math.Between(42, 58), {
+            maxAngle: 14,
+            alpha: 0.92,
+            sway: true,
+            swayAmp: 2,
+          });
+          if (dist > 160 && tileNoise(Math.floor(py / TILE_SIZE), Math.floor(px / TILE_SIZE), 501) > 0.62) {
+            placeLandmarkDeco(Phaser.Utils.Array.GetRandom(grassKeys), px + nx * side * 18, py + ny * side * 10, 44, {
+              maxAngle: 18,
+              alpha: 0.82,
+              sway: true,
+              swayAmp: 2,
+            });
+          }
+        }
+        if (tileNoise(Math.floor(cy / TILE_SIZE), Math.floor(cx / TILE_SIZE), 502) > 0.70) {
+          placeGround(cx + nx * 18, cy + ny * 10, pebbleKey, Phaser.Math.Between(42, 74), 0xc8c0a8, 0.14);
+        }
+      }
+    };
+    approach(1, 0);
+    approach(-1, 0);
+    approach(0, 1);
+    approach(0, -1);
+
+    const cornerClusters = [
+      { dx: -245, dy: -170 },
+      { dx:  245, dy: -170 },
+      { dx: -245, dy:  175 },
+      { dx:  245, dy:  175 },
+    ];
+    for (const p of cornerClusters) {
+      placeGround(spX + p.dx, spY + p.dy, groundKey, 190, 0xd8e0b8, 0.10);
+      placeLandmarkDeco(Phaser.Utils.Array.GetRandom(bushKeys), spX + p.dx, spY + p.dy + 8, 64, {
+        alignBottom: true,
+        shadow: true,
+        maxAngle: 5,
+      });
+      placeLandmarkDeco(Phaser.Utils.Array.GetRandom(flowerKeys), spX + p.dx + 42, spY + p.dy + 16, 46, {
+        maxAngle: 14,
+        sway: true,
+        swayAmp: 2,
+      });
+      placeLandmarkDeco(Phaser.Utils.Array.GetRandom(grassKeys), spX + p.dx - 38, spY + p.dy - 8, 44, {
+        alpha: 0.86,
+        maxAngle: 18,
+        sway: true,
+        swayAmp: 2,
+      });
+    }
+  };
+  addSpawnHubDressing();
+
   // Grasslands (center) — dense ground cover + scattered focal trees.
   // Counts ~2.5× the pre-19200 baseline so the 9× area doesn't read as
   // sparse, plus cluster passes for the RO-style thicket feel.

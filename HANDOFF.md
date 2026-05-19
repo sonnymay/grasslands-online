@@ -4,19 +4,27 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 7:35 PM CDT — post authored micro-scenes pass.**
+**State as of 2026-05-18 8:04 PM CDT — post spawn hub beauty pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 54 adds authored micro-scenes near
-  landmark approaches and selected road edges so the world feels more
-  intentionally composed instead of only procedurally scattered.
-- **Cache version live in `project-grasslands/index.html`:** `?v=145`.
-- **Next change must use:** `?v=146`.
+- **Latest completed work:** session 55 dresses the spawn plaza approaches
+  with flower-lined paths, soft ground scuffs, pebble details, and corner
+  shrub/flower clusters so the first screen feels more like a town hub.
+- **Cache version live in `project-grasslands/index.html`:** `?v=146`.
+- **Next change must use:** `?v=147`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
 
-**Where we left off (session 54):**
+**Where we left off (session 55):**
+- Added `addSpawnHubDressing()` inside `buildDecorations()`.
+- Spawn now has four decorated approach lanes using soft scuffs, flowers,
+  grass tufts, occasional pebbles, and corner shrub/flower clusters.
+- All new spawn dressing is cosmetic/non-blocking and uses existing assets.
+- No gameplay, combat, progression, controls, UI layout, map dimensions, or
+  monster logic changed.
+
+**Previous state (session 54):**
 - Added `placeSceneGround()`, `placeSceneItem()`, and `addMicroScene()` inside
   `buildDecorations()`.
 - New authored micro-scene pass places small composed patches around landmark
@@ -156,8 +164,8 @@ obvious meaning, is a yes/no/ok acknowledgement, or starts with `/`.
 
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 54, authored
-> micro-scenes pass. Cache `?v=145`).
+> coding sessions. Last refresh: 2026-05-18 (post session 55, spawn hub
+> beauty pass. Cache `?v=146`).
 >
 > (Pre-session-47 header line:) Last refresh: 2026-05-18 (post session 46,
 > `grass_tileset_v2.png` wired as the base grass tileset. Cache `?v=137`).
@@ -365,7 +373,36 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 54 (latest)
+## 3. What we did in session 55 (latest)
+
+Cache now at **`?v=146`**. Sonny asked to keep improving visual beauty after
+each task. This session focuses on first-impression spawn hub polish.
+
+1. **Spawn hub dressing helper.** Added `addSpawnHubDressing()` inside
+   `buildDecorations()`.
+2. **Four approach lanes.** North/south/east/west approaches from the spawn
+   signpost now get soft scuffed ground details and flower/grass edges.
+3. **Corner pockets.** Spawn plaza corners now get small shrub, flower, and
+   grass clusters so the center feels more like a cared-for town hub.
+4. **Readability preserved.** New dressing sits below player/monster labels,
+   HP bars, and props. It is cosmetic and non-blocking.
+5. **Scope preserved.** No gameplay, combat, progression, controls, UI
+   layout, monster logic, saves, map size, or lighting changed.
+6. **Verification.** `node -c project-grasslands/game.js` exited 0.
+7. **Cache bump.** `?v=145` → `?v=146`.
+
+### Next beauty suggestions
+
+1. **Biome identity prop pack.** Generate and wire ruins/desert/riverside
+   hero details: broken wall, statue fragment, bone pile, dry bush,
+   cactus flower, stepping stones, wet shoreline stones.
+2. **Water edge pass.** Riverside should get dedicated shoreline scenes:
+   reeds, wet dirt overlays, stones, flower clumps, and bridge approach
+   dressing.
+3. **Prop style harmonization.** Normalize generated prop scale, tint,
+   shadow size, and alpha stripping so all art feels from one set.
+
+## 3.1. What we did in session 54
 
 Cache now at **`?v=145`**. Sonny asked to keep improving toward a
 Ragnarok Online-like authored map feel. This session adds composed
