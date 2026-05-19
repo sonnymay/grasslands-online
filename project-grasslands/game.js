@@ -750,6 +750,7 @@ function preload() {
   this.load.image('tent_canvas_front_01', 'assets/decorations/tent_canvas_front_01.png');
   this.load.image('tent_canvas_side_01', 'assets/decorations/tent_canvas_side_01.png');
   this.load.image('wooden_cart_01', 'assets/decorations/wooden_cart_01.png?v=199');
+  this.load.image('log_fence_horizontal_01', 'assets/decorations/log_fence_horizontal_01.png?v=200');
   // Decorations
   for (let i = 1; i <= 4; i++) this.load.image(`deco_flower_cluster_0${i}`, `assets/decorations/deco_flower_cluster_0${i}.png`);
   for (let i = 1; i <= 3; i++) this.load.image(`deco_rock_0${i}`, `assets/decorations/deco_rock_0${i}.png`);
@@ -3282,13 +3283,14 @@ function buildDecorations(scene) {
       { dx:   80, dy: 118, angle:  5 },
       { dx:  215, dy: -14, angle: 74 },
     ];
+    const fenceKey = scene.textures.exists('log_fence_horizontal_01') ? 'log_fence_horizontal_01' : 'camp_fence_canvas';
     for (const f of fences) {
-      placeLandmarkDeco('camp_fence_canvas', campX + f.dx, campY + f.dy, 76, {
+      placeLandmarkDeco(fenceKey, campX + f.dx, campY + f.dy, fenceKey === 'log_fence_horizontal_01' ? 82 : 76, {
         alignBottom: true,
         allowFlip: false,
         angle: f.angle,
         baseCluster: 0,
-        contact: { width: 112, height: 16, yOffset: -6, alpha: 0.08, angle: f.angle, scuffs: 5 },
+        contact: { width: fenceKey === 'log_fence_horizontal_01' ? 168 : 112, height: 16, yOffset: -6, alpha: 0.08, angle: f.angle, scuffs: 5 },
       });
     }
     const cartKey = scene.textures.exists('wooden_cart_01') ? 'wooden_cart_01' : 'camp_wagon_canvas';

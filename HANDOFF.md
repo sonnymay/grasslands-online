@@ -4,19 +4,43 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 95 terrain/contact polish pass.**
+**State as of 2026-05-19 — post session 96 camp fence asset pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 95 responds to the latest review that
-  paths still looked airbrushed and structures still read slightly stickered.
-  It sharpens the dirt path rendering and adds structure-only painted contact
-  marks for camp/ruin anchor props without re-enabling generic decoration
-  shadows.
-- **Cache version live in `project-grasslands/index.html`:** `?v=199`.
-- **Next change must use:** `?v=200`.
+- **Latest completed work:** session 96 wires Sonny's generated
+  `log_fence_horizontal_01.png` into the camp scene as the real fence asset,
+  replacing the runtime canvas fence placeholder while preserving the
+  structure-only contact mark approach.
+- **Cache version live in `project-grasslands/index.html`:** `?v=200`.
+- **Next change must use:** `?v=201`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 96):**
+- Goal: continue the asset pipeline after Sonny generated the horizontal log
+  fence PNG in Downloads.
+- Source asset:
+  `/Users/santipapmay/Downloads/log_fence_horizontal_01.png`. It was
+  2048x768 RGB with a fake checkerboard background and no alpha, so it was
+  normalized locally into
+  `project-grasslands/assets/decorations/log_fence_horizontal_01.png`.
+- Final project asset: `log_fence_horizontal_01.png`, 320x120 RGBA with real
+  alpha. The original Downloads file was left untouched.
+- `preload()` now loads `log_fence_horizontal_01` with cache bust `?v=200`.
+- `addSpawnCamp()` now chooses `log_fence_horizontal_01` for camp fences when
+  present, falling back to `camp_fence_canvas` if missing. Existing
+  structure-only contact marks remain applied to the fence placements.
+- Static decoration shadows remain disabled. Do not re-enable
+  `addPropShadow()`.
+- Cache bumped to `game.js?v=200`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md project-grasslands/assets/decorations/log_fence_horizontal_01.png`
+  passed, PNG alpha/dimensions were confirmed, and Chrome preview at
+  `http://localhost:8002/?codex=fence-v200` loaded `game.js?v=200` and
+  `log_fence_horizontal_01.png?v=200` with no current console warnings/errors.
+  The real fence is visible in the spawn camp and reads richer than the old
+  runtime canvas placeholder.
 
 **Where we left off (session 95):**
 - Goal: act on the new review feedback without violating Sonny's earlier
