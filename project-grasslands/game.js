@@ -1994,15 +1994,11 @@ function buildDecorations(scene) {
           placeLandmarkDeco(flower, px, py, Phaser.Math.Between(42, 58), {
             maxAngle: 14,
             alpha: 0.92,
-            sway: true,
-            swayAmp: 2,
           });
           if (dist > 160 && tileNoise(Math.floor(py / TILE_SIZE), Math.floor(px / TILE_SIZE), 501) > 0.62) {
             placeLandmarkDeco(Phaser.Utils.Array.GetRandom(grassKeys), px + nx * side * 18, py + ny * side * 10, 44, {
               maxAngle: 18,
               alpha: 0.82,
-              sway: true,
-              swayAmp: 2,
             });
           }
         }
@@ -2031,14 +2027,10 @@ function buildDecorations(scene) {
       });
       placeLandmarkDeco(Phaser.Utils.Array.GetRandom(flowerKeys), spX + p.dx + 42, spY + p.dy + 16, 46, {
         maxAngle: 14,
-        sway: true,
-        swayAmp: 2,
       });
       placeLandmarkDeco(Phaser.Utils.Array.GetRandom(grassKeys), spX + p.dx - 38, spY + p.dy - 8, 44, {
         alpha: 0.86,
         maxAngle: 18,
-        sway: true,
-        swayAmp: 2,
       });
     }
   };
@@ -2281,7 +2273,7 @@ function buildDecorations(scene) {
       if (getCellType(r, c) !== 'grass') continue;
       const zone = getZone(r, c);
       const pathDir = adjacentPathDir(r, c);
-      if (pathDir && roadBlendCount < 760 && tileNoise(r, c, 301) > 0.16) {
+      if (pathDir && roadBlendCount < 420 && tileNoise(r, c, 301) > 0.34) {
         const key = transitionOverlayKey(zone, zone, true);
         placeGroundTransition(r, c, key, {
           dir: pathDir,
@@ -2291,7 +2283,7 @@ function buildDecorations(scene) {
           tint: blendTint(zone, zone),
           depth: -790,
         });
-        if (tileNoise(r, c, 302) > 0.74) {
+        if (tileNoise(r, c, 302) > 0.86) {
           placeGroundTransition(r, c, transitionOverlayKey(zone, zone, true), {
             dir: pathDir,
             edgeOffset: 18,
@@ -2306,7 +2298,7 @@ function buildDecorations(scene) {
 
       const zones = [...neighborZones(r, c)].filter((z) => z !== zone);
       const neighborZone = zones[0];
-      if (neighborZone && biomeBlendCount < 520 && tileNoise(r, c, 311) > 0.20) {
+      if (neighborZone && biomeBlendCount < 280 && tileNoise(r, c, 311) > 0.36) {
         const key = transitionOverlayKey(zone, neighborZone, false);
         placeGroundTransition(r, c, key, {
           h: Phaser.Math.Between(100, 210),
@@ -2335,10 +2327,10 @@ function buildDecorations(scene) {
     queueScene(lm.r, lm.c - 2, zone);
     queueScene(lm.r, lm.c + 2, zone);
   }
-  for (let r = 2; r < MAP_ROWS - 2 && sceneTiles.length < 92; r++) {
-    for (let c = 2; c < MAP_COLS - 2 && sceneTiles.length < 92; c++) {
+  for (let r = 2; r < MAP_ROWS - 2 && sceneTiles.length < 56; r++) {
+    for (let c = 2; c < MAP_COLS - 2 && sceneTiles.length < 56; c++) {
       if (getCellType(r, c) !== 'grass' || !adjacentPathDir(r, c)) continue;
-      if (tileNoise(r, c, 461) > 0.982) queueScene(r, c);
+      if (tileNoise(r, c, 461) > 0.990) queueScene(r, c);
     }
   }
   const usedSceneTiles = new Set();
@@ -2356,7 +2348,7 @@ function buildDecorations(scene) {
   const softKeys = [...flowerKeys, ...grassKeys];
   // Mid-size overlay layer — sparse and low-alpha so it adds organic
   // variation without drawing attention as another large patch pattern.
-  const softCount = 760;
+  const softCount = 520;
   for (let i = 0; i < softCount; i++) {
     const x = Phaser.Math.Between(0, WORLD_W);
     const y = Phaser.Math.Between(0, WORLD_H);
@@ -2377,7 +2369,7 @@ function buildDecorations(scene) {
 
   // Macro-blob layer — larger, fainter sprites that span multiple tiles,
   // adding broad value variance and breaking long axis-aligned tile rows.
-  const macroCount = 180;
+  const macroCount = 120;
   for (let i = 0; i < macroCount; i++) {
     const x = Phaser.Math.Between(0, WORLD_W);
     const y = Phaser.Math.Between(0, WORLD_H);
@@ -2399,7 +2391,7 @@ function buildDecorations(scene) {
   // Small ground accents — low-contrast pebble/crack/tuft details below
   // props. These make dry and rocky regions feel authored without adding
   // blockers or visual noise around combat readability.
-  const accentCount = 520;
+  const accentCount = 300;
   for (let i = 0; i < accentCount; i++) {
     const x = Phaser.Math.Between(0, WORLD_W);
     const y = Phaser.Math.Between(0, WORLD_H);

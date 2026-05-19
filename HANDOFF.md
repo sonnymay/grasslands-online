@@ -4,19 +4,29 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 8:04 PM CDT — post spawn hub beauty pass.**
+**State as of 2026-05-18 8:10 PM CDT — post visual performance trim.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 55 dresses the spawn plaza approaches
-  with flower-lined paths, soft ground scuffs, pebble details, and corner
-  shrub/flower clusters so the first screen feels more like a town hub.
-- **Cache version live in `project-grasslands/index.html`:** `?v=146`.
-- **Next change must use:** `?v=147`.
+- **Latest completed work:** session 56 trims the recent decoration/overlay
+  budget to reduce lag while keeping the new RO-style terrain beauty layers.
+- **Cache version live in `project-grasslands/index.html`:** `?v=147`.
+- **Next change must use:** `?v=148`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
 
-**Where we left off (session 55):**
+**Where we left off (session 56):**
+- Root cause for lag: recent beauty passes added many always-present display
+  objects and extra sway tweens, especially road/biome blend overlays,
+  soft/macro overlays, accents, and authored micro-scenes.
+- Fix: reduced road blend cap `760 → 420`, biome blend cap `520 → 280`,
+  roadside micro-scene cap `92 → 56`, soft overlays `760 → 520`, macro
+  overlays `180 → 120`, and small accents `520 → 300`.
+- Removed sway tweens from the newest spawn hub dressing flowers/grass.
+- No gameplay, combat, progression, controls, UI layout, map dimensions, or
+  monster logic changed.
+
+**Previous state (session 55):**
 - Added `addSpawnHubDressing()` inside `buildDecorations()`.
 - Spawn now has four decorated approach lanes using soft scuffs, flowers,
   grass tufts, occasional pebbles, and corner shrub/flower clusters.
@@ -164,8 +174,8 @@ obvious meaning, is a yes/no/ok acknowledgement, or starts with `/`.
 
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 55, spawn hub
-> beauty pass. Cache `?v=146`).
+> coding sessions. Last refresh: 2026-05-18 (post session 56, visual
+> performance trim. Cache `?v=147`).
 >
 > (Pre-session-47 header line:) Last refresh: 2026-05-18 (post session 46,
 > `grass_tileset_v2.png` wired as the base grass tileset. Cache `?v=137`).
@@ -373,7 +383,41 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 55 (latest)
+## 3. What we did in session 56 (latest)
+
+Cache now at **`?v=147`**. Sonny reported the game felt a little laggy after
+the recent beauty passes. This session focused on trimming render/update
+cost without removing the overall world-beauty direction.
+
+1. **Root cause.** Recent visual passes added many always-present display
+   objects: road shoulder overlays, biome border overlays, soft/macro
+   ground overlays, small accents, and authored micro-scenes. The spawn
+   hub pass also added several unnecessary sway tweens.
+2. **Reduced static overlay budget.**
+   - Road blend cap: `760 → 420`.
+   - Biome blend cap: `520 → 280`.
+   - Roadside micro-scene cap: `92 → 56`.
+   - Soft overlays: `760 → 520`.
+   - Macro overlays: `180 → 120`.
+   - Small accents: `520 → 300`.
+3. **Reduced tween cost.** Removed sway tweens from the newest spawn hub
+   flowers/grass. They remain static; broader world sway still exists in
+   older grass/flower layers and is already off-screen culled.
+4. **Scope preserved.** No gameplay, combat, progression, controls, UI
+   layout, monster logic, saves, map size, or lighting changed.
+5. **Verification.** `node -c project-grasslands/game.js` exited 0.
+6. **Cache bump.** `?v=146` → `?v=147`.
+
+### Next beauty suggestions
+
+1. **Prefer better assets over more objects.** Next beauty work should add a
+   small number of stronger biome identity sprites, not more scatter layers.
+2. **Use composed landmark packs.** One good ruined wall / bone pile / dock
+   prop can replace dozens of tiny accents.
+3. **Add viewport-aware decoration culling later** if lag persists: keep
+   far-away decorative overlay groups hidden/paused outside camera range.
+
+## 3.1. What we did in session 55
 
 Cache now at **`?v=146`**. Sonny asked to keep improving visual beauty after
 each task. This session focuses on first-impression spawn hub polish.
