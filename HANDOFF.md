@@ -4,18 +4,42 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 96 camp fence asset pass.**
+**State as of 2026-05-19 — post session 97 broken fence asset pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 96 wires Sonny's generated
-  `log_fence_horizontal_01.png` into the camp scene as the real fence asset,
-  replacing the runtime canvas fence placeholder while preserving the
-  structure-only contact mark approach.
-- **Cache version live in `project-grasslands/index.html`:** `?v=200`.
-- **Next change must use:** `?v=201`.
+- **Latest completed work:** session 97 wires Sonny's generated
+  `log_fence_broken_01.png` into the camp scene as the damaged fence segment,
+  adding fence variation without changing the no-generic-decoration-shadow
+  rule.
+- **Cache version live in `project-grasslands/index.html`:** `?v=201`.
+- **Next change must use:** `?v=202`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 97):**
+- Goal: continue the camp asset pipeline after Sonny generated the broken log
+  fence PNG in Downloads.
+- Source asset:
+  `/Users/santipapmay/Downloads/log_fence_broken_01.png`. It was 2048x768
+  RGB with a fake checkerboard background and no alpha, so it was normalized
+  locally into
+  `project-grasslands/assets/decorations/log_fence_broken_01.png`.
+- Final project asset: `log_fence_broken_01.png`, 320x120 RGBA with real
+  alpha. The original Downloads file was left untouched.
+- `preload()` now loads `log_fence_broken_01` with cache bust `?v=201`.
+- `addSpawnCamp()` now uses the broken fence asset for the right-side damaged
+  camp fence segment when present, falling back to the straight fence/canvas
+  fence chain if missing. Existing structure-only contact marks remain applied.
+- Static decoration shadows remain disabled. Do not re-enable
+  `addPropShadow()`.
+- Cache bumped to `game.js?v=201`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md project-grasslands/assets/decorations/log_fence_broken_01.png`
+  passed, PNG alpha/dimensions were confirmed, and local HTTP checks returned
+  200 for `game.js?v=201`, `log_fence_broken_01.png?v=201`, and the index
+  HTML containing `game.js?v=201`. Sonny asked to skip local browser preview
+  and use Gemini Browser for visual feedback instead.
 
 **Where we left off (session 96):**
 - Goal: continue the asset pipeline after Sonny generated the horizontal log
