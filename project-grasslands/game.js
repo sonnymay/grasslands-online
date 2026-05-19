@@ -2363,6 +2363,29 @@ function buildDecorations(scene) {
     }
   };
 
+  const addRuinsWallScene = (tile_r, tile_c, variant = 0) => {
+    if (getCellType(tile_r, tile_c) !== 'grass' || getZone(tile_r, tile_c) !== 'ruins') return;
+    const cx = tile_c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-18, 18);
+    const cy = tile_r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-16, 16);
+    const flip = variant % 2 === 1 ? -1 : 1;
+    const ground = (dx, dy, key, h, tint, alpha) =>
+      placeSceneGround(cx + dx * flip, cy + dy, key, h, { tint, alpha });
+    const item = (dx, dy, key, h, opts = {}) =>
+      placeSceneItem(cx, cy, dx * flip, dy, key, h, opts);
+
+    ground(0, 0, 'deco_stone_dust_soft_01', 240, 0xbfb6a2, 0.16);
+    ground(-42, 22, 'deco_pebble_cluster_01', 100, ruinTint, 0.20);
+    ground(40, -20, 'deco_cracked_earth_01', 96, 0xb8ad96, 0.18);
+    if (ruinsPillarKeys.length) {
+      item(-34, -28, Phaser.Utils.Array.GetRandom(ruinsPillarKeys), 132, { alignBottom: true, shadow: true, maxAngle: 4 });
+    }
+    item(34, 24, Phaser.Utils.Array.GetRandom(rockKeys), 66, { tint: ruinTint, alignBottom: true, shadow: true, maxAngle: 12 });
+    item(74, -10, Phaser.Utils.Array.GetRandom(rockKeys), 52, { tint: ruinTint, alignBottom: true, shadow: true, maxAngle: 12 });
+    if (tileNoise(tile_r, tile_c, 592) > 0.52) {
+      item(-78, 38, Phaser.Utils.Array.GetRandom(bushKeys), 58, { tint: 0xa89878, alignBottom: true, shadow: true, maxAngle: 6 });
+    }
+  };
+
   const identityTiles = [];
   const identityCounts = { grasslands: 0, forest: 0, desert: 0, ruins: 0, riverside: 0 };
   const queueIdentity = (r, c, zoneHint = null) => {
@@ -2446,6 +2469,33 @@ function buildDecorations(scene) {
     if (usedForestGroveTiles.has(key)) continue;
     usedForestGroveTiles.add(key);
     addForestGroveScene(s.r, s.c, Math.floor(tileNoise(s.r, s.c, 571) * 4));
+  }
+
+  const ruinsWallTiles = [];
+  const queueRuinsWall = (r, c) => {
+    if (r <= 1 || c <= 1 || r >= MAP_ROWS - 2 || c >= MAP_COLS - 2) return;
+    if (ruinsWallTiles.length >= 16) return;
+    if (getCellType(r, c) !== 'grass' || getZone(r, c) !== 'ruins') return;
+    if (!adjacentPathDir(r, c) && !nearZoneBoundary(r, c)) return;
+    ruinsWallTiles.push({ r, c });
+  };
+  for (const lm of landmarkTiles().filter((p) => getZone(p.r, p.c) === 'ruins')) {
+    queueRuinsWall(lm.r - 2, lm.c - 1);
+    queueRuinsWall(lm.r + 2, lm.c - 1);
+    queueRuinsWall(lm.r - 1, lm.c + 2);
+    queueRuinsWall(lm.r + 1, lm.c + 2);
+  }
+  for (let r = 2; r < MAP_ROWS - 2 && ruinsWallTiles.length < 16; r++) {
+    for (let c = 2; c < MAP_COLS - 2 && ruinsWallTiles.length < 16; c++) {
+      if (tileNoise(r, c, 581) > 0.992) queueRuinsWall(r, c);
+    }
+  }
+  const usedRuinsWallTiles = new Set();
+  for (const s of ruinsWallTiles) {
+    const key = `${s.r},${s.c}`;
+    if (usedRuinsWallTiles.has(key)) continue;
+    usedRuinsWallTiles.add(key);
+    addRuinsWallScene(s.r, s.c, Math.floor(tileNoise(s.r, s.c, 591) * 4));
   }
 
   let roadBlendCount = 0;

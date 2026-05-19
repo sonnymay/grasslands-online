@@ -4,16 +4,28 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 8:56 PM CDT — post forest grove dressing pass.**
+**State as of 2026-05-18 9:19 PM CDT — post ruins wall dressing pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 59 adds capped forest grove dressing
-  around shrine/path approaches with existing assets.
-- **Cache version live in `project-grasslands/index.html`:** `?v=150`.
-- **Next change must use:** `?v=151`.
+- **Latest completed work:** session 60 adds capped ruins wall dressing around
+  well/path approaches with existing assets.
+- **Cache version live in `project-grasslands/index.html`:** `?v=151`.
+- **Next change must use:** `?v=152`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 60):**
+- Goal: make the western ruins feel more like broken architecture instead of
+  generic rock scatter.
+- Added `addRuinsWallScene()` inside `buildDecorations()` and capped it at 16
+  placed scenes.
+- Ruins wall scenes appear around ruins landmark/path approaches and rare ruins
+  edge tiles, using low-alpha stone dust, pebbles, cracked earth, pillars,
+  rocks, and occasional dead bushes.
+- All new ruins wall dressing is cosmetic and non-blocking. No gameplay,
+  combat, progression, controls, UI layout, map dimensions, saves, or monster
+  logic changed.
 
 **Where we left off (session 59):**
 - Goal: make the forest feel more like an authored RO-style shrine grove
@@ -422,7 +434,36 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 59 (latest)
+## 3. What we did in session 60 (latest)
+
+Cache now at **`?v=151`**. Sonny asked to keep making the map beautiful and
+impressive like Ragnarok Online. This session rotates from forest to ruins
+and adds stronger broken-architecture pockets with existing art.
+
+1. **Added ruins wall dressing.** Added `addRuinsWallScene()` inside
+   `buildDecorations()` to compose small broken-wall / shrine-approach scenes.
+2. **Kept placement capped.** Ruins wall scenes are capped at 16 and appear
+   around ruins well/path approaches plus rare ruins edge tiles.
+3. **Used existing art only.** Scenes combine low-alpha stone dust, pebble
+   clusters, cracked earth, broken pillars, rocks, and occasional dead bushes.
+4. **Performance scope preserved.** This is a small authored set-piece pass,
+   not broad scatter. No blockers were added.
+5. **Scope preserved.** No gameplay, combat, progression, controls, UI
+   layout, monster logic, saves, map size, or lighting changed.
+6. **Verification.** `node -c project-grasslands/game.js` exited 0.
+7. **Cache bump.** `?v=150` -> `?v=151`.
+
+### Next beauty suggestions
+
+1. **Desert oasis/bone-yard pass.** Existing cactus, rock, sand, and crack art
+   can make stronger authored pockets until new hero props arrive.
+2. **Spawn-to-biome road storytelling.** Add tiny capped scene beats along the
+   four major roads so first-time walks feel hand-placed.
+3. **Generate true biome hero props.** Highest impact remains ruined wall,
+   desert bone pile, dry bush, cactus flower, riverside stepping stones, and
+   shoreline mud/stone overlays.
+
+## 3.1. What we did in session 59
 
 Cache now at **`?v=150`**. Sonny approved continuing visual improvement
 toward a Ragnarok Online-like authored map feel. This session rotates from
