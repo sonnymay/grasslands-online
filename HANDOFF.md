@@ -4,19 +4,33 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 6:54 PM CDT — post full-world terrain cohesion pass.**
+**State as of 2026-05-18 7:03 PM CDT — post terrain detail asset wiring.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 51 improves full-world terrain visuals
-  beyond grass: clustered desert/ruins/stone ground selection, blended biome
-  transitions, and low-alpha dry/rock overlay accents.
-- **Cache version live in `project-grasslands/index.html`:** `?v=142`.
-- **Next change must use:** `?v=143`.
+- **Latest completed work:** session 52 imports and wires five generated
+  terrain-detail overlays: sand scuff, stone dust, cracked earth, pebbles,
+  and dry grass tuft.
+- **Cache version live in `project-grasslands/index.html`:** `?v=143`.
+- **Next change must use:** `?v=144`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
 
-**Where we left off (session 51):**
+**Where we left off (session 52):**
+- Five generated terrain-detail PNGs were moved from Downloads into
+  `project-grasslands/assets/decorations/`, resized to game-ready dimensions,
+  preloaded, and included in `keyOutWhite()` because the source files have no
+  alpha channel.
+- New asset filenames now wired:
+  `deco_sand_scuff_soft_01.png`, `deco_stone_dust_soft_01.png`,
+  `deco_cracked_earth_01.png`, `deco_pebble_cluster_01.png`,
+  `deco_dry_grass_tuft_01.png`.
+- These assets are now picked up by the session-51 overlay logic for desert,
+  ruins, and biome transition accents.
+- No gameplay, combat, progression, controls, UI layout, map dimensions, or
+  monster logic changed.
+
+**Previous state (session 51):**
 - Root cause: desert/ruins/rock ground still looked like pasted squares
   because `buildMap()` used independent per-tile random rolls for terrain
   categories. That produced noise, not natural clustered terrain.
@@ -119,8 +133,8 @@ obvious meaning, is a yes/no/ok acknowledgement, or starts with `/`.
 
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 51, full-world
-> terrain cohesion pass. Cache `?v=142`).
+> coding sessions. Last refresh: 2026-05-18 (post session 52, terrain detail
+> asset wiring. Cache `?v=143`).
 >
 > (Pre-session-47 header line:) Last refresh: 2026-05-18 (post session 46,
 > `grass_tileset_v2.png` wired as the base grass tileset. Cache `?v=137`).
@@ -328,7 +342,33 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 51 (latest)
+## 3. What we did in session 52 (latest)
+
+Cache now at **`?v=143`**. Sonny generated the five terrain detail images
+requested after session 51 and dropped them in Downloads.
+
+1. **Moved generated terrain assets into the project.**
+   - `deco_sand_scuff_soft_01.png`
+   - `deco_stone_dust_soft_01.png`
+   - `deco_pebble_cluster.png` → renamed to
+     `deco_pebble_cluster_01.png`
+   - `deco_cracked_earth_01.png`
+   - `deco_dry_grass_tuft_01.png`
+2. **Resized assets to game-ready dimensions.**
+   - Sand scuff: `256×256`
+   - Stone dust: `256×256`
+   - Pebble cluster: `192×192`
+   - Cracked earth: `192×192`
+   - Dry grass tuft: `128×192`
+3. **Wired preload.** Added all five keys to `preload()` so the session-51
+   ground overlay selection can use the purpose-built sprites instead of
+   fallback rocks/grass/dunes.
+4. **White-background stripping.** Source PNGs still reported `hasAlpha: no`,
+   so all five keys were added to the `keyOutWhite()` list.
+5. **Cache bump.** `?v=142` → `?v=143`.
+6. **Verification.** `node -c project-grasslands/game.js` exited 0.
+
+## 3.1. What we did in session 51
 
 Cache now at **`?v=142`**. Sonny said grass was better but the whole world
 still felt like a pasted-square grid, especially rock and desert terrain.

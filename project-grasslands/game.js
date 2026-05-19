@@ -724,6 +724,11 @@ function preload() {
   this.load.image('forest_fern_01', 'assets/decorations/forest_fern_01.png');
   this.load.image('ruins_pillar_broken_01', 'assets/decorations/ruins_pillar_broken_01.png');
   this.load.image('riverside_cattail_01', 'assets/decorations/riverside_cattail_01.png');
+  this.load.image('deco_sand_scuff_soft_01', 'assets/decorations/deco_sand_scuff_soft_01.png');
+  this.load.image('deco_stone_dust_soft_01', 'assets/decorations/deco_stone_dust_soft_01.png');
+  this.load.image('deco_cracked_earth_01', 'assets/decorations/deco_cracked_earth_01.png');
+  this.load.image('deco_pebble_cluster_01', 'assets/decorations/deco_pebble_cluster_01.png');
+  this.load.image('deco_dry_grass_tuft_01', 'assets/decorations/deco_dry_grass_tuft_01.png');
   this.load.image('landmark_spawn_signpost', 'assets/decorations/landmark_spawn_signpost.png');
   this.load.image('landmark_forest_shrine', 'assets/decorations/landmark_forest_shrine.png');
   this.load.image('landmark_desert_obelisk', 'assets/decorations/landmark_desert_obelisk.png');
@@ -824,6 +829,8 @@ function create() {
     'deco_flower_cluster_01','deco_flower_cluster_02','deco_flower_cluster_03','deco_flower_cluster_04',
     'deco_rock_01','deco_rock_02','deco_rock_03',
     'deco_tallgrass_01','deco_tallgrass_02','deco_tallgrass_03',
+    'deco_sand_scuff_soft_01','deco_stone_dust_soft_01',
+    'deco_cracked_earth_01','deco_pebble_cluster_01','deco_dry_grass_tuft_01',
     'tree_oak_01','tree_pine_02','tree_round_03',
     'bush_01','bush_02',
     'mushroom_red_01','mushroom_brown_02',
