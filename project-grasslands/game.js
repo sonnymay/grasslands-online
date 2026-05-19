@@ -5484,7 +5484,7 @@ class UIManager {
     };
 
     // Bottom status band — slim full-width player HUD bar.
-    this.bottomH = 56;
+    this.bottomH = 76;
     this.bar = scene.add.rectangle(0, GAME_H - this.bottomH, GAME_W, this.bottomH, 0x17100a, 0.90)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10000)
       .setStrokeStyle(2, PANEL_STROKE, 0.95);
@@ -5497,8 +5497,8 @@ class UIManager {
     const expX = hpX + this.hpBarW + 28;
     this.expBarW = Math.max(220, statusX - expX - 28);
     const expY = hpY;
-    const panelH = 30;
-    const barH = 16;
+    const panelH = 40;
+    const barH = 24;
 
     this.hpPanel = scene.add.rectangle(hpX - 8, hpY - panelH / 2, this.hpBarW + 16, panelH, PANEL_FILL, 0.72)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10001)
@@ -5508,7 +5508,7 @@ class UIManager {
     this.hpFill = scene.add.rectangle(hpX, hpY, this.hpBarW, barH, 0xcc3333)
       .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10003);
     this.hpText = scene.add.text(hpX + this.hpBarW / 2, hpY, '', {
-      fontSize: '15px', fontStyle: 'bold', color: '#fff7ef', stroke: '#000', strokeThickness: 3,
+      fontSize: '20px', fontStyle: 'bold', color: '#fff7ef', stroke: '#000', strokeThickness: 4,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
 
     this.expPanel = scene.add.rectangle(expX - 8, expY - panelH / 2, this.expBarW + 16, panelH, PANEL_FILL, 0.72)
@@ -5519,22 +5519,22 @@ class UIManager {
     this.expFill = scene.add.rectangle(expX, expY, this.expBarW, barH, 0x8e50d6)
       .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10003);
     this.expText = scene.add.text(expX + this.expBarW / 2, expY, '', {
-      fontSize: '15px', fontStyle: 'bold', color: '#fff7ef', stroke: '#000', strokeThickness: 3,
+      fontSize: '20px', fontStyle: 'bold', color: '#fff7ef', stroke: '#000', strokeThickness: 4,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
 
     // Bottom-right status panel: Lv on the left edge, Zeny on the right
     // edge, with a thin vertical divider so the two values can never run
     // into each other regardless of width.
-    this.statusPanel = scene.add.rectangle(statusX, bottomY + (this.bottomH - 36) / 2, statusW, 36, PANEL_FILL, 0.78)
+    this.statusPanel = scene.add.rectangle(statusX, bottomY + (this.bottomH - 48) / 2, statusW, 48, PANEL_FILL, 0.78)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10001)
       .setStrokeStyle(1, PANEL_GOLD, 0.75);
-    this.statusDivider = scene.add.rectangle(statusX + Math.floor(statusW * 0.42), bottomY + (this.bottomH - 22) / 2, 1, 22, 0xffe066, 0.45)
+    this.statusDivider = scene.add.rectangle(statusX + Math.floor(statusW * 0.42), bottomY + (this.bottomH - 30) / 2, 1, 30, 0xffe066, 0.45)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10002);
     this.lvlText = scene.add.text(statusX + 14, hpY, 'Lv.1', {
-      fontSize: '17px', fontStyle: 'bold', color: '#ffff88', stroke: '#000', strokeThickness: 3,
+      fontSize: '24px', fontStyle: 'bold', color: '#ffff88', stroke: '#000', strokeThickness: 4,
     }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(10004);
     this.zenyText = scene.add.text(statusX + statusW - 14, hpY, '0z', {
-      fontSize: '15px', fontStyle: 'bold', color: '#ffd24a', stroke: '#000', strokeThickness: 3,
+      fontSize: '19px', fontStyle: 'bold', color: '#ffd24a', stroke: '#000', strokeThickness: 4,
     }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10004);
 
     // Auto-save indicator — dim idle glyph that pulses whenever saveGame()
@@ -5703,7 +5703,7 @@ class UIManager {
     // and overleveled enemies. Sits right below the mute button.
     const AP_KEY = 'grasslands_autopilot_v1';
     try { autopilotOn = localStorage.getItem(AP_KEY) === '1'; } catch (e) { autopilotOn = false; }
-    row = addToolbarButton(autopilotOn ? '⚙ Auto: ON' : '⚙ Auto: OFF', 'toggle');
+    row = addToolbarButton(autopilotOn ? '⚙ Autopilot: ON' : '⚙ Autopilot: OFF', 'toggle');
     this.apBg = row.bg;
     this.apText = row.text;
     this.apBg.setFillStyle(autopilotOn ? 0x264c2d : TOOLBAR_FILL, 0.88);
@@ -5712,7 +5712,7 @@ class UIManager {
     this.apBg.on('pointerdown', () => {
       autopilotOn = !autopilotOn;
       autopilotLastScan = 0; // force immediate scan on next update tick
-      this.apText.setText(autopilotOn ? '⚙ Auto: ON' : '⚙ Auto: OFF');
+      this.apText.setText(autopilotOn ? '⚙ Autopilot: ON' : '⚙ Autopilot: OFF');
       this.apText.setColor(autopilotOn ? '#ddffdd' : TOOLBAR_MUTED);
       this.apBg.setFillStyle(autopilotOn ? 0x264c2d : TOOLBAR_FILL, 0.88);
       this.apBg.setStrokeStyle(2, autopilotOn ? 0x8ee894 : TOOLBAR_STROKE, autopilotOn ? 0.95 : 0.82);
@@ -6026,10 +6026,10 @@ class UIManager {
     this.expBg.width = this.expBarW; this.expBg.displayWidth = this.expBarW;
     this.expFill.x = expX; this.expFill.y = midY;
     this.expText.x = expX + this.expBarW / 2; this.expText.y = midY;
-    this.statusPanel.x = statusX; this.statusPanel.y = bottomY + (this.bottomH - 36) / 2;
+    this.statusPanel.x = statusX; this.statusPanel.y = bottomY + (this.bottomH - 48) / 2;
     if (this.statusDivider) {
       this.statusDivider.x = statusX + Math.floor(statusW * 0.42);
-      this.statusDivider.y = bottomY + (this.bottomH - 22) / 2;
+      this.statusDivider.y = bottomY + (this.bottomH - 30) / 2;
     }
     this.lvlText.x = statusX + 14; this.lvlText.y = midY;
     this.zenyText.x = statusX + statusW - 14; this.zenyText.y = midY;
