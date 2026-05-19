@@ -495,7 +495,37 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 63 (latest)
+## 3. What we did in session 65 (latest)
+
+Cache now at **`?v=156`**. Sonny: "Improve the Choose Your Path
+character cards so they are easier to click and look more polished."
+Pure UI polish — no class stats, tier logic, save schema, or selection
+behavior changed.
+
+1. **Bigger cards.** `cardW × cardH` 230×330 → 250×360, gap 38 → 44.
+2. **Easier targets.** `cardGroup` hit area extends `hitPad = 18` px
+   past the card edge so near-misses still register as clicks.
+3. **Polished typography.** `nameText` 26 → 28 px, flavor 13 → 14,
+   role 11 → 12. Re-laid for the taller card
+   (y 86/115/138 → 96/128/156).
+4. **CTA reads as a button.** Bottom `chooseText` 12 → 15 px bold. On
+   hover brightens to `#ffffff` with `#5a3a00` stroke; reverts on
+   `pointerout`.
+5. **Press-down feedback.** `pointerdown` plays a quick `scale: 0.96`
+   yoyo (70 ms) and `selectClass()` fires `onComplete`, so the click
+   feels confirmed.
+6. **Recommended ribbon.** Swordsman card gets a gold pill
+   `★ RECOMMENDED` on the top-right (`#ffd24a` fill, white stroke,
+   drop shadow), guiding new players toward the easiest start.
+7. **Hover lift bumped.** `scale: 1.025 → 1.03` for a clearer hover
+   state on the larger cards.
+8. **Verification.** `node -c project-grasslands/game.js` exited 0.
+   Browser preview verification skipped — loader wedged at 21 % after
+   several restarts (known audio decoder hang from rapid reloads).
+   Open + close the preview cleanly to confirm next session.
+9. **Cache bump.** `?v=155` → `?v=156`.
+
+## 3.1. What we did in session 63
 
 Cache now at **`?v=154`**. Sonny pointed out that the "Choose Your Path"
 class cards were hard to click and did not look good. This session targets
@@ -2793,7 +2823,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=141`**. Next change should use `?v=142`.
+  change. Current: **`?v=156`**. Next change should use `?v=157`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 

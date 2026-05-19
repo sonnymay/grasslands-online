@@ -1438,6 +1438,22 @@ function neighborZones(r, c) {
   return zones;
 }
 
+function terrainBlendAsset(zone, neighborZone = zone) {
+  if (zone === 'desert' || neighborZone === 'desert') return 'floor_sand_wash_soft_01';
+  if (zone === 'ruins' || neighborZone === 'ruins') return 'floor_stone_dust_soft_01';
+  if (zone === 'riverside' || neighborZone === 'riverside') return 'floor_wet_mud_soft_01';
+  if (zone === 'forest' || neighborZone === 'forest') return 'floor_forest_moss_soft_01';
+  return 'floor_grass_blob_soft_01';
+}
+
+function terrainBlendTint(zone, neighborZone = zone) {
+  if (zone === 'desert' || neighborZone === 'desert') return 0xd8bd78;
+  if (zone === 'ruins' || neighborZone === 'ruins') return 0xbfb6a2;
+  if (zone === 'riverside' || neighborZone === 'riverside') return 0xbfd8c8;
+  if (zone === 'forest' || neighborZone === 'forest') return 0xb8d8a0;
+  return 0xd8e0b8;
+}
+
 function pickNaturalGroundTile(zone, r, c, type) {
   if (type === 'path_cross' || type === 'path_open') return TILE.DIRT_OPEN;
   if (type === 'path_h') return tileNoise(r, c, 101) < 0.55 ? TILE.DIRT_H : TILE.DIRT_H2;
@@ -1549,6 +1565,69 @@ function buildMap(scene) {
         if (tint && tint !== 0xffffff) img.setTint(tint);
       }
       img.setDepth(-1000);
+    }
+  }
+
+  addTerrainSeamBlends(scene);
+}
+
+function addTerrainSeamBlends(scene) {
+  const dirs = [
+    { dr: -1, dc: 0, angle: 0, ox: 0, oy: -TILE_SIZE / 2 },
+    { dr: 1, dc: 0, angle: 0, ox: 0, oy: TILE_SIZE / 2 },
+    { dr: 0, dc: -1, angle: 90, ox: -TILE_SIZE / 2, oy: 0 },
+    { dr: 0, dc: 1, angle: 90, ox: TILE_SIZE / 2, oy: 0 },
+  ];
+  let seamCount = 0;
+  let cornerCount = 0;
+
+  const addSeam = (r, c, zone, neighborZone, dir) => {
+    const key = terrainBlendAsset(zone, neighborZone);
+    if (!scene.textures.exists(key)) return;
+    const noise = tileNoise(r, c, 731 + dir.dr * 11 + dir.dc * 17);
+    const x = c * TILE_SIZE + TILE_SIZE / 2 + dir.ox + Phaser.Math.Between(-18, 18);
+    const y = r * TILE_SIZE + TILE_SIZE / 2 + dir.oy + Phaser.Math.Between(-16, 16);
+    const img = scene.add.image(x, y, key);
+    img.setDisplaySize(
+      Phaser.Math.Between(250, 410),
+      Phaser.Math.Between(110, 185)
+    );
+    img.setAngle(dir.angle + Phaser.Math.Between(-5, 5));
+    img.setAlpha(Phaser.Math.FloatBetween(0.18, 0.32));
+    img.setTint(terrainBlendTint(zone, neighborZone));
+    img.setDepth(-940 + noise * 4);
+    seamCount++;
+  };
+
+  const addCorner = (r, c, zone, zones) => {
+    const neighborZone = zones.find((z) => z !== zone) || zone;
+    const key = terrainBlendAsset(zone, neighborZone);
+    if (!scene.textures.exists(key)) return;
+    const x = c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-34, 34);
+    const y = r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-30, 30);
+    const img = scene.add.image(x, y, key);
+    img.setScale(Phaser.Math.Between(430, 700) / img.height);
+    img.setAngle(Phaser.Math.Between(0, 359));
+    img.setAlpha(Phaser.Math.FloatBetween(0.12, 0.22));
+    img.setTint(terrainBlendTint(zone, neighborZone));
+    img.setDepth(-945);
+    cornerCount++;
+  };
+
+  for (let r = 1; r < MAP_ROWS - 1; r++) {
+    for (let c = 1; c < MAP_COLS - 1; c++) {
+      if (getCellType(r, c) !== 'grass') continue;
+      const zone = getZone(r, c);
+      const touchingZones = new Set([zone]);
+      for (const dir of dirs) {
+        const neighborZone = getZone(r + dir.dr, c + dir.dc);
+        touchingZones.add(neighborZone);
+        if (neighborZone === zone) continue;
+        if (seamCount < 900) addSeam(r, c, zone, neighborZone, dir);
+      }
+      if (touchingZones.size >= 3 && cornerCount < 160 && tileNoise(r, c, 743) > 0.18) {
+        addCorner(r, c, zone, [...touchingZones]);
+      }
     }
   }
 }
