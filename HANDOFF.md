@@ -4,16 +4,28 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 8:41 PM CDT — post riverside shoreline dressing pass.**
+**State as of 2026-05-18 8:56 PM CDT — post forest grove dressing pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 58 adds capped riverside shoreline
-  dressing around bridge/path approaches with existing assets.
-- **Cache version live in `project-grasslands/index.html`:** `?v=149`.
-- **Next change must use:** `?v=150`.
+- **Latest completed work:** session 59 adds capped forest grove dressing
+  around shrine/path approaches with existing assets.
+- **Cache version live in `project-grasslands/index.html`:** `?v=150`.
+- **Next change must use:** `?v=151`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 59):**
+- Goal: make the forest feel more like an authored RO-style shrine grove
+  without adding new art or broad scatter.
+- Added `addForestGroveScene()` inside `buildDecorations()` and capped it at
+  16 placed scenes.
+- Grove scenes appear around forest landmark/path approaches and rare forest
+  edge tiles, using low-alpha ground dust/scuffs, ferns, mushrooms, grass, and
+  occasional trees.
+- All new forest grove dressing is cosmetic and non-blocking. No gameplay,
+  combat, progression, controls, UI layout, map dimensions, saves, or monster
+  logic changed.
 
 **Where we left off (session 58):**
 - Goal: make the riverside feel more hand-authored without adding new art or
@@ -410,7 +422,36 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 58 (latest)
+## 3. What we did in session 59 (latest)
+
+Cache now at **`?v=150`**. Sonny approved continuing visual improvement
+toward a Ragnarok Online-like authored map feel. This session rotates from
+riverside to forest and keeps the pass small, capped, and existing-art-only.
+
+1. **Added forest grove dressing.** Added `addForestGroveScene()` inside
+   `buildDecorations()` to compose shrine-grove pockets.
+2. **Kept placement capped.** Grove scenes are capped at 16 and appear around
+   forest shrine/path approaches plus rare forest edge tiles.
+3. **Used existing art only.** Scenes combine low-alpha stone dust/scuffs,
+   ferns, mushrooms, grass, and occasional trees.
+4. **Performance scope preserved.** This is a small authored set-piece pass,
+   not broad scatter. No blockers were added.
+5. **Scope preserved.** No gameplay, combat, progression, controls, UI
+   layout, monster logic, saves, map size, or lighting changed.
+6. **Verification.** `node -c project-grasslands/game.js` exited 0.
+7. **Cache bump.** `?v=149` -> `?v=150`.
+
+### Next beauty suggestions
+
+1. **Ruins shrine-wall pass.** Use existing pillar/rock/crack art to make the
+   western ruins feel more like broken architecture.
+2. **Desert oasis/bone-yard pass.** Existing cactus, rock, sand, and crack art
+   can make stronger authored pockets until new hero props arrive.
+3. **Generate true biome hero props.** Highest impact remains ruined wall,
+   desert bone pile, dry bush, cactus flower, riverside stepping stones, and
+   shoreline mud/stone overlays.
+
+## 3.1. What we did in session 58
 
 Cache now at **`?v=149`**. No new downloaded hero prop was present, so this
 session continued the hand-authored-map direction with existing art and a

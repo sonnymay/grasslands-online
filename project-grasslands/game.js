@@ -2340,6 +2340,29 @@ function buildDecorations(scene) {
     }
   };
 
+  const addForestGroveScene = (tile_r, tile_c, variant = 0) => {
+    if (getCellType(tile_r, tile_c) !== 'grass' || getZone(tile_r, tile_c) !== 'forest') return;
+    const cx = tile_c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-16, 16);
+    const cy = tile_r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-14, 14);
+    const flip = variant % 2 === 1 ? -1 : 1;
+    const ground = (dx, dy, key, h, tint, alpha) =>
+      placeSceneGround(cx + dx * flip, cy + dy, key, h, { tint, alpha });
+    const item = (dx, dy, key, h, opts = {}) =>
+      placeSceneItem(cx, cy, dx * flip, dy, key, h, opts);
+
+    ground(0, 0, 'deco_stone_dust_soft_01', 210, 0xa8c898, 0.09);
+    ground(-34, 22, 'deco_sand_scuff_soft_01', 150, 0xb8d8a0, 0.07);
+    item(-48, 8, Phaser.Utils.Array.GetRandom(forestFernKeys), 68, { tint: forestTint, alpha: 0.94, maxAngle: 12, sway: true, swayAmp: 1.8 });
+    item(36, -20, Phaser.Utils.Array.GetRandom(mushroomKeys), 48, { maxAngle: 8 });
+    item(58, 26, Phaser.Utils.Array.GetRandom(grassKeys), 54, { tint: forestTint, alpha: 0.84, maxAngle: 16, sway: true, swayAmp: 1.8 });
+    if (tileNoise(tile_r, tile_c, 561) > 0.38) {
+      item(-8, -42, Phaser.Utils.Array.GetRandom(treeKeys), 146, { tint: forestTint, alignBottom: true, shadow: true, maxAngle: 3 });
+    }
+    if (tileNoise(tile_r, tile_c, 562) > 0.54) {
+      item(74, 42, Phaser.Utils.Array.GetRandom(mushroomKeys), 42, { maxAngle: 8 });
+    }
+  };
+
   const identityTiles = [];
   const identityCounts = { grasslands: 0, forest: 0, desert: 0, ruins: 0, riverside: 0 };
   const queueIdentity = (r, c, zoneHint = null) => {
@@ -2396,6 +2419,33 @@ function buildDecorations(scene) {
     if (usedShorelineTiles.has(key)) continue;
     usedShorelineTiles.add(key);
     addShorelineScene(s.r, s.c, Math.floor(tileNoise(s.r, s.c, 541) * 4));
+  }
+
+  const forestGroveTiles = [];
+  const queueForestGrove = (r, c) => {
+    if (r <= 1 || c <= 1 || r >= MAP_ROWS - 2 || c >= MAP_COLS - 2) return;
+    if (forestGroveTiles.length >= 16) return;
+    if (getCellType(r, c) !== 'grass' || getZone(r, c) !== 'forest') return;
+    if (!adjacentPathDir(r, c) && !nearZoneBoundary(r, c)) return;
+    forestGroveTiles.push({ r, c });
+  };
+  for (const lm of landmarkTiles().filter((p) => getZone(p.r, p.c) === 'forest')) {
+    queueForestGrove(lm.r - 2, lm.c - 1);
+    queueForestGrove(lm.r - 2, lm.c + 1);
+    queueForestGrove(lm.r + 1, lm.c - 2);
+    queueForestGrove(lm.r + 1, lm.c + 2);
+  }
+  for (let r = 2; r < MAP_ROWS - 2 && forestGroveTiles.length < 16; r++) {
+    for (let c = 2; c < MAP_COLS - 2 && forestGroveTiles.length < 16; c++) {
+      if (tileNoise(r, c, 551) > 0.992) queueForestGrove(r, c);
+    }
+  }
+  const usedForestGroveTiles = new Set();
+  for (const s of forestGroveTiles) {
+    const key = `${s.r},${s.c}`;
+    if (usedForestGroveTiles.has(key)) continue;
+    usedForestGroveTiles.add(key);
+    addForestGroveScene(s.r, s.c, Math.floor(tileNoise(s.r, s.c, 571) * 4));
   }
 
   let roadBlendCount = 0;
