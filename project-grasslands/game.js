@@ -1638,6 +1638,7 @@ function buildMap(scene) {
   }
   addPathWashes(scene);
   addBiomeWash(scene);
+  addTerrainRelief(scene);
   addGrassTones(scene);
 }
 
@@ -1841,6 +1842,83 @@ function addBiomeWash(scene) {
       }
     }
   });
+}
+
+// Pseudo-2.5D terrain cues. RO's real depth comes from 3D terrain; this pass
+// fakes a little of that with hand-painted ridge/bank strokes on the ground
+// layer instead of prop shadows or tile-height changes.
+function addTerrainRelief(scene) {
+  const g = scene.add.graphics().setDepth(-958);
+  const pathDir = (r, c) => {
+    const dirs = [
+      { dr: -1, dc: 0 }, { dr: 1, dc: 0 },
+      { dr: 0, dc: -1 }, { dr: 0, dc: 1 },
+    ];
+    return dirs.find(({ dr, dc }) => {
+      const nr = Phaser.Math.Clamp(r + dr, 0, MAP_ROWS - 1);
+      const nc = Phaser.Math.Clamp(c + dc, 0, MAP_COLS - 1);
+      return getCellType(nr, nc) !== 'grass';
+    });
+  };
+  const boundaryDir = (r, c) => {
+    const z = getZone(r, c);
+    const dirs = [
+      { dr: -1, dc: 0 }, { dr: 1, dc: 0 },
+      { dr: 0, dc: -1 }, { dr: 0, dc: 1 },
+    ];
+    return dirs.find(({ dr, dc }) => {
+      const nr = Phaser.Math.Clamp(r + dr, 0, MAP_ROWS - 1);
+      const nc = Phaser.Math.Clamp(c + dc, 0, MAP_COLS - 1);
+      return getZone(nr, nc) !== z;
+    });
+  };
+  const reliefTint = (zone) => ({
+    grasslands: { hi: 0xcfe2a2, lo: 0x375f2f },
+    forest:     { hi: 0xaec995, lo: 0x243f24 },
+    desert:     { hi: 0xf0cd83, lo: 0x8a6638 },
+    ruins:      { hi: 0xd4c9ae, lo: 0x5a5548 },
+    riverside:  { hi: 0xb9dfc9, lo: 0x32686d },
+  }[zone] || { hi: 0xd5e2ad, lo: 0x365f31 });
+  const stroke = (x, y, dir, zone, salt, strength = 1) => {
+    const tangentX = dir.dr !== 0 ? 1 : 0;
+    const tangentY = dir.dc !== 0 ? 1 : 0;
+    const len = 34 + tileNoise(Math.floor(y / TILE_SIZE), Math.floor(x / TILE_SIZE), salt) * 72;
+    const wobble = (tileNoise(Math.floor(y / TILE_SIZE), Math.floor(x / TILE_SIZE), salt + 1) - 0.5) * 18;
+    const ox = tangentY ? wobble : 0;
+    const oy = tangentX ? wobble : 0;
+    const tint = reliefTint(zone);
+    g.lineStyle(3, tint.lo, 0.08 * strength);
+    g.lineBetween(x - tangentX * len * 0.5 + ox, y - tangentY * len * 0.5 + oy + 5,
+      x + tangentX * len * 0.5 + ox, y + tangentY * len * 0.5 + oy + 5);
+    g.lineStyle(1, tint.hi, 0.11 * strength);
+    g.lineBetween(x - tangentX * len * 0.45 + ox, y - tangentY * len * 0.45 + oy - 3,
+      x + tangentX * len * 0.45 + ox, y + tangentY * len * 0.45 + oy - 3);
+  };
+
+  let count = 0;
+  for (let r = 1; r < MAP_ROWS - 1; r++) {
+    for (let c = 1; c < MAP_COLS - 1; c++) {
+      if (getCellType(r, c) !== 'grass' || count >= 680) continue;
+      const zone = getZone(r, c);
+      const road = pathDir(r, c);
+      const edge = boundaryDir(r, c);
+      const n = tileNoise(r, c, road ? 1701 : 1702);
+      if (road && n > 0.58) {
+        stroke(c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-44, 44),
+          r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-28, 28), road, zone, 1711, zone === 'grasslands' ? 0.75 : 1);
+        count++;
+      } else if (edge && n > 0.72) {
+        stroke(c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-52, 52),
+          r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-34, 34), edge, zone, 1721, zone === 'riverside' ? 1.2 : 0.9);
+        count++;
+      } else if (n > (zone === 'grasslands' ? 0.955 : 0.978)) {
+        const dir = tileNoise(r, c, 1703) > 0.5 ? { dr: 1, dc: 0 } : { dr: 0, dc: 1 };
+        stroke(c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-58, 58),
+          r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-36, 36), dir, zone, 1731, zone === 'grasslands' ? 0.58 : 0.72);
+        count++;
+      }
+    }
+  }
 }
 
 // Grass texture marks — tiny blade-like strokes and pin specks across the
@@ -2187,6 +2265,37 @@ function buildDecorations(scene) {
     });
   };
 
+  const addPondEdgeDressing = (pond, zone = 'grasslands') => {
+    if (!pond) return;
+    const count = zone === 'riverside' ? 18 : 12;
+    const rx = Math.max(92, pond.displayWidth * 0.44);
+    const ry = Math.max(50, pond.displayHeight * 0.40);
+    for (let i = 0; i < count; i++) {
+      if (tileNoise(Math.floor(pond.y / TILE_SIZE), i, 1751) < 0.18) continue;
+      const a = (i / count) * Math.PI * 2 + Phaser.Math.FloatBetween(-0.18, 0.18);
+      const x = pond.x + Math.cos(a) * rx + Phaser.Math.Between(-12, 12);
+      const y = pond.y + Math.sin(a) * ry + Phaser.Math.Between(-8, 10);
+      const wetSide = Math.sin(a) > -0.35;
+      let key;
+      let h;
+      let opts = { maxAngle: 12, sway: true, swayAmp: 1.2 };
+      if ((zone === 'riverside' || wetSide) && tileNoise(i, Math.floor(pond.x / TILE_SIZE), 1752) > 0.36) {
+        key = Phaser.Utils.Array.GetRandom(riversideCattailKeys);
+        h = Phaser.Math.Between(54, zone === 'riverside' ? 76 : 64);
+        opts = { alignBottom: true, maxAngle: 8, sway: true, swayAmp: 1.2 };
+      } else if (tileNoise(i, Math.floor(pond.y / TILE_SIZE), 1753) > 0.52) {
+        key = Phaser.Utils.Array.GetRandom(flowerKeys);
+        h = Phaser.Math.Between(44, 58);
+      } else {
+        key = Phaser.Utils.Array.GetRandom(grassKeys);
+        h = Phaser.Math.Between(42, 56);
+        opts.alpha = 0.88;
+        opts.maxAngle = 16;
+      }
+      placeLandmarkDeco(key, x, y, h, opts);
+    }
+  };
+
   const edgeAccentForZone = (zone, nearPath) => {
     if (zone === 'forest') {
       if (Math.random() < 0.45) return { key: Phaser.Utils.Array.GetRandom(forestFernKeys), h: 48, opts: { tint: forestTint } };
@@ -2459,7 +2568,10 @@ function buildDecorations(scene) {
   for (let i = 0; i < 580; i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  44, { maxAngle: 10, zoneFilter: 'grasslands' });
   for (let i = 0; i < 420; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      72, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'grasslands', shadow: true });
   for (let i = 0; i < 280; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'grasslands', shadow: true });
-  for (let i = 0; i <  14; i++) place('pond_01',                                  220, { maxAngle:  0, alignBottom: true, blockRadius: 6, allowFlip: false, zoneFilter: 'grasslands', shimmer: true });
+  for (let i = 0; i <  14; i++) {
+    const pond = place('pond_01', 220, { maxAngle:  0, alignBottom: true, blockRadius: 6, allowFlip: false, zoneFilter: 'grasslands', shimmer: true });
+    addPondEdgeDressing(pond, 'grasslands');
+  }
   // Grasslands clusters: grass-tuft thickets + flower patches.
   for (let i = 0; i < 130; i++) placeCluster(Phaser.Utils.Array.GetRandom(grassKeys),  52, Phaser.Math.Between(5, 9), { alpha: 0.95, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3 });
   for (let i = 0; i < 105; i++) placeCluster(Phaser.Utils.Array.GetRandom(flowerKeys), 58, Phaser.Math.Between(4, 7), { maxAngle: 14, zoneFilter: 'grasslands', sway: true, swayAmp: 2 });
@@ -2490,7 +2602,10 @@ function buildDecorations(scene) {
   for (let i = 0; i <  32; i++) placeCluster(Phaser.Utils.Array.GetRandom(rockKeys), 56, Phaser.Math.Between(4, 7), { maxAngle: 14, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: ruinTint, spread: TILE_SIZE * 0.9, shadow: true });
 
   // Riverside (east) — ponds, tall grass, flowers, occasional tree.
-  for (let i = 0; i <  30; i++) place('pond_01',                                  240, { maxAngle:  0, alignBottom: true, blockRadius: 7, allowFlip: false, zoneFilter: 'riverside', shimmer: true });
+  for (let i = 0; i <  30; i++) {
+    const pond = place('pond_01', 240, { maxAngle:  0, alignBottom: true, blockRadius: 7, allowFlip: false, zoneFilter: 'riverside', shimmer: true });
+    addPondEdgeDressing(pond, 'riverside');
+  }
   for (let i = 0; i < 700; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     56, { alpha: 0.95, maxAngle: 18, zoneFilter: 'riverside', sway: true, swayAmp: 3 });
   for (let i = 0; i < 500; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),    60, { maxAngle: 15, zoneFilter: 'riverside', sway: true, swayAmp: 2 });
   for (let i = 0; i < 360; i++) place(Phaser.Utils.Array.GetRandom(riversideCattailKeys), 68, { maxAngle: 10, alignBottom: true, zoneFilter: 'riverside', shadow: true, sway: true, swayAmp: 1.5 });

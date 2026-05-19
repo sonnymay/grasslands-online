@@ -4,17 +4,38 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 85 decoration-shadow fix.**
+**State as of 2026-05-19 — post session 86 pseudo-2.5D depth pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 85 removes decoration shadows again after
-  Sonny reported they make props look like they are floating. Player and
-  monster shadows are still untouched because they ground moving characters.
-- **Cache version live in `project-grasslands/index.html`:** `?v=181`.
-- **Next change must use:** `?v=182`.
+- **Latest completed work:** session 86 answers Gemini's RO critique with the
+  first safe pseudo-2.5D pass inside Phaser instead of jumping straight to a
+  Three.js rewrite. It adds terrain relief strokes and richer pond-edge
+  dressing while preserving the no-decoration-shadow rule.
+- **Cache version live in `project-grasslands/index.html`:** `?v=182`.
+- **Next change must use:** `?v=183`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 86):**
+- Goal: respond to Gemini Browser's critique that Grasslands Online is still a
+  flat 2D RPG map, not RO's 2.5D 3D-terrain/2D-sprite hybrid.
+- Decision: do not migrate to Three.js/Babylon yet. First test a cheaper
+  pseudo-2.5D layer in the existing Phaser renderer.
+- `buildMap()` now calls `addTerrainRelief(scene)` after biome washes. This
+  draws low-alpha hand-painted ridge/bank strokes near roads and biome
+  borders, giving terrain a little height language without using decoration
+  shadows or changing collision.
+- Ponds now call `addPondEdgeDressing()` after placement. Grasslands and
+  riverside ponds get cattails, flowers, and grass clumps around the edge so
+  water features feel more authored and ecosystem-like.
+- `addPropShadow()` remains a no-op from session 85. Do not re-enable static
+  decoration shadows without explicit approval from Sonny.
+- Cache bumped to `game.js?v=182`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md`
+  passed, and Chrome preview at `http://localhost:8001/?codex=pseudo-25d-v182b`
+  loaded `game.js?v=182` with no console warnings/errors.
 
 **Where we left off (session 85):**
 - Goal: respond to Sonny's correction that decoration shadows make map props
@@ -649,7 +670,29 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 85 (latest)
+## 3. What we did in session 86 (latest)
+
+Cache now at **`?v=182`**. Gemini Browser's critique was structurally right:
+RO's depth comes from 3D terrain plus 2D billboard sprites. This pass does not
+rewrite the engine; it ships the first safe pseudo-2.5D test inside Phaser.
+
+1. **Decision: fake depth first, migrate later only if needed.** Three.js or
+   Babylon would be the authentic RO path, but a full renderer rewrite is too
+   expensive before proving the art direction. Phaser can still test terrain
+   height language.
+2. **Terrain relief layer.** `addTerrainRelief(scene)` draws subtle ridge/bank
+   strokes near roads and biome borders after biome washes. These are terrain
+   marks, not prop shadows, and they do not affect collision.
+3. **Pond ecosystem dressing.** Every grasslands/riverside pond now gets a
+   ring of cattails, flowers, and grass clumps, making water features feel more
+   authored and less like isolated stickers.
+4. **No-decoration-shadow rule preserved.** `addPropShadow()` remains a no-op.
+5. **Verification.** `node -c project-grasslands/game.js` clean.
+   `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md`
+   clean. Chrome v182 loaded with no console warnings/errors.
+6. **Cache bump.** `?v=181` → `?v=182`.
+
+## 3. What we did in session 85
 
 Cache now at **`?v=181`**. Sonny corrected the previous pass: decoration
 shadows make props look like they are floating. This pass restores the no-prop
