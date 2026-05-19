@@ -5512,7 +5512,7 @@ class UIManager {
     const bottomY = GAME_H - this.bottomH;
     const hpX = 20;
     const hpY = bottomY + this.bottomH / 2;
-    const statusW = 210;
+    const statusW = 290;
     const statusX = GAME_W - statusW - 20;
     const expX = hpX + this.hpBarW + 28;
     this.expBarW = Math.max(220, statusX - expX - 28);
@@ -5550,7 +5550,7 @@ class UIManager {
       .setStrokeStyle(1, PANEL_GOLD, 0.75);
     this.statusDivider = scene.add.rectangle(statusX + Math.floor(statusW * 0.42), bottomY + (this.bottomH - 30) / 2, 1, 30, 0xffe066, 0.45)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10002);
-    this.lvlText = scene.add.text(statusX + 14, hpY, 'Lv.1', {
+    this.lvlText = scene.add.text(statusX + 18, hpY, 'Lv.1', {
       fontSize: '24px', fontStyle: 'bold', color: '#ffff88', stroke: '#000', strokeThickness: 4,
     }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(10004);
     this.zenyText = scene.add.text(statusX + statusW - 14, hpY, '0z', {
@@ -6029,7 +6029,7 @@ class UIManager {
     this.bar.y = bottomY;
     // Bottom-bar items.
     const hpX = 20;
-    const statusW = 210;
+    const statusW = 290;
     const statusX = w - statusW - 20;
     const expX = hpX + this.hpBarW + 28;
     this.expBarW = Math.max(220, statusX - expX - 28);
@@ -6051,7 +6051,7 @@ class UIManager {
       this.statusDivider.x = statusX + Math.floor(statusW * 0.42);
       this.statusDivider.y = bottomY + (this.bottomH - 30) / 2;
     }
-    this.lvlText.x = statusX + 14; this.lvlText.y = midY;
+    this.lvlText.x = statusX + 18; this.lvlText.y = midY;
     this.zenyText.x = statusX + statusW - 14; this.zenyText.y = midY;
     // Minimap — anchor to right edge.
     this.miniX = w - this.miniW - 12;
