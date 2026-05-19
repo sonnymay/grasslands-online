@@ -567,7 +567,38 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 71 (latest)
+## 3. What we did in session 72 (latest)
+
+Cache now at **`?v=163`**. Sonny generated all 4 biome blob PNGs
+(`biome_{forest,desert,ruins,riverside}_blob.png`, 1254×1254) but they
+shipped without an alpha channel — Photoshop transparency-checker
+greys baked into the image. Wired them with a runtime alpha-key.
+
+1. **`keyOutCheckerboard(scene, key)` helper.** Mirrors `keyOutWhite`
+   but targets near-greyscale high-value pixels:
+   - `saturation < 12` AND `value ≥ 195` → fully transparent.
+   - `saturation < 22` AND `value ≥ 180` → partial fade scaled by
+     saturation, so anti-aliased edges between blob and checker
+     feather instead of leaving a hard outline.
+2. **Preload + alpha-key.** `preload()` loads the 4 biome blob keys
+   under `assets/decorations/`; `create()` runs
+   `keyOutCheckerboard()` over them right after the existing
+   `keyOutWhite()` spriteKeys pass.
+3. **`addBiomeWash()` uses real PNGs when available.** For each
+   non-grasslands zone:
+   - If `textureKey` exists, stamp 6–8 large image placements per
+     zone (1400–2200 px width, alpha 0.65–0.85, depth -980, random
+     0–359° angle + flipX/Y) at random tiles in that zone, with two
+     overlapping placements per stamp for irregular silhouette.
+   - If missing, falls back to the previous graphics radial-alpha
+     circle clusters so the system still works without art.
+4. **Verification.** Preview boots clean. Riverside blob renders with
+   a feathered organic edge over the grass base; no checkerboard
+   residue, no hard outline. Same approach now applies to forest,
+   desert, ruins.
+5. **Cache bump.** `?v=162` → `?v=163`.
+
+## 3.1. What we did in session 71
 
 Cache now at **`?v=162`**. Sonny correctly diagnosed the architectural
 bug: per-cell biome tile selection always produces a grid no matter
@@ -3114,7 +3145,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=162`**. Next change should use `?v=163`.
+  change. Current: **`?v=163`**. Next change should use `?v=164`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
