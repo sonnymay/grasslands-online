@@ -4330,68 +4330,128 @@ function showClassSelect(scene) {
   cont.add([titleShadow, title]);
 
   const ids = ['swordsman', 'mage', 'archer'];
-  const cardW = 220, cardH = 320;
-  const gap = 40;
+  // Larger cards + wider gap = easier targets and breathing room.
+  const cardW = 250, cardH = 360;
+  const gap = 44;
+  const hitPad = 18; // extra invisible margin so near-misses still register
   const totalW = ids.length * cardW + (ids.length - 1) * gap;
   const startX = (GAME_W - totalW) / 2;
   const baseY = 150;
+  // Swordsman is the new-player recommended pick — gets a gold ribbon.
+  const RECOMMENDED_ID = 'swordsman';
 
   ids.forEach((id, i) => {
     const cdef = CLASS_DEFS[id];
     const cx = startX + i * (cardW + gap);
     const cy = baseY;
 
-    // Card body — placeholder colored panel until real card images ship.
-    const card = scene.add.rectangle(cx + cardW / 2, cy + cardH / 2, cardW, cardH, cdef.tint, 0.85)
-      .setStrokeStyle(3, 0xffffff, 0.9);
-    // Explicit hit area centered on the rectangle's origin (0.5, 0.5).
-    card.setInteractive(
-      new Phaser.Geom.Rectangle(-cardW / 2, -cardH / 2, cardW, cardH),
+    const accent = colorValue(cdef.tint, 0xffffff);
+    const cardGroup = scene.add.container(cx + cardW / 2, cy + cardH / 2);
+    const paintCard = (hovered = false) => {
+      frame.clear();
+      frame.fillStyle(0x000000, hovered ? 0.36 : 0.28);
+      frame.fillRoundedRect(-cardW / 2 + 6, -cardH / 2 + 8, cardW, cardH, 14);
+      frame.fillStyle(accent, hovered ? 0.96 : 0.9);
+      frame.fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 12);
+      frame.lineStyle(hovered ? 5 : 3, hovered ? 0xffe066 : 0xffffff, 1);
+      frame.strokeRoundedRect(-cardW / 2 + 1.5, -cardH / 2 + 1.5, cardW - 3, cardH - 3, 12);
+      frame.fillStyle(0x120f0a, 0.2);
+      frame.fillRoundedRect(-cardW / 2 + 13, -cardH / 2 + 13, cardW - 26, cardH - 26, 8);
+      frame.fillStyle(0xf8f0d8, 0.96);
+      frame.fillRoundedRect(-cardW / 2 + 24, -cardH / 2 + 30, cardW - 48, 188, 5);
+      frame.lineStyle(2, 0xffffff, 0.7);
+      frame.strokeRoundedRect(-cardW / 2 + 24, -cardH / 2 + 30, cardW - 48, 188, 5);
+      frame.fillStyle(0x000000, 0.18);
+      frame.fillRoundedRect(-cardW / 2 + 14, cardH / 2 - 96, cardW - 28, 82, 8);
+      frame.fillStyle(0x000000, 0.2);
+      frame.fillRoundedRect(-78, cardH / 2 - 42, 156, 28, 12);
+      frame.lineStyle(2, hovered ? 0xfff1a6 : 0xffffff, hovered ? 1 : 0.75);
+      frame.strokeRoundedRect(-78, cardH / 2 - 42, 156, 28, 12);
+    };
+    const frame = scene.add.graphics();
+    paintCard(false);
+
+    // The whole card, including its art and text, is one large button.
+    // Hit area extends `hitPad` past the card edge so near-misses register.
+    cardGroup.setInteractive(
+      new Phaser.Geom.Rectangle(-cardW / 2 - hitPad, -cardH / 2 - hitPad,
+                                cardW + hitPad * 2, cardH + hitPad * 2),
       Phaser.Geom.Rectangle.Contains
     );
-    card.input.cursor = 'pointer';
-    card.setScrollFactor(0);
+    cardGroup.input.cursor = 'pointer';
+    cardGroup.setScrollFactor(0);
 
     // Optional real card image if it was preloaded.
     let img = null;
     if (scene.textures.exists(cdef.cardImage)) {
-      img = scene.add.image(cx + cardW / 2, cy + cardH / 2 - 30, cdef.cardImage);
-      const scale = Math.min((cardW - 30) / img.width, (cardH - 120) / img.height);
+      img = scene.add.image(0, -52, cdef.cardImage);
+      const scale = Math.min((cardW - 68) / img.width, 174 / img.height);
       img.setScale(scale);
     }
 
-    const nameText = scene.add.text(cx + cardW / 2, cy + cardH - 60, cdef.tierNames[0], {
-      fontSize: '24px', fontStyle: 'bold', color: '#ffffff',
+    const nameText = scene.add.text(0, 96, cdef.tierNames[0], {
+      fontSize: '28px', fontStyle: 'bold', color: '#ffffff',
       stroke: '#000', strokeThickness: 4,
     }).setOrigin(0.5);
-    const flavor = scene.add.text(cx + cardW / 2, cy + cardH - 36, `"${cdef.flavor}"`, {
-      fontSize: '13px', color: '#f4f4f4', fontStyle: 'italic',
-      stroke: '#000', strokeThickness: 3, align: 'center', wordWrap: { width: cardW - 20 },
+    const flavor = scene.add.text(0, 128, `"${cdef.flavor}"`, {
+      fontSize: '14px', color: '#f4f4f4', fontStyle: 'italic',
+      stroke: '#000', strokeThickness: 3, align: 'center', wordWrap: { width: cardW - 36 },
     }).setOrigin(0.5);
-    const role = scene.add.text(cx + cardW / 2, cy + cardH - 16, cdef.role || '', {
-      fontSize: '11px', color: '#ffe066',
-      stroke: '#000', strokeThickness: 3, align: 'center', wordWrap: { width: cardW - 20 },
+    const role = scene.add.text(0, 156, cdef.role || '', {
+      fontSize: '12px', color: '#ffe066',
+      stroke: '#000', strokeThickness: 3, align: 'center', wordWrap: { width: cardW - 34 },
+    }).setOrigin(0.5);
+    const chooseText = scene.add.text(0, cardH / 2 - 28, player.classId ? 'SWAP CLASS' : 'CHOOSE', {
+      fontSize: '15px', fontStyle: 'bold', color: '#fff4ba',
+      stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5);
 
-    cont.add(card);
-    if (img) cont.add(img);
-    cont.add([nameText, flavor, role]);
+    cardGroup.add(frame);
+    if (img) cardGroup.add(img);
+    cardGroup.add([nameText, flavor, role, chooseText]);
 
-    // Hover lift + glow.
+    // Recommended ribbon — gold pill on top-right of swordsman card to
+    // guide new players toward the easiest starting class.
+    if (id === RECOMMENDED_ID) {
+      const ribX = cardW / 2 - 14, ribY = -cardH / 2 + 14;
+      const ribbon = scene.add.graphics();
+      ribbon.fillStyle(0x000000, 0.35);
+      ribbon.fillRoundedRect(ribX - 110, ribY - 12 + 2, 108, 24, 10);
+      ribbon.fillStyle(0xffd24a, 1);
+      ribbon.fillRoundedRect(ribX - 110, ribY - 12, 108, 24, 10);
+      ribbon.lineStyle(2, 0xffffff, 0.85);
+      ribbon.strokeRoundedRect(ribX - 110, ribY - 12, 108, 24, 10);
+      const ribbonText = scene.add.text(ribX - 56, ribY, '★ RECOMMENDED', {
+        fontSize: '11px', fontStyle: 'bold', color: '#3a2400',
+      }).setOrigin(0.5);
+      cardGroup.add([ribbon, ribbonText]);
+    }
+    cont.add(cardGroup);
+
+    // Hover lift + glow. CTA text brightens to make the click target read.
     const lift = () => {
-      scene.tweens.add({ targets: [card, nameText, flavor, img].filter(Boolean),
-        y: '-=10', duration: 120 });
-      card.setStrokeStyle(4, 0xffe066, 1);
+      scene.tweens.killTweensOf(cardGroup);
+      scene.tweens.add({ targets: cardGroup, y: cy + cardH / 2 - 10, scale: 1.03, duration: 120 });
+      chooseText.setColor('#ffffff');
+      chooseText.setStroke('#5a3a00', 4);
+      paintCard(true);
     };
     const drop = () => {
-      scene.tweens.add({ targets: [card, nameText, flavor, img].filter(Boolean),
-        y: '+=10', duration: 120 });
-      card.setStrokeStyle(3, 0xffffff, 0.9);
+      scene.tweens.killTweensOf(cardGroup);
+      scene.tweens.add({ targets: cardGroup, y: cy + cardH / 2, scale: 1, duration: 120 });
+      chooseText.setColor('#fff4ba');
+      chooseText.setStroke('#000', 3);
+      paintCard(false);
     };
-    card.on('pointerover', lift);
-    card.on('pointerout', drop);
-    card.on('pointerdown', () => {
-      selectClass(scene, id, cont);
+    cardGroup.on('pointerover', lift);
+    cardGroup.on('pointerout', drop);
+    cardGroup.on('pointerdown', () => {
+      // Quick press-down tactile feedback before swap fires.
+      scene.tweens.killTweensOf(cardGroup);
+      scene.tweens.add({
+        targets: cardGroup, scale: 0.96, duration: 70, yoyo: true,
+        onComplete: () => selectClass(scene, id, cont),
+      });
     });
   });
 }
