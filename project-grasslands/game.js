@@ -1762,33 +1762,75 @@ function addGrassWorldWashes(scene) {
 
 function addPathWashes(scene) {
   const g = scene.add.graphics().setDepth(-1002);
-  const paintTrailPoint = (x, y, type, salt) => {
+  const isPath = (r, c) => r >= 0 && c >= 0 && r < MAP_ROWS && c < MAP_COLS
+    && getCellType(r, c) !== 'grass';
+  const pathPoint = (r, c) => {
+    const type = getCellType(r, c);
     const wide = type === 'path_cross' || type === 'path_open';
-    const n = tileNoise(Math.floor(y / TILE_SIZE), Math.floor(x / TILE_SIZE), salt);
-    const baseW = wide ? 196 : 168;
-    const baseH = wide ? 118 : 96;
-    g.fillStyle(0x80613a, 0.16);
-    g.fillEllipse(x, y, baseW + n * 54, baseH + n * 30);
-    g.fillStyle(0xa17a43, 0.105);
-    g.fillEllipse(x + (tileNoise(Math.floor(y / TILE_SIZE), Math.floor(x / TILE_SIZE), salt + 1) - 0.5) * 26,
-      y + (tileNoise(Math.floor(y / TILE_SIZE), Math.floor(x / TILE_SIZE), salt + 2) - 0.5) * 18,
-      baseW * 0.52, baseH * 0.40);
-    g.fillStyle(0x4f743d, 0.014);
-    g.fillEllipse(x + (tileNoise(Math.floor(y / TILE_SIZE), Math.floor(x / TILE_SIZE), salt + 3) - 0.5) * 44,
-      y + (tileNoise(Math.floor(y / TILE_SIZE), Math.floor(x / TILE_SIZE), salt + 4) - 0.5) * 30,
-      baseW * 0.86, baseH * 0.64);
+    const jitter = wide ? 10 : 22;
+    return {
+      x: c * TILE_SIZE + TILE_SIZE / 2 + (tileNoise(r, c, 1411) - 0.5) * jitter,
+      y: r * TILE_SIZE + TILE_SIZE / 2 + (tileNoise(r, c, 1412) - 0.5) * jitter,
+      wide,
+    };
   };
+  const roadSegment = (a, b) => {
+    const wide = a.wide || b.wide;
+    const outer = wide ? 122 : 102;
+    const mid = wide ? 84 : 70;
+    const inner = wide ? 42 : 34;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+    const bend = Phaser.Math.FloatBetween(-34, 34);
+    const cx = (a.x + b.x) / 2 + nx * bend;
+    const cy = (a.y + b.y) / 2 + ny * bend * 0.55;
+    const stroke = (width, color, alpha) => {
+      g.lineStyle(width, color, alpha);
+      g.lineBetween(a.x, a.y, cx, cy);
+      g.lineBetween(cx, cy, b.x, b.y);
+    };
+    stroke(outer, 0x6f5a34, 0.12);
+    stroke(mid, 0x94723f, 0.11);
+    stroke(inner, 0xb1894f, 0.045);
+  };
+  const roadNode = (r, c) => {
+    const p = pathPoint(r, c);
+    const radius = p.wide ? 72 : 58;
+    g.fillStyle(0x80613a, p.wide ? 0.13 : 0.11);
+    g.fillCircle(p.x, p.y, radius);
+    g.fillStyle(0xa17a43, 0.09);
+    g.fillCircle(p.x + (tileNoise(r, c, 1421) - 0.5) * 24,
+      p.y + (tileNoise(r, c, 1422) - 0.5) * 18, radius * 0.54);
+    for (let i = 0; i < 3; i++) {
+      if (tileNoise(r, c, 1430 + i) < 0.46) continue;
+      const a = tileNoise(r, c, 1440 + i) * Math.PI * 2;
+      const dist = radius * Phaser.Math.FloatBetween(0.65, 1.12);
+      const x = p.x + Math.cos(a) * dist + Phaser.Math.Between(-10, 10);
+      const y = p.y + Math.sin(a) * dist * 0.72 + Phaser.Math.Between(-8, 8);
+      g.fillStyle(i % 2 === 0 ? 0x5f7f47 : 0x6b5734, i % 2 === 0 ? 0.035 : 0.062);
+      g.fillEllipse(x, y, Phaser.Math.Between(28, 74), Phaser.Math.Between(12, 32));
+    }
+  };
+
   for (let r = 0; r < MAP_ROWS; r++) {
     for (let c = 0; c < MAP_COLS; c++) {
+      if (!isPath(r, c)) continue;
+      const a = pathPoint(r, c);
       const type = getCellType(r, c);
-      if (type === 'grass') continue;
-      const x = c * TILE_SIZE + TILE_SIZE / 2;
-      const y = r * TILE_SIZE + TILE_SIZE / 2;
-      paintTrailPoint(x, y, type, 1411);
-      if (tileNoise(r, c, 1414) > 0.74) {
-        g.fillStyle(0x6b5734, 0.078);
-        g.fillEllipse(x + (tileNoise(r, c, 1415) - 0.5) * 70, y + (tileNoise(r, c, 1416) - 0.5) * 48, 42, 18);
+      for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+        if (!isPath(r + dr, c + dc)) continue;
+        const neighborType = getCellType(r + dr, c + dc);
+        if (dr !== 0 && dc !== 0 && type !== 'path_diag' && neighborType !== 'path_diag') continue;
+        roadSegment(a, pathPoint(r + dr, c + dc));
       }
+    }
+  }
+  for (let r = 0; r < MAP_ROWS; r++) {
+    for (let c = 0; c < MAP_COLS; c++) {
+      if (isPath(r, c)) roadNode(r, c);
     }
   }
 }
@@ -2044,6 +2086,110 @@ function buildDecorations(scene) {
   const ruinsPillarKeys = scene.textures.exists('ruins_pillar_broken_01') ? ['ruins_pillar_broken_01'] : [];
   const riversideCattailKeys = scene.textures.exists('riverside_cattail_01') ? ['riverside_cattail_01'] : grassKeys;
 
+  const addCanvasTexture = (key, width, height, draw) => {
+    if (scene.textures.exists(key)) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    draw(ctx, width, height);
+    scene.textures.addCanvas(key, canvas);
+  };
+
+  const ensureStructureTextures = () => {
+    addCanvasTexture('camp_tent_canvas', 180, 150, (ctx) => {
+      ctx.clearRect(0, 0, 180, 150);
+      ctx.fillStyle = 'rgba(66, 50, 32, 0.22)';
+      ctx.beginPath();
+      ctx.ellipse(90, 126, 70, 15, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#b95f43';
+      ctx.beginPath();
+      ctx.moveTo(28, 118);
+      ctx.lineTo(92, 28);
+      ctx.lineTo(154, 118);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#e0b274';
+      ctx.beginPath();
+      ctx.moveTo(40, 114);
+      ctx.lineTo(92, 36);
+      ctx.lineTo(95, 118);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#5a372b';
+      ctx.beginPath();
+      ctx.moveTo(94, 118);
+      ctx.lineTo(122, 82);
+      ctx.lineTo(146, 118);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#3c2a22';
+      ctx.lineWidth = 5;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+      ctx.strokeStyle = '#ead2a0';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(24, 121);
+      ctx.lineTo(12, 134);
+      ctx.moveTo(158, 121);
+      ctx.lineTo(170, 134);
+      ctx.stroke();
+    });
+
+    addCanvasTexture('camp_fire_canvas', 120, 100, (ctx) => {
+      ctx.clearRect(0, 0, 120, 100);
+      ctx.fillStyle = 'rgba(62, 42, 28, 0.18)';
+      ctx.beginPath();
+      ctx.ellipse(60, 78, 42, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#6a4226';
+      ctx.lineWidth = 9;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(30, 78);
+      ctx.lineTo(90, 62);
+      ctx.moveTo(32, 62);
+      ctx.lineTo(88, 80);
+      ctx.stroke();
+      ctx.fillStyle = '#ffcc55';
+      ctx.beginPath();
+      ctx.moveTo(60, 20);
+      ctx.quadraticCurveTo(34, 58, 58, 72);
+      ctx.quadraticCurveTo(86, 54, 60, 20);
+      ctx.fill();
+      ctx.fillStyle = '#ff7440';
+      ctx.beginPath();
+      ctx.moveTo(60, 34);
+      ctx.quadraticCurveTo(46, 58, 60, 69);
+      ctx.quadraticCurveTo(76, 56, 60, 34);
+      ctx.fill();
+    });
+
+    addCanvasTexture('camp_fence_canvas', 160, 80, (ctx) => {
+      ctx.clearRect(0, 0, 160, 80);
+      ctx.strokeStyle = '#7a522e';
+      ctx.lineWidth = 8;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(18, 38);
+      ctx.lineTo(142, 26);
+      ctx.moveTo(18, 58);
+      ctx.lineTo(142, 46);
+      ctx.stroke();
+      ctx.strokeStyle = '#4b301f';
+      ctx.lineWidth = 10;
+      for (const x of [32, 76, 120]) {
+        ctx.beginPath();
+        ctx.moveTo(x, 20);
+        ctx.lineTo(x - 6, 64);
+        ctx.stroke();
+      }
+    });
+  };
+  ensureStructureTextures();
+
   // Block a disk of cells around (worldX, worldY) so A* routes around it.
   const blockCells = (worldX, worldY, cellRadius) => {
     if (!walkable) return;
@@ -2062,6 +2208,29 @@ function buildDecorations(scene) {
   // flattened field art. Keep this helper a no-op; player/monster shadows
   // use separate code paths and still ground moving characters.
   const addPropShadow = (_img, _x, _y, _opts = {}) => null;
+  const addBaseOverlapCluster = (x, y, opts = {}, countRange = [1, 3]) => {
+    const baseClusterChance = opts.baseCluster ?? 0;
+    if (!baseClusterChance || !opts.alignBottom || Math.random() >= baseClusterChance) return;
+    const count = Phaser.Math.Between(countRange[0], countRange[1]);
+    for (let i = 0; i < count; i++) {
+      const underKey = Phaser.Utils.Array.GetRandom(
+        i === 0 ? grassKeys : [...grassKeys, ...flowerKeys, ...mushroomKeys]
+      );
+      if (!scene.textures.exists(underKey)) continue;
+      const spr = scene.add.image(
+        x + Phaser.Math.Between(-36, 36),
+        y + Phaser.Math.Between(8, 32),
+        underKey
+      );
+      const h = Phaser.Math.Between(34, 56);
+      spr.setScale((h / spr.height) * Phaser.Math.FloatBetween(0.82, 1.18));
+      spr.setAngle(Phaser.Math.Between(-18, 18));
+      if (Math.random() < 0.5) spr.setFlipX(true);
+      spr.setAlpha(Phaser.Math.FloatBetween(0.82, 0.96));
+      if (opts.tint && Math.random() < 0.5) spr.setTint(opts.tint);
+      spr.setDepth(y + 0.15 + i * 0.01);
+    }
+  };
 
   // Generic scatter. By default decorations are flat overlays under entities.
   // `alignBottom` anchors true standing props at their base so the depth-sort
@@ -2103,6 +2272,26 @@ function buildDecorations(scene) {
     img.setAlpha(opts.alpha ?? 1);
     if (opts.tint) img.setTint(opts.tint);
     if (opts.shadow) addPropShadow(img, x, y, opts);
+    const baseClusterChance = opts.baseCluster ?? (opts.alignBottom && !opts.shimmer ? 0.34 : 0);
+    if (baseClusterChance && opts.alignBottom && Math.random() < baseClusterChance) {
+      const count = Phaser.Math.Between(2, 4);
+      for (let i = 0; i < count; i++) {
+        const underKey = Phaser.Utils.Array.GetRandom(
+          i === 0 ? grassKeys : [...grassKeys, ...flowerKeys, ...mushroomKeys]
+        );
+        if (!scene.textures.exists(underKey)) continue;
+        const ox = Phaser.Math.Between(-34, 34);
+        const oy = Phaser.Math.Between(6, 30);
+        const spr = scene.add.image(x + ox, y + oy, underKey);
+        const h = Phaser.Math.Between(36, 56);
+        spr.setScale((h / spr.height) * Phaser.Math.FloatBetween(0.82, 1.18));
+        spr.setAngle(Phaser.Math.Between(-18, 18));
+        if (Math.random() < 0.5) spr.setFlipX(true);
+        spr.setAlpha(Phaser.Math.FloatBetween(0.82, 0.96));
+        if (opts.tint && Math.random() < 0.55) spr.setTint(opts.tint);
+        spr.setDepth(y + 0.15 + i * 0.01);
+      }
+    }
 
     if (opts.blockRadius) blockCells(x, y, opts.blockRadius);
 
@@ -2209,6 +2398,20 @@ function buildDecorations(scene) {
       img.setAlpha(opts.alpha ?? 1);
       if (opts.tint) img.setTint(opts.tint);
       if (opts.shadow) addPropShadow(img, x, y, opts);
+      const clusterChance = opts.baseCluster ?? (opts.alignBottom ? 0.24 : 0);
+      if (clusterChance && opts.alignBottom && Math.random() < clusterChance) {
+        const underKey = Phaser.Utils.Array.GetRandom([...grassKeys, ...flowerKeys, ...mushroomKeys]);
+        if (scene.textures.exists(underKey)) {
+          const spr = scene.add.image(x + Phaser.Math.Between(-30, 30), y + Phaser.Math.Between(8, 30), underKey);
+          const h = Phaser.Math.Between(34, 54);
+          spr.setScale((h / spr.height) * Phaser.Math.FloatBetween(0.82, 1.18));
+          spr.setAngle(Phaser.Math.Between(-18, 18));
+          if (Math.random() < 0.5) spr.setFlipX(true);
+          spr.setAlpha(Phaser.Math.FloatBetween(0.82, 0.95));
+          if (opts.tint && Math.random() < 0.55) spr.setTint(opts.tint);
+          spr.setDepth(y + 0.12);
+        }
+      }
       // Sway 40% of clustered tufts — keeps total tween count sane
       // while still giving the patch a hint of motion.
       if (opts.sway && Math.random() < 0.4) {
@@ -2273,6 +2476,7 @@ function buildDecorations(scene) {
     img.setAlpha(opts.alpha ?? 1);
     if (opts.tint) img.setTint(opts.tint);
     if (opts.shadow) addPropShadow(img, x, y, opts);
+    addBaseOverlapCluster(x, y, opts, [1, 3]);
     if (opts.blockRadius) blockCells(x, y, opts.blockRadius);
     if (opts.sway) {
       const base = img.angle;
@@ -2467,7 +2671,7 @@ function buildDecorations(scene) {
         ...Array.from({ length: 8 }, () => ({ key: Phaser.Utils.Array.GetRandom(mushroomKeys), h: 44, opts: { maxAngle: 8 } })),
         ...Array.from({ length: 6 }, () => ({ key: Phaser.Utils.Array.GetRandom(grassKeys), h: 48, opts: { alpha: 0.9, maxAngle: 16, tint: forestTint, sway: true, swayAmp: 2 } })),
       ], 122);
-      ring(Array.from({ length: 3 }, () => ({ key: Phaser.Utils.Array.GetRandom(treeKeys), h: 150, opts: { alignBottom: true, shadow: true, tint: forestTint, maxAngle: 3 } })), 178);
+      ring(Array.from({ length: 3 }, () => ({ key: Phaser.Utils.Array.GetRandom(treeKeys), h: 150, opts: { alignBottom: true, shadow: true, tint: forestTint, maxAngle: 3, baseCluster: 0.42 } })), 178);
     } else if (zone === 'desert') {
       ring([
         ...Array.from({ length: 7 }, () => ({ key: Phaser.Utils.Array.GetRandom(rockKeys), h: 52, opts: { alignBottom: true, shadow: true, tint: desertRockTint, maxAngle: 12 } })),
@@ -2488,7 +2692,7 @@ function buildDecorations(scene) {
         ...Array.from({ length: 8 }, () => ({ key: Phaser.Utils.Array.GetRandom(flowerKeys), h: 58, opts: { maxAngle: 14, sway: true, swayAmp: 2 } })),
         ...Array.from({ length: 6 }, () => ({ key: Phaser.Utils.Array.GetRandom(grassKeys), h: 50, opts: { alpha: 0.95, maxAngle: 18, sway: true, swayAmp: 2.5 } })),
       ], 126);
-      ring(Array.from({ length: 2 }, () => ({ key: Phaser.Utils.Array.GetRandom(treeKeys), h: 145, opts: { alignBottom: true, shadow: true, maxAngle: 3 } })), 178);
+      ring(Array.from({ length: 2 }, () => ({ key: Phaser.Utils.Array.GetRandom(treeKeys), h: 145, opts: { alignBottom: true, shadow: true, maxAngle: 3, baseCluster: 0.40 } })), 178);
     }
   };
 
@@ -2496,8 +2700,8 @@ function buildDecorations(scene) {
     const x = tile_c * TILE_SIZE + TILE_SIZE / 2;
     const y = tile_r * TILE_SIZE + TILE_SIZE / 2 + 8;
     const hero = {
-      grasslands: { key: 'landmark_spawn_signpost', h: 112, opts: { alignBottom: true, shadow: true, maxAngle: 2 } },
-      forest: { key: 'landmark_forest_shrine', h: 128, opts: { alignBottom: true, shadow: true, maxAngle: 2, tint: 0xf0ffe0 } },
+      grasslands: { key: 'landmark_spawn_signpost', h: 112, opts: { alignBottom: true, shadow: true, maxAngle: 2, baseCluster: 0.24 } },
+      forest: { key: 'landmark_forest_shrine', h: 128, opts: { alignBottom: true, shadow: true, maxAngle: 2, tint: 0xf0ffe0, baseCluster: 0.30 } },
       desert: { key: 'landmark_desert_obelisk', h: 154, opts: { alignBottom: true, shadow: true, maxAngle: 1 } },
       ruins: { key: 'landmark_ruins_well', h: 128, opts: { alignBottom: true, shadow: true, maxAngle: 2 } },
       riverside: { key: 'landmark_riverside_bridge', h: 130, opts: { alignBottom: true, shadow: true, maxAngle: 0, allowFlip: false } },
@@ -2551,6 +2755,8 @@ function buildDecorations(scene) {
   const { midRow: _mr, midCol: _mc } = mapCenter();
   const spX = _mc * TILE_SIZE + TILE_SIZE / 2;
   const spY = _mr * TILE_SIZE + TILE_SIZE / 2 + 8;
+  const spawnCampX = spX - 420;
+  const spawnCampY = spY + 260;
   const lanternOffsets = [
     { dx: -150, dy:  10 },
     { dx:  150, dy:  10 },
@@ -2629,6 +2835,7 @@ function buildDecorations(scene) {
         alignBottom: true,
         shadow: true,
         maxAngle: 5,
+        baseCluster: 0.42,
       });
       placeLandmarkDeco(Phaser.Utils.Array.GetRandom(flowerKeys), spX + p.dx + 42, spY + p.dy + 16, 46, {
         maxAngle: 14,
@@ -2664,6 +2871,7 @@ function buildDecorations(scene) {
         allowFlip: false,
         angle: tree.angle,
         scale: tree.scale,
+        baseCluster: 0.36,
       });
     }
     for (const tuft of floorTufts) {
@@ -2674,8 +2882,135 @@ function buildDecorations(scene) {
       });
     }
   };
+  const addSpawnCamp = () => {
+    const campX = spawnCampX;
+    const campY = spawnCampY;
+    const ground = scene.add.ellipse(campX, campY + 26, 440, 190, 0x8f7845, 0.065)
+      .setDepth(-781);
+    scene.add.ellipse(campX + 18, campY + 20, 260, 110, 0xd6c08a, 0.045)
+      .setDepth(-780);
+    const tents = [
+      { dx: -128, dy: -28, angle: -7 },
+      { dx:   36, dy: -60, angle:  4 },
+      { dx:  150, dy:  38, angle:  8 },
+    ];
+    for (const tent of tents) {
+      const x = campX + tent.dx;
+      const y = campY + tent.dy;
+      placeLandmarkDeco('camp_tent_canvas', x, y, 112, {
+        alignBottom: true,
+        allowFlip: false,
+        angle: tent.angle,
+        baseCluster: 0,
+      });
+      blockCells(x, y, 2);
+    }
+    const fire = placeLandmarkDeco('camp_fire_canvas', campX - 16, campY + 38, 74, {
+      alignBottom: true,
+      allowFlip: false,
+      angle: 0,
+      baseCluster: 0,
+    });
+    if (fire) {
+      scene.add.ellipse(fire.x, fire.y + 2, 92, 34, 0xffaa44, 0.10).setDepth(-618);
+      scene.tweens.add({
+        targets: fire,
+        alpha: 0.84,
+        scaleX: fire.scaleX * 1.04,
+        scaleY: fire.scaleY * 1.04,
+        duration: 900,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+    }
+    const fences = [
+      { dx: -210, dy:  70, angle: -6 },
+      { dx:   80, dy: 118, angle:  5 },
+      { dx:  215, dy: -14, angle: 74 },
+    ];
+    for (const f of fences) {
+      placeLandmarkDeco('camp_fence_canvas', campX + f.dx, campY + f.dy, 76, {
+        alignBottom: true,
+        allowFlip: false,
+        angle: f.angle,
+        baseCluster: 0,
+      });
+    }
+    const npcs = [
+      { key: 'rookie_idle_south', dx: -76, dy: 64, name: 'Guide' },
+      { key: scene.textures.exists('mage_idle_south') ? 'mage_idle_south' : 'rookie_idle_south', dx: 78, dy: 48, name: 'Forager' },
+    ];
+    for (const npc of npcs) {
+      const x = campX + npc.dx;
+      const y = campY + npc.dy;
+      const img = placeLandmarkDeco(npc.key, x, y, 86, {
+        alignBottom: true,
+        allowFlip: false,
+        angle: 0,
+        baseCluster: 0,
+      });
+      if (!img) continue;
+      scene.add.text(x, y - 86, npc.name, {
+        fontFamily: '"Trebuchet MS", Arial, sans-serif',
+        fontSize: '13px',
+        color: '#fff3c4',
+        stroke: '#2a1c12',
+        strokeThickness: 4,
+      }).setOrigin(0.5, 1).setDepth(y + 1).setResolution(UI_TEXT_RESOLUTION);
+    }
+  };
+
+  const addGrasslandsChokeLines = () => {
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const lines = [
+      { from: [-820, -460], to: [-250, -330], count: 6 },
+      { from: [ 260, -335], to: [ 860, -470], count: 6 },
+      { from: [-820,  480], to: [-270,  360], count: 6 },
+      { from: [ 280,  350], to: [ 880,  500], count: 6 },
+      { from: [-720, -230], to: [-680,  270], count: 5 },
+      { from: [ 720, -260], to: [ 690,  250], count: 5 },
+    ];
+    let placed = 0;
+    for (const line of lines) {
+      for (let i = 0; i < line.count; i++) {
+        const t = line.count === 1 ? 0 : i / (line.count - 1);
+        const x = spX + lerp(line.from[0], line.to[0], t) + Phaser.Math.Between(-34, 34);
+        const y = spY + lerp(line.from[1], line.to[1], t) + Phaser.Math.Between(-24, 24);
+        if (Math.abs(x - spawnCampX) < 390 && Math.abs(y - spawnCampY) < 245) continue;
+        const r = Math.floor(y / TILE_SIZE);
+        const c = Math.floor(x / TILE_SIZE);
+        if (getZone(r, c) !== 'grasslands' || getCellType(r, c) !== 'grass') continue;
+        const tree = placeLandmarkDeco(Phaser.Utils.Array.GetRandom(treeKeys), x, y, Phaser.Math.Between(205, 260), {
+          alignBottom: true,
+          maxAngle: 3,
+          baseCluster: 0.58,
+        });
+        if (!tree) continue;
+        blockCells(x, y, 2);
+        placed++;
+        if (placed % 2 === 0) {
+          placeLandmarkDeco(Phaser.Utils.Array.GetRandom(bushKeys), x + Phaser.Math.Between(-70, 70), y + Phaser.Math.Between(12, 48), 72, {
+            alignBottom: true,
+            maxAngle: 7,
+            baseCluster: 0.42,
+          });
+        }
+        if (placed % 3 !== 0) {
+          placeLandmarkDeco(Phaser.Utils.Array.GetRandom(grassKeys), x + Phaser.Math.Between(-82, 82), y + Phaser.Math.Between(24, 58), 52, {
+            alpha: 0.88,
+            maxAngle: 18,
+            sway: true,
+            swayAmp: 2,
+          });
+        }
+      }
+    }
+  };
   addSpawnHubDressing();
   addOcclusionTestGrove();
+  addSpawnCamp();
+  addGrasslandsChokeLines();
 
   const addAnchorCompositions = () => {
     const groundKey = scene.textures.exists('deco_sand_scuff_soft_01')

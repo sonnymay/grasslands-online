@@ -4,18 +4,47 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 87 map-composition pass.**
+**State as of 2026-05-19 — post session 88 organic path/structure pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 87 responds to the latest honest map
-  critique: less pepper-shaker scatter, stronger visible dirt routes, true
-  bottom-origin y-sorting for standing props, a spawn occlusion test grove,
-  clustered shoreline dressing, and large anchor-prop compositions.
-- **Cache version live in `project-grasslands/index.html`:** `?v=187`.
-- **Next change must use:** `?v=188`.
+- **Latest completed work:** session 88 responds to the "too organized"
+  feedback. It replaces stamped oval road decals with a connected ragged
+  path renderer, adds automatic base-overlap micro-clusters to standing props,
+  and adds a small spawn camp plus tree-line choke cues for world structure.
+- **Cache version live in `project-grasslands/index.html`:** `?v=191`.
+- **Next change must use:** `?v=192`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 88):**
+- Goal: answer the feedback that the map still looked organized/artificial:
+  stamped oval paths, isolated props, visible placement math, and no social
+  footprint.
+- `addPathWashes(scene)` now paints connected, slightly bent road segments
+  between path cells with layered wide/mid/inner strokes, then adds irregular
+  node fills and ragged edge flecks. This removes the "stacked oval stamp" look
+  from dirt routes.
+- Standing prop placement now automatically creates small overlapping base
+  clusters sometimes: grass, flowers, or mushrooms physically overlap the
+  bottom pixels of trees/bushes/rocks/cacti/reeds so props stop looking like
+  isolated chess pieces.
+- Added runtime canvas textures for `camp_tent_canvas`, `camp_fire_canvas`,
+  and `camp_fence_canvas`; no external asset files were added.
+- Added a small spawn camp southwest of spawn with three tents, a fire, fence
+  pieces, and two stationary named NPC sprites.
+- Added dense grasslands tree-line cues around spawn to suggest boundaries and
+  choke points without implementing cliff/collider logic yet. Paths are still
+  force-protected after decoration blocking.
+- Static decoration shadows remain disabled. Player and monster shadows remain
+  separate.
+- Cache bumped to `game.js?v=191`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md`
+  passed, and Chrome preview at `http://localhost:8002/?codex=organic-v191`
+  loaded `game.js?v=191` with no current console warnings/errors. Walked from
+  spawn to the camp and along the road; the camp/tree-line overlap bug seen in
+  the first preview was corrected before shipping.
 
 **Where we left off (session 87):**
 - Goal: answer the latest brutal map feedback that the world still felt
@@ -697,7 +726,36 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 87 (latest)
+## 3. What we did in session 88 (latest)
+
+Cache now at **`?v=191`**. The latest feedback was that the map still looked
+organized and artificial: stamped oval paths, snap-to-grid prop placement,
+isolated plants, weak overlap, and no societal footprint. This pass tackles
+those issues inside the current Phaser renderer.
+
+1. **Stamped road decals replaced.** `addPathWashes(scene)` now connects path
+   cells with layered wide/mid/inner dirt strokes instead of painting each cell
+   as a separate oval. Long segments get a small bent midpoint and node flecks
+   so the road reads more like a continuous painted trail.
+2. **Base-overlap micro-clusters.** Standing prop placement can now add small
+   overlapping tufts, flowers, or mushrooms at the sprite base. This was wired
+   into generic standing props and selected authored trees/bushes so plants no
+   longer sit alone like chess pieces.
+3. **Spawn camp added.** Runtime canvas textures create tents, a campfire, and
+   fence pieces with no new asset files. The camp includes two named stationary
+   NPC sprites, `Guide` and `Forager`.
+4. **Map structure added.** Grasslands tree-line cues around spawn create
+   boundary/choke-point language without implementing cliff collision yet.
+   The camp area is explicitly protected so the tree line does not bury it.
+5. **No-decoration-shadow rule preserved.** Static decoration shadows remain
+   disabled. Player and monster shadows stay on their separate grounding path.
+6. **Verification.** `node -c project-grasslands/game.js` clean.
+   `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md`
+   clean. Chrome v191 loaded with no current console warnings/errors. Walked
+   from spawn to camp and along the dirt road after fixing the unsupported
+   Phaser graphics curve attempt from the v190 preview.
+
+## 3. What we did in session 87
 
 Cache now at **`?v=187`**. The latest visual feedback was right: even with
 nice assets, the map still read too procedural because props were evenly
