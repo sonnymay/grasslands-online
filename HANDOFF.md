@@ -4,16 +4,27 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 9:19 PM CDT — post ruins wall dressing pass.**
+**State as of 2026-05-18 9:29 PM CDT — post floor-shake camera fix.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 60 adds capped ruins wall dressing around
-  well/path approaches with existing assets.
-- **Cache version live in `project-grasslands/index.html`:** `?v=151`.
-- **Next change must use:** `?v=152`.
+- **Latest completed work:** session 61 fixes floor/map shaking by moving
+  camera follow from the bobbing player sprite to a stable ground anchor.
+- **Cache version live in `project-grasslands/index.html`:** `?v=152`.
+- **Next change must use:** `?v=153`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 61):**
+- Goal: stop the visible floor/map shaking Sonny noticed while playing.
+- Root cause: the main camera followed `player.sprite`, but walking bob moves
+  `sprite.y` up/down every step. The camera inherited that bob, making the
+  whole tile floor appear to shake.
+- Fix: added a hidden `player.followTarget` anchored to the player's stable
+  ground position (`groundY`) and changed camera follow to that target.
+- The player sprite still has walk bob/squash, but the camera no longer bobs
+  with it. No gameplay, combat, progression, controls, UI layout, map
+  dimensions, saves, or monster logic changed.
 
 **Where we left off (session 60):**
 - Goal: make the western ruins feel more like broken architecture instead of
@@ -434,7 +445,36 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 60 (latest)
+## 3. What we did in session 61 (latest)
+
+Cache now at **`?v=152`**. Sonny reported the floor/map visibly shaking while
+playing. This session prioritizes that bug over more beauty work.
+
+1. **Root cause.** The main camera followed `player.sprite`, and walking bob
+   changes `sprite.y` every step. The camera inherited the player bob, so the
+   whole world appeared to shake.
+2. **Stable camera anchor.** Added hidden `player.followTarget` anchored to
+   the player's stable ground position (`groundY`).
+3. **Camera follows ground, not bob.** Changed `startFollow()` to follow
+   `player.followTarget` instead of `player.sprite`.
+4. **Walk feel preserved.** Player sprite bob/squash remains; only camera
+   shake from that bob is removed.
+5. **Scope preserved.** No gameplay, combat, progression, controls, UI
+   layout, monster logic, saves, map size, or decoration placement changed.
+6. **Verification.** `node -c project-grasslands/game.js` exited 0.
+7. **Cache bump.** `?v=151` -> `?v=152`.
+
+### Next beauty suggestions
+
+1. **Desert oasis/bone-yard pass.** Existing cactus, rock, sand, and crack art
+   can make stronger authored pockets until new hero props arrive.
+2. **Spawn-to-biome road storytelling.** Add tiny capped scene beats along the
+   four major roads so first-time walks feel hand-placed.
+3. **Generate true biome hero props.** Highest impact remains ruined wall,
+   desert bone pile, dry bush, cactus flower, riverside stepping stones, and
+   shoreline mud/stone overlays.
+
+## 3.1. What we did in session 60
 
 Cache now at **`?v=151`**. Sonny asked to keep making the map beautiful and
 impressive like Ragnarok Online. This session rotates from forest to ruins

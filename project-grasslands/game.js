@@ -954,7 +954,7 @@ function create() {
   }
 
   // Camera follow
-  scene.cameras.main.startFollow(player.sprite, true, 0.1, 0.1);
+  scene.cameras.main.startFollow(player.followTarget, true, 0.1, 0.1);
   // RO camera reveals ~12-15 tiles wide — zoom out a touch.
   scene.cameras.main.setZoom(0.65);
 
@@ -2726,6 +2726,7 @@ class PlayerController {
       this.sprite.scaleY = this.basePScale * squashRatio;
     };
     this.groundY = y;
+    this.followTarget = scene.add.zone(x, y, 1, 1).setVisible(false);
     this.shadow = scene.add.ellipse(
       x,
       y + this.sprite.displayHeight * 0.36,
@@ -2918,6 +2919,10 @@ class PlayerController {
     this.shadow.setDisplaySize(this.sprite.displayWidth * 0.58, Math.max(8, this.sprite.displayHeight * 0.12));
   }
 
+  _syncFollowTarget() {
+    this.followTarget.setPosition(this.sprite.x, this.groundY);
+  }
+
   update(time, delta) {
     if (this.dead) {
       this._setPlayerTexture(this.dir, 'dead');
@@ -2925,6 +2930,7 @@ class PlayerController {
       this.sprite.setOrigin(0.5, 0.5);
       this.sprite.scaleY = this.basePScale;
       this._syncShadow();
+      this._syncFollowTarget();
       const deadTop = this.sprite.y - this.sprite.displayHeight / 2;
       this.nameTag.setPosition(this.sprite.x, deadTop);
       if (this.titleTag.visible) this.titleTag.setPosition(this.sprite.x, deadTop - 18);
@@ -3081,6 +3087,7 @@ class PlayerController {
     const showingAttack = time < this.attackPoseUntil;
 
     if (!moving) this.frame = 'idle';
+    this._syncFollowTarget();
 
     if (showingAttack) {
       this._setPlayerTexture(this.dir, 'attack');
