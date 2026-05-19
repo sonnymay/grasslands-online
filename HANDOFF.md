@@ -4,18 +4,45 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 86 pseudo-2.5D depth pass.**
+**State as of 2026-05-19 — post session 87 map-composition pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 86 answers Gemini's RO critique with the
-  first safe pseudo-2.5D pass inside Phaser instead of jumping straight to a
-  Three.js rewrite. It adds terrain relief strokes and richer pond-edge
-  dressing while preserving the no-decoration-shadow rule.
-- **Cache version live in `project-grasslands/index.html`:** `?v=182`.
-- **Next change must use:** `?v=183`.
+- **Latest completed work:** session 87 responds to the latest honest map
+  critique: less pepper-shaker scatter, stronger visible dirt routes, true
+  bottom-origin y-sorting for standing props, a spawn occlusion test grove,
+  clustered shoreline dressing, and large anchor-prop compositions.
+- **Cache version live in `project-grasslands/index.html`:** `?v=187`.
+- **Next change must use:** `?v=188`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 87):**
+- Goal: answer the latest brutal map feedback that the world still felt
+  algorithmic: evenly peppered props, weak terrain routes, soft/uniform water
+  edges, dead space, and no landmark hierarchy.
+- All `alignBottom` decoration paths now use `setOrigin(0.5, 1)` in
+  `place()`, `placeCluster()`, and `placeLandmarkDeco()`. Standing props sort
+  from the exact ground-contact point; flat decals still use negative depths.
+- Added a visual-only spawn occlusion grove near the signpost so player/tree
+  overlap can be tested immediately.
+- Grasslands scatter was rebalanced away from thousands of singletons.
+  Flowers, grass, mushrooms, bushes, and trees now lean harder on clustered
+  patches, roadside meadows, open-field pockets, and big anchor compositions.
+- Dirt-route painting is much stronger and visible across the field instead of
+  disappearing into the grass texture.
+- Pond/shoreline dressing now appears in clustered reed/flower clumps instead
+  of evenly spaced cattails. `addShorelineBanks(scene)` adds subtle sandy/rocky
+  definition around riverside edges.
+- Static decoration shadows remain disabled. Player and monster shadows remain
+  on their separate code paths.
+- Cache bumped to `game.js?v=187`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html`
+  passed, and Chrome preview at `http://localhost:8002/?codex=composition-v187`
+  loaded `game.js?v=187` with no console warnings/errors after the
+  `adjacentPathDir` ordering bug was fixed. Walking through the spawn grove
+  showed the base-origin y-sort working.
 
 **Where we left off (session 86):**
 - Goal: respond to Gemini Browser's critique that Grasslands Online is still a
@@ -670,7 +697,40 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 86 (latest)
+## 3. What we did in session 87 (latest)
+
+Cache now at **`?v=187`**. The latest visual feedback was right: even with
+nice assets, the map still read too procedural because props were evenly
+sprinkled and the field lacked strong path/landmark composition. This pass
+keeps Phaser and improves the current renderer.
+
+1. **True base-origin y-sorting.** `alignBottom` props now use
+   `setOrigin(0.5, 1)` in all three decoration placement helpers. Trees,
+   bushes, ponds, and anchor props sort from their ground-contact point.
+2. **Spawn occlusion test grove.** A dense non-blocking grove sits near spawn
+   so walking in front of and behind trunks can be checked immediately.
+3. **Pepper-shaker scatter reduced.** Grasslands singleton decoration counts
+   were cut back; density now comes from clustered flowers, grass thickets,
+   mushroom patches, bush groups, tree groves, roadside meadows, and open-field
+   pockets.
+4. **Anchor-prop composition.** Large trees, cacti, rocks, and ruins props now
+   seed small ecological scenes around landmarks and waystations so the map has
+   memorable places instead of continuous noise.
+5. **Visible dirt routes.** `addPathWashes()` now paints stronger warm dirt
+   trails so paths guide the eye across the grass.
+6. **Clustered shoreline treatment.** Pond edges now place cattails/flowers in
+   clumps, riverside single cattails were reduced, and `addShorelineBanks()`
+   adds subtle sandy/rocky edge definition.
+7. **Load/perf correction.** The generated grass texture and grass-tone stroke
+   counts were trimmed so the prettier scene still reaches gameplay.
+8. **Verification.** `node -c project-grasslands/game.js` clean.
+   `git diff --check -- project-grasslands/game.js project-grasslands/index.html`
+   clean. Chrome v187 loaded with no console warnings/errors after fixing the
+   `adjacentPathDir` ordering bug. Walked through the spawn grove and east
+   along the path.
+9. **No-decoration-shadow rule preserved.** `addPropShadow()` remains a no-op.
+
+## 3. What we did in session 86
 
 Cache now at **`?v=182`**. Gemini Browser's critique was structurally right:
 RO's depth comes from 3D terrain plus 2D billboard sprites. This pass does not
