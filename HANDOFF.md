@@ -612,7 +612,48 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 82 (latest)
+## 3. What we did in session 83 (latest)
+
+Cache now at **`?v=177`**. Sonny did a walking tour and flagged the
+three biggest map/world wins as (#3) water animation, (#4) weather
+visuals, (#2) empty zone outskirts. All shipped code-only this pass.
+
+1. **Water shimmer upgraded.** Per pond, three layered tweens now:
+   - Scale breath 1.06× + alpha 0.86 (was 1.04×/0.92).
+   - Subtle rotation drift `±3°` suggesting gentle current.
+   - Overlay sparkle dot — small white circle drifting ±30 px x,
+     -18 → +8 y, alpha 0 → 0.85, yoyo infinite.
+2. **Weather presence 3–4×.** Weather already had per-zone particle
+   spawners; they were just too sparse to register on screen. Bumped:
+   - `WEATHER_INTERVAL_MS` 90 s → 60 s, `DURATION_MS` 10 s → 16 s.
+   - Per-style rate: grasslands petals 10 → 38, forest mist 7 → 22,
+     desert sand swirl 12 → 42, ruins dust 8 → 28, riverside rain
+     16 → 60.
+3. **Biome density ~1.6× to fill outskirts.**
+   - **forest**: trees 480→760, bushes 260→420, mushrooms 320→520,
+     ferns 210→340, grass 300→500.
+   - **desert**: rocks 290→460, cacti 210→340, dunes 88→150,
+     grass 55→90.
+   - **ruins**: rocks 460→740, bushes 120→200, pillars 70→120,
+     grass 170→290.
+   - **riverside**: grass 430→700, flowers 310→500, cattails 200→360,
+     trees 110→180.
+4. **Verification.** `node -c` clean. Preview not re-checked this
+   session (rapid restarts wedge loader); ready for next session
+   visual confirm.
+5. **Cache bump.** `?v=176` → `?v=177`.
+
+### Critique points still queued
+
+- Elevation/shadow under "downhill" side of bumps to suggest topography.
+- Moss-blob in grasslands center: art-level fix to add overlay props or
+  reduce alpha further.
+- Riverbank ecosystem density (denser cattail clumps, lily pads, mud
+  texture right at water edge).
+- Dungeon/cave zone with distinct tile palette and stone props.
+- Zone-transition markers (worn stone path, posts) at biome borders.
+
+## 3.1. What we did in session 82
 
 Cache now at **`?v=176`**. Sonny: Lv and Zeny boxes overlap. Caused by
 session-78 font bump (Lv 17→24, Zeny 15→19) outgrowing the 210 px
@@ -3395,7 +3436,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=176`**. Next change should use `?v=177`.
+  change. Current: **`?v=177`**. Next change should use `?v=178`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
