@@ -607,20 +607,57 @@ biome identity, generate ONE image per biome — feathered irregular
 blob PNGs with transparent alpha, drawn over the neutral grass base
 the same way `pond_01.png` is. Order by impact:
 
+**Important image-generation handoff rule:** whenever Codex/Claude asks
+Sonny to generate images, provide the exact filename, size, output format,
+and full copy/paste prompt for each file. Do not say "generate these images"
+without prompts.
+
 1. **`biome_riverside_blob.png` (1024×1024)** — irregular teal/blue
    water-region blob, feathered alpha edge bleeding to transparent
    at silhouette. Mirrors pond ring style at scene scale.
+   - Prompt:
+     *"Create `biome_riverside_blob.png`, a 1024×1024 transparent PNG.
+     Top-down anime / Ragnarok Online style biome ground texture for a
+     riverside wet-grass and shallow muddy shoreline region. Irregular
+     rounded organic teal-blue and soft green ground blob, subtle wet mud
+     texture, faint reed-bank color variation, painterly detail, soft
+     feathered alpha edges blending to fully transparent at the silhouette,
+     no hard outline, no square tile boundary, no grid, no text, no objects,
+     original art, transparent background PNG."*
 2. **`biome_desert_blob.png` (1024×1024)** — irregular sandy/yellow
    biome blob, feathered.
+   - Prompt:
+     *"Create `biome_desert_blob.png`, a 1024×1024 transparent PNG.
+     Top-down anime / Ragnarok Online style biome ground texture for a
+     warm sandy desert transition region. Irregular organic sand-yellow
+     and dry-grass ground blob, subtle dust, tiny scuffed sand texture,
+     faint sun-baked dry patches, painterly detail, soft feathered alpha
+     edges blending to fully transparent at the silhouette, no hard outline,
+     no square tile boundary, no grid, no text, no cactus, no rocks, original
+     art, transparent background PNG."*
 3. **`biome_forest_blob.png` (1024×1024)** — irregular deep-green
    blob, feathered.
+   - Prompt:
+     *"Create `biome_forest_blob.png`, a 1024×1024 transparent PNG.
+     Top-down anime / Ragnarok Online style biome ground texture for a
+     mossy forest floor transition region. Irregular organic deep-green
+     and moss-green ground blob, subtle moss, soft leaf-litter color
+     variation, shaded grass texture, painterly detail, soft feathered
+     alpha edges blending to fully transparent at the silhouette, no hard
+     outline, no square tile boundary, no grid, no text, no trees, no
+     mushrooms, original art, transparent background PNG."*
 4. **`biome_ruins_blob.png` (1024×1024)** — irregular grey-tan biome
    blob, feathered, slightly broken/scuffed silhouette.
-
-Prompt suffix: *"top-down anime / Ragnarok Online style biome ground
-texture, soft feathered alpha edges blending to fully transparent at
-the silhouette, no hard outline, no grid, no text, original art,
-transparent background PNG."*
+   - Prompt:
+     *"Create `biome_ruins_blob.png`, a 1024×1024 transparent PNG.
+     Top-down anime / Ragnarok Online style biome ground texture for an
+     ancient ruins transition region. Irregular organic grey-tan and
+     warm stone-dust ground blob, subtle cracked-earth scuffs, worn stone
+     dust color variation, slightly broken/scuffed silhouette, painterly
+     detail, soft feathered alpha edges blending to fully transparent at
+     the silhouette, no hard outline, no square tile boundary, no grid,
+     no text, no pillars, no rocks, original art, transparent background
+     PNG."*
 
 Wire flow when first PNG lands:
 - `this.load.image('biome_<zone>_blob', 'assets/decorations/biome_<zone>_blob.png');`
