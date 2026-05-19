@@ -1081,7 +1081,12 @@ function create() {
     let over = false;
     for (const b of bloblings) {
       if (!b.alive || !b.sprite || !b.sprite.scene) continue;
-      if (Math.hypot(wx - b.sprite.x, wy - b.sprite.y) < 70) { over = true; break; }
+      // Scale hit test to the sprite's actual display size so giant bosses
+      // (scaleMult 6.6) register over their whole body. Floor at 70 px so
+      // tiny slimes stay easy to hover.
+      const halfW = Math.max(70, b.sprite.displayWidth / 2);
+      const halfH = Math.max(70, b.sprite.displayHeight / 2);
+      if (Math.abs(wx - b.sprite.x) < halfW && Math.abs(wy - b.sprite.y) < halfH) { over = true; break; }
     }
     scene.input.setDefaultCursor(over ? 'crosshair' : 'default');
   });
@@ -1104,7 +1109,13 @@ function create() {
     let clicked = null;
     for (const b of bloblings) {
       if (!b.alive || !b.sprite || !b.sprite.scene) continue;
-      if (Math.hypot(wx - b.sprite.x, wy - b.sprite.y) < 80) { clicked = b; break; }
+      // Scale click hit-test to sprite's actual display size — bosses with
+      // scaleMult 6.6 (Bigfoot, T-Rex, Kaiju Titan) cover much more than
+      // 80 px so clicks anywhere on the visible body register. Floor at
+      // 80 so small mobs keep the original generous tap target.
+      const halfW = Math.max(80, b.sprite.displayWidth / 2);
+      const halfH = Math.max(80, b.sprite.displayHeight / 2);
+      if (Math.abs(wx - b.sprite.x) < halfW && Math.abs(wy - b.sprite.y) < halfH) { clicked = b; break; }
     }
 
     // Spawn signpost is clickable — opens Travel panel as a world-anchored
