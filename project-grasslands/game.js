@@ -771,7 +771,9 @@ function preload() {
   // Background music — optional. Loader tolerates missing file (silent if absent).
   // Try mp3 first; ogg fallback for Firefox-only setups.
   this.load.audio('bgm', ['assets/audio/bgm.mp3', 'assets/audio/bgm.ogg']);
-  this.load.audio('hitthemonster', 'assets/audio/hitthemonster.mp3');
+  this.load.audio('hitthemonster',  'assets/audio/hitthemonster.mp3');
+  this.load.audio('hitthemonster2', 'assets/audio/hitting sound2.mp3');
+  this.load.audio('hitthemonster3', 'assets/audio/hitting sound3.mp3');
 }
 
 // ---------- Create ----------
@@ -5373,8 +5375,12 @@ function attemptPlayerAttack(scene, target) {
   spawnClassAttackFx(scene, player, target, special);
   target.takeDamage(dmg, { crit, variance });
   if (crit) sfxCrit(); else sfxHit();
-  // Sonny's custom hit SFX — plays on every landed monster hit.
-  try { scene.sound.play('hitthemonster', { volume: 0.7 }); } catch (e) { /* ignore */ }
+  // Sonny's custom hit SFX — pick one of three uniformly at random per
+  // landed hit so the sound has variety. Only one fires per hit.
+  try {
+    const hitKey = Phaser.Utils.Array.GetRandom(['hitthemonster', 'hitthemonster2', 'hitthemonster3']);
+    scene.sound.play(hitKey, { volume: 0.7 });
+  } catch (e) { /* ignore */ }
 }
 
 // Class-flavored attack visual. Cheap shapes, no art assets needed. Falls
