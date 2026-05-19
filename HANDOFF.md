@@ -612,7 +612,22 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 76 (latest)
+## 3. What we did in session 77 (latest)
+
+Cache now at **`?v=171`**. Sonny: "All decorations should not have
+shadow." The shadow ellipses under trees / bushes / cacti / ponds
+were reading as the "yellow-green bald oval bleach patches" flagged
+earlier.
+
+1. **`addPropShadow` short-circuited to no-op.** Single change in
+   `buildDecorations`: helper returns `null` immediately. `opts.shadow`
+   still accepted at call sites (no behavior change needed there).
+2. **Monster + player drop shadows untouched.** Those use a separate
+   code path (`MonsterController._addShadow`, `PlayerController` shadow
+   ellipse) and remain.
+3. **Cache bump.** `?v=170` → `?v=171`.
+
+## 3.1. What we did in session 76
 
 Cache now at **`?v=170`**. User said "Improve this game" after rejecting the
 grass direction. Current preview showed the remaining grass problem: circular
@@ -3309,7 +3324,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=168`**. Next change should use `?v=169`.
+  change. Current: **`?v=171`**. Next change should use `?v=172`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
