@@ -771,6 +771,7 @@ function preload() {
   // Background music — optional. Loader tolerates missing file (silent if absent).
   // Try mp3 first; ogg fallback for Firefox-only setups.
   this.load.audio('bgm', ['assets/audio/bgm.mp3', 'assets/audio/bgm.ogg']);
+  this.load.audio('hitthemonster', 'assets/audio/hitthemonster.mp3');
 }
 
 // ---------- Create ----------
@@ -5372,6 +5373,8 @@ function attemptPlayerAttack(scene, target) {
   spawnClassAttackFx(scene, player, target, special);
   target.takeDamage(dmg, { crit, variance });
   if (crit) sfxCrit(); else sfxHit();
+  // Sonny's custom hit SFX — plays on every landed monster hit.
+  try { scene.sound.play('hitthemonster', { volume: 0.7 }); } catch (e) { /* ignore */ }
 }
 
 // Class-flavored attack visual. Cheap shapes, no art assets needed. Falls
