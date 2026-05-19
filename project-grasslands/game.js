@@ -2058,6 +2058,103 @@ function buildDecorations(scene) {
     grasslands: large ? 0xc8d8a8 : 0xd8e8c0,
   }[zone] || 0xffffff);
 
+  const transitionOverlayKey = (zone, neighborZone = zone, pathShoulder = false) => {
+    if (zone === 'desert' || neighborZone === 'desert') {
+      return firstExisting(['deco_sand_scuff_soft_01', 'deco_dry_grass_tuft_01', 'deco_cracked_earth_01']);
+    }
+    if (zone === 'ruins' || neighborZone === 'ruins') {
+      return firstExisting(['deco_stone_dust_soft_01', 'deco_pebble_cluster_01', 'deco_cracked_earth_01']);
+    }
+    if (pathShoulder) {
+      return firstExisting(['deco_pebble_cluster_01', 'deco_sand_scuff_soft_01', Phaser.Utils.Array.GetRandom(grassKeys)]);
+    }
+    if (zone === 'riverside' || neighborZone === 'riverside') {
+      return firstExisting(['deco_stone_dust_soft_01', Phaser.Utils.Array.GetRandom(riversideCattailKeys), Phaser.Utils.Array.GetRandom(grassKeys)]);
+    }
+    if (zone === 'forest' || neighborZone === 'forest') {
+      return firstExisting(['deco_dry_grass_tuft_01', Phaser.Utils.Array.GetRandom(forestFernKeys), Phaser.Utils.Array.GetRandom(grassKeys)]);
+    }
+    return firstExisting(['deco_pebble_cluster_01', Phaser.Utils.Array.GetRandom(flowerKeys), Phaser.Utils.Array.GetRandom(grassKeys)]);
+  };
+
+  const blendTint = (zone, neighborZone) => {
+    if (zone === 'desert' || neighborZone === 'desert') return 0xd8bf80;
+    if (zone === 'ruins' || neighborZone === 'ruins') return 0xbfb6a2;
+    if (zone === 'riverside' || neighborZone === 'riverside') return 0xbfd8c8;
+    if (zone === 'forest' || neighborZone === 'forest') return 0xa8c898;
+    return 0xd8e0b8;
+  };
+
+  const adjacentPathDir = (r, c) => {
+    for (const [dr, dc] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      if (getCellType(r + dr, c + dc) !== 'grass') return { dr, dc };
+    }
+    return null;
+  };
+
+  const placeGroundTransition = (r, c, key, opts = {}) => {
+    if (!key || !scene.textures.exists(key)) return null;
+    const dir = opts.dir || { dr: 0, dc: 0 };
+    const x = c * TILE_SIZE + TILE_SIZE / 2
+      + dir.dc * (opts.edgeOffset ?? 34)
+      + Phaser.Math.Between(-(opts.jitterX ?? 30), opts.jitterX ?? 30);
+    const y = r * TILE_SIZE + TILE_SIZE / 2
+      + dir.dr * (opts.edgeOffset ?? 30)
+      + Phaser.Math.Between(-(opts.jitterY ?? 26), opts.jitterY ?? 26);
+    const img = scene.add.image(x, y, key);
+    img.setScale((opts.h ?? Phaser.Math.Between(96, 190)) / img.height);
+    img.setAlpha(opts.alpha ?? Phaser.Math.FloatBetween(0.10, 0.18));
+    img.setAngle(Phaser.Math.Between(0, 359));
+    img.setDepth(opts.depth ?? -785);
+    if (opts.tint) img.setTint(opts.tint);
+    return img;
+  };
+
+  let roadBlendCount = 0;
+  let biomeBlendCount = 0;
+  for (let r = 1; r < MAP_ROWS - 1; r++) {
+    for (let c = 1; c < MAP_COLS - 1; c++) {
+      if (getCellType(r, c) !== 'grass') continue;
+      const zone = getZone(r, c);
+      const pathDir = adjacentPathDir(r, c);
+      if (pathDir && roadBlendCount < 760 && tileNoise(r, c, 301) > 0.16) {
+        const key = transitionOverlayKey(zone, zone, true);
+        placeGroundTransition(r, c, key, {
+          dir: pathDir,
+          edgeOffset: 42,
+          h: Phaser.Math.Between(86, 170),
+          alpha: Phaser.Math.FloatBetween(0.11, 0.21),
+          tint: blendTint(zone, zone),
+          depth: -790,
+        });
+        if (tileNoise(r, c, 302) > 0.74) {
+          placeGroundTransition(r, c, transitionOverlayKey(zone, zone, true), {
+            dir: pathDir,
+            edgeOffset: 18,
+            h: Phaser.Math.Between(38, 74),
+            alpha: Phaser.Math.FloatBetween(0.12, 0.22),
+            tint: blendTint(zone, zone),
+            depth: -775,
+          });
+        }
+        roadBlendCount++;
+      }
+
+      const zones = [...neighborZones(r, c)].filter((z) => z !== zone);
+      const neighborZone = zones[0];
+      if (neighborZone && biomeBlendCount < 520 && tileNoise(r, c, 311) > 0.20) {
+        const key = transitionOverlayKey(zone, neighborZone, false);
+        placeGroundTransition(r, c, key, {
+          h: Phaser.Math.Between(100, 210),
+          alpha: Phaser.Math.FloatBetween(0.075, 0.15),
+          tint: blendTint(zone, neighborZone),
+          depth: -795,
+        });
+        biomeBlendCount++;
+      }
+    }
+  }
+
   // Soft ground overlay pass — breaks the 128 px tile grid visually by
   // scattering translucent sprites at sub-tile offsets. Depth -800 sits
   // between map tiles (-1000) and props (-500/-620), so these blend terrain

@@ -4,19 +4,31 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 7:03 PM CDT — post terrain detail asset wiring.**
+**State as of 2026-05-18 7:26 PM CDT — post path/biome transition pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 52 imports and wires five generated
-  terrain-detail overlays: sand scuff, stone dust, cracked earth, pebbles,
-  and dry grass tuft.
-- **Cache version live in `project-grasslands/index.html`:** `?v=143`.
-- **Next change must use:** `?v=144`.
+- **Latest completed work:** session 53 adds a dedicated transition overlay
+  layer so roads have soft shoulders and biome borders blend with ground
+  scuffs/pebbles/tufts instead of hard tile edges.
+- **Cache version live in `project-grasslands/index.html`:** `?v=144`.
+- **Next change must use:** `?v=145`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
 
-**Where we left off (session 52):**
+**Where we left off (session 53):**
+- Added `transitionOverlayKey()`, `blendTint()`, `adjacentPathDir()`, and
+  `placeGroundTransition()` inside `buildDecorations()`.
+- New road-shoulder pass places low-alpha scuffs/pebbles/tufts along grass
+  tiles adjacent to road/path tiles, offset toward the path edge so roads
+  read as worn into terrain rather than stamped squares.
+- New biome-border pass places broad low-alpha transition overlays along
+  neighboring-zone edges, choosing sand/stone/grass/reed-style details based
+  on both zones.
+- No gameplay, combat, progression, controls, UI layout, map dimensions, or
+  monster logic changed.
+
+**Previous state (session 52):**
 - Five generated terrain-detail PNGs were moved from Downloads into
   `project-grasslands/assets/decorations/`, resized to game-ready dimensions,
   preloaded, and included in `keyOutWhite()` because the source files have no
@@ -133,8 +145,8 @@ obvious meaning, is a yes/no/ok acknowledgement, or starts with `/`.
 
 
 > **READ TOP-TO-BOTTOM BEFORE TOUCHING CODE.** Single source of truth between
-> coding sessions. Last refresh: 2026-05-18 (post session 52, terrain detail
-> asset wiring. Cache `?v=143`).
+> coding sessions. Last refresh: 2026-05-18 (post session 53, path/biome
+> transition pass. Cache `?v=144`).
 >
 > (Pre-session-47 header line:) Last refresh: 2026-05-18 (post session 46,
 > `grass_tileset_v2.png` wired as the base grass tileset. Cache `?v=137`).
@@ -342,7 +354,38 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 52 (latest)
+## 3. What we did in session 53 (latest)
+
+Cache now at **`?v=144`**. Sonny accepted the recommendation to improve
+paths and biome transitions so the world feels more like an authored
+Ragnarok Online-style map rather than stamped tile regions.
+
+1. **Road shoulder overlays.** Added a transition layer that scans grass
+   tiles adjacent to roads/paths and places low-alpha ground details offset
+   toward the path edge. This uses sand scuffs, pebbles, dry tufts, and
+   existing vegetation details depending on biome.
+2. **Biome border overlays.** Added a border blend pass for tiles next to
+   a different zone. It chooses sand/stone/reed/grass transition details
+   based on both the current zone and neighbor zone.
+3. **New helper functions.** Added `transitionOverlayKey()`, `blendTint()`,
+   `adjacentPathDir()`, and `placeGroundTransition()` inside
+   `buildDecorations()`.
+4. **Readability preserved.** Transition overlays sit around depth `-795`
+   to `-775`, below props, players, monsters, HP bars, and nameplates.
+   They do not block cells and do not alter movement.
+5. **Scope preserved.** No gameplay, combat, progression, controls, UI
+   layout, monster logic, saves, map size, or lighting changed.
+6. **Verification.** `node -c project-grasslands/game.js` exited 0.
+7. **Cache bump.** `?v=143` → `?v=144`.
+
+### Next best RO-beauty move
+
+Add authored micro-scenes near roads and landmark approaches: small ruined
+wall clusters, flower meadow pockets, cactus/dry-grass groups, forest
+mushroom groves, and riverside reed/stone banks. The terrain now blends
+better; next beauty jump comes from intentional scene composition.
+
+## 3.1. What we did in session 52
 
 Cache now at **`?v=143`**. Sonny generated the five terrain detail images
 requested after session 51 and dropped them in Downloads.
