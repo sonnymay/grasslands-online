@@ -934,6 +934,7 @@ function create() {
   sliceTileset('forest_tileset');
   sliceTileset('ruins_tileset');
   sliceTileset('riverside_tileset');
+  createTerrainBlendMasks(scene);
 
   // World bounds + camera
   scene.physics.world.setBounds(0, 0, WORLD_W, WORLD_H);
@@ -1456,6 +1457,72 @@ function terrainBlendTint(zone, neighborZone = zone) {
   return 0xd8e0b8;
 }
 
+function terrainZoneEdgeTint(zone) {
+  return {
+    grasslands: 0xd8e6b8,
+    forest: 0xb8d8a0,
+    desert: 0xd8bd78,
+    ruins: 0xbfb6a2,
+    riverside: 0xbfd8c8,
+  }[zone] || 0xd8e0b8;
+}
+
+function terrainTransitionBaseTint(zone, zones, distance = 3) {
+  const closeness = Phaser.Math.Clamp((4 - (distance || 3)) / 3, 0.2, 1);
+  if (zones.has('desert')) {
+    return zone === 'desert'
+      ? (closeness > 0.66 ? 0xd9c38d : 0xd6cfa4)
+      : (closeness > 0.66 ? 0xded4a4 : 0xe3e0b4);
+  }
+  if (zones.has('riverside')) {
+    return zone === 'riverside'
+      ? (closeness > 0.66 ? 0xd0dfc6 : 0xd8e8ca)
+      : (closeness > 0.66 ? 0xd8e5c6 : 0xe0eccf);
+  }
+  if (zones.has('ruins')) return closeness > 0.66 ? 0xd0c8ae : 0xd8d7b8;
+  if (zones.has('forest')) return closeness > 0.66 ? 0xccddb8 : 0xdae8c6;
+  return 0xe0e8c8;
+}
+
+function createTerrainBlendMasks(scene) {
+  if (scene.textures.exists('terrain_edge_alpha_mask')) return;
+  const makeMask = (key, alphaAt) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = TILE_SIZE;
+    canvas.height = TILE_SIZE;
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(TILE_SIZE, TILE_SIZE);
+    for (let y = 0; y < TILE_SIZE; y++) {
+      for (let x = 0; x < TILE_SIZE; x++) {
+        const i = (y * TILE_SIZE + x) * 4;
+        const alpha = Phaser.Math.Clamp(alphaAt(x, y), 0, 1);
+        img.data[i] = 255;
+        img.data[i + 1] = 255;
+        img.data[i + 2] = 255;
+        img.data[i + 3] = Math.round(alpha * 255);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    scene.textures.addCanvas(key, canvas);
+  };
+
+  makeMask('terrain_edge_alpha_mask', (x, y) => {
+    const wave = Math.sin(x * 0.12) * 7 + Math.sin(x * 0.31 + 1.7) * 4;
+    const d = y - (6 + wave);
+    const base = 1 - d / 82;
+    const grain = 0.84 + Math.sin((x * 13 + y * 7) * 0.07) * 0.08;
+    return base * grain;
+  });
+
+  makeMask('terrain_corner_alpha_mask', (x, y) => {
+    const waveX = Math.sin(y * 0.14) * 8;
+    const waveY = Math.sin(x * 0.13 + 0.8) * 8;
+    const d = Math.hypot(x + waveX, y + waveY);
+    const grain = 0.86 + Math.sin((x * 11 + y * 17) * 0.05) * 0.08;
+    return (1 - d / 118) * grain;
+  });
+}
+
 function terrainBoundaryInfo(r, c, radius = 3) {
   const zone = getZone(r, c);
   const zones = new Set([zone]);
@@ -1566,7 +1633,10 @@ function buildMap(scene) {
         ruins: 'ruins_tileset',
         riverside: 'riverside_tileset',
       }[zone];
-      const transitionBase = inTransitionBand && (zone === 'riverside' || zone === 'desert' || boundaryInfo.zones.has('riverside') || boundaryInfo.zones.has('desert'));
+      const transitionBase = inTransitionBand;
+      const transitionTint = transitionBase
+        ? terrainTransitionBaseTint(zone, boundaryInfo.zones, boundaryInfo.distance)
+        : null;
       const tilesetKey = !transitionBase && zoneTileset && scene.textures.exists(zoneTileset)
         ? zoneTileset : 'grass_tileset';
 
@@ -1594,7 +1664,7 @@ function buildMap(scene) {
       };
       if (type === 'grass') {
         if (tilesetKey === 'grass_tileset') {
-          const tint = ZONE_TINTS[zone] || 0xffffff;
+          const tint = transitionTint || ZONE_TINTS[zone] || 0xffffff;
           img.setTint(jitterTint(tint));
         } else {
           // Biome tilesets still need a shared painterly wash so they don't
@@ -1615,16 +1685,28 @@ function buildMap(scene) {
 
 function addTerrainSeamBlends(scene) {
   const dirs = [
-    { dr: -1, dc: 0, angle: 0, ox: 0, oy: -TILE_SIZE / 2 },
-    { dr: 1, dc: 0, angle: 0, ox: 0, oy: TILE_SIZE / 2 },
-    { dr: 0, dc: -1, angle: 90, ox: -TILE_SIZE / 2, oy: 0 },
-    { dr: 0, dc: 1, angle: 90, ox: TILE_SIZE / 2, oy: 0 },
+    { dr: -1, dc: 0, angle: 0, maskAngle: 0, ox: 0, oy: -TILE_SIZE / 2 },
+    { dr: 1, dc: 0, angle: 0, maskAngle: 180, ox: 0, oy: TILE_SIZE / 2 },
+    { dr: 0, dc: -1, angle: 90, maskAngle: -90, ox: -TILE_SIZE / 2, oy: 0 },
+    { dr: 0, dc: 1, angle: 90, maskAngle: 90, ox: TILE_SIZE / 2, oy: 0 },
   ];
   let seamCount = 0;
   let cornerCount = 0;
   let bandCount = 0;
 
   const addSeam = (r, c, zone, neighborZone, dir) => {
+    if (scene.textures.exists('terrain_edge_alpha_mask')) {
+      const mask = scene.add.image(
+        c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-4, 4),
+        r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-4, 4),
+        'terrain_edge_alpha_mask'
+      );
+      mask.setDisplaySize(TILE_SIZE + 22, TILE_SIZE + 22);
+      mask.setAngle(dir.maskAngle + Phaser.Math.Between(-3, 3));
+      mask.setAlpha(Phaser.Math.FloatBetween(0.48, 0.68));
+      mask.setTint(terrainZoneEdgeTint(neighborZone));
+      mask.setDepth(-934);
+    }
     const key = terrainBlendAsset(zone, neighborZone);
     if (!scene.textures.exists(key)) return;
     const noise = tileNoise(r, c, 731 + dir.dr * 11 + dir.dc * 17);
@@ -1644,6 +1726,18 @@ function addTerrainSeamBlends(scene) {
 
   const addCorner = (r, c, zone, zones) => {
     const neighborZone = zones.find((z) => z !== zone) || zone;
+    if (scene.textures.exists('terrain_corner_alpha_mask')) {
+      const mask = scene.add.image(
+        c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-10, 10),
+        r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-10, 10),
+        'terrain_corner_alpha_mask'
+      );
+      mask.setDisplaySize(TILE_SIZE + 42, TILE_SIZE + 42);
+      mask.setAngle(Phaser.Math.Between(0, 3) * 90);
+      mask.setAlpha(Phaser.Math.FloatBetween(0.32, 0.52));
+      mask.setTint(terrainZoneEdgeTint(neighborZone));
+      mask.setDepth(-938);
+    }
     const key = terrainBlendAsset(zone, neighborZone);
     if (!scene.textures.exists(key)) return;
     const x = c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-34, 34);

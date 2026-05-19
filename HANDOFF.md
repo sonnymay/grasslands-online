@@ -4,18 +4,35 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-18 11:12 PM CDT — post organic transition band pass.**
+**State as of 2026-05-18 11:25 PM CDT — post alpha edge-mask transition pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 67 attacks Claude Browser's #1 complaint:
-  hard square biome chunks. Boundary tiles now use neutral transition bases,
-  warped biome edges, and wider soft wash bands instead of full teal/sand
-  tiles meeting grass in one hard edge.
-- **Cache version live in `project-grasslands/index.html`:** `?v=158`.
-- **Next change must use:** `?v=159`.
+- **Latest completed work:** session 68 fixes the actual per-tile edge snap:
+  runtime alpha masks now overlay each differing biome edge/corner, and
+  transition-band base tiles no longer receive full teal/sand zone tint.
+- **Cache version live in `project-grasslands/index.html`:** `?v=159`.
+- **Next change must use:** `?v=160`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 68):**
+- Goal: answer Claude Browser's new feedback that warped zone shapes helped
+  only marginally because individual teal/sand tile edges still snapped hard.
+- Added runtime-generated `terrain_edge_alpha_mask` and
+  `terrain_corner_alpha_mask` canvas textures: white alpha masks with wavy
+  gradients that Phaser can tint per neighboring biome.
+- `addTerrainSeamBlends()` now stamps those masks directly over tile edges and
+  corners, so neighbor color fades into each boundary tile instead of changing
+  at one pixel-sharp square edge.
+- Transition-band base tiles now use `terrainTransitionBaseTint()` instead of
+  `ZONE_TINTS`, so riverside/desert edge tiles no longer render as fully teal
+  or fully sand-colored squares.
+- Cache bumped to `game.js?v=159`.
+- No gameplay, combat, controls, class selection, save schema, monster logic,
+  collision, map size, or sprite assets changed.
+- Verification: `node -c project-grasslands/game.js` passed and
+  `git diff --check` passed.
 
 **Where we left off (session 67):**
 - Goal: fix the glaring checkerboard/rectangular biome-transition problem,
@@ -512,7 +529,31 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 67 (latest)
+## 3. What we did in session 68 (latest)
+
+Cache now at **`?v=159`**. Claude Browser said the map shape was only
+marginally better because the actual per-tile edge rendering still snapped
+from teal/sand to grass with hard pixel-sharp square borders. This session
+targets that renderer-level issue directly.
+
+1. **Runtime edge masks.** Added `createTerrainBlendMasks(scene)`, generating
+   `terrain_edge_alpha_mask` and `terrain_corner_alpha_mask` from canvas at
+   startup. Masks are wavy alpha gradients, not solid rectangles.
+2. **Autotile-like edge stamps.** `addTerrainSeamBlends()` now places tinted
+   edge masks on every tile side touching another biome. Neighbor color fades
+   into the current tile instead of snapping at the tile border.
+3. **Corner stamps.** Multi-zone corners also get tinted corner masks, reducing
+   square/corner cuts.
+4. **No full teal/sand edge tint.** Added `terrainTransitionBaseTint()` so
+   transition-band base tiles use muted neutral grass/soil colors instead of
+   full `ZONE_TINTS` teal/sand.
+5. **Per-biome tint source.** Added `terrainZoneEdgeTint()` so masks tint to
+   the neighboring terrain type: grass, forest moss, sand, stone, or wet mud.
+6. **Cache bump.** `?v=158` → `?v=159`.
+7. **Verification.** `node -c project-grasslands/game.js` passed and
+   `git diff --check` passed.
+
+## 3.1. What we did in session 67
 
 Cache now at **`?v=158`**. Claude Browser confirmed the remaining dominant
 problem was still square, harsh biome chunks — teal/cyan riverside blocks and
@@ -538,7 +579,7 @@ session changes the map logic, not just decoration.
 8. **Verification.** `node -c project-grasslands/game.js` passed and
    `git diff --check` passed.
 
-## 3.1. What we did in session 66
+## 3.2. What we did in session 66
 
 Cache now at **`?v=157`**. Sonny identified the #1 remaining visual problem:
 terrain tile transitions were still harsh, square, and blocky, especially
@@ -562,7 +603,7 @@ riverside/grass and biome edges. This session targets that problem directly.
 7. **Verification.** `node -c project-grasslands/game.js` passed and
    `git diff --check` passed.
 
-## 3.2. What we did in session 65
+## 3.3. What we did in session 65
 
 Cache now at **`?v=156`**. Sonny: "Improve the Choose Your Path
 character cards so they are easier to click and look more polished."
@@ -592,7 +633,7 @@ behavior changed.
    Open + close the preview cleanly to confirm next session.
 9. **Cache bump.** `?v=155` → `?v=156`.
 
-## 3.3. What we did in session 63
+## 3.4. What we did in session 63
 
 Cache now at **`?v=154`**. Sonny pointed out that the "Choose Your Path"
 class cards were hard to click and did not look good. This session targets
@@ -2890,7 +2931,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=158`**. Next change should use `?v=159`.
+  change. Current: **`?v=159`**. Next change should use `?v=160`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
