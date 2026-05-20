@@ -19,7 +19,7 @@ const MAP_ROWS = Math.ceil(WORLD_H / TILE_SIZE);
 const CELL_SIZE = 32;
 const GRID_COLS = Math.floor(WORLD_W / CELL_SIZE);
 const GRID_ROWS = Math.floor(WORLD_H / CELL_SIZE);
-const MS_PER_CELL = 170; // RO-like: slower cell steps make footfalls readable.
+const MS_PER_CELL = 145; // Snappier RO-like cell steps without feeling twitchy.
 const MAX_PATH_LEN = 256;
 const HIT_STUN_MS = 200;
 const HP_REGEN_INTERVAL_MS = 3000;  // tick every 3s
@@ -45,11 +45,11 @@ const BLOBLING_ATTACK_RANGE = 80;
 // name label, and HP bars, so over-populating the whole 19200px map tanks FPS
 // even when most monsters are off camera. Keep density readable through pods
 // and respawns instead of hundreds of simultaneous display objects.
-const BLOBLING_COUNT = 60;
-const MOOHAM_COUNT = 40;
-const MOOWAAN_COUNT = 32;
-const MOODENG_COUNT = 24;
-const DUNE_BLOB_COUNT = 24;
+const BLOBLING_COUNT = 20;
+const MOOHAM_COUNT = 14;
+const MOOWAAN_COUNT = 12;
+const MOODENG_COUNT = 8;
+const DUNE_BLOB_COUNT = 8;
 const BIGFOOT_COUNT = 1;
 const BIOME_BOSS_COUNT = 1;
 
@@ -1410,7 +1410,7 @@ function keyOutWhite(scene, key) {
   const canvas = document.createElement('canvas');
   canvas.width = src.width;
   canvas.height = src.height;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(src, 0, 0);
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const d = imgData.data;
@@ -1433,7 +1433,7 @@ function keyOutCheckerboard(scene, key) {
   const canvas = document.createElement('canvas');
   canvas.width = src.width;
   canvas.height = src.height;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(src, 0, 0);
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const d = imgData.data;
@@ -3040,12 +3040,12 @@ function buildDecorations(scene) {
       const nearPath = [[1,0],[-1,0],[0,1],[0,-1]].some(([dr, dc]) =>
         getCellType(r + dr, c + dc) !== 'grass'
       );
-      if (nearBoundary && boundaryAccentCount < 520 && Math.random() < 0.34) {
+      if (nearBoundary && boundaryAccentCount < 90 && Math.random() < 0.20) {
         const accent = edgeAccentForZone(zone, false);
         placeTileAccent(r, c, accent.key, accent.h, accent.opts);
         boundaryAccentCount++;
       }
-      if (nearPath && pathShoulderCount < 380 && Math.random() < 0.22) {
+      if (nearPath && pathShoulderCount < 70 && Math.random() < 0.14) {
         const accent = edgeAccentForZone(zone, true);
         placeTileAccent(r, c, accent.key, accent.h, accent.opts);
         pathShoulderCount++;
@@ -3058,12 +3058,12 @@ function buildDecorations(scene) {
   let roadsideMeadowCount = 0;
   for (let r = 2; r < MAP_ROWS - 2; r++) {
     for (let c = 2; c < MAP_COLS - 2; c++) {
-      if (roadsideMeadowCount >= 145) break;
+      if (roadsideMeadowCount >= 32) break;
       if (getCellType(r, c) !== 'grass' || !adjacentPathDir(r, c)) continue;
       const zone = getZone(r, c);
       const threshold = zone === 'grasslands' ? 0.80 : 0.88;
       if (tileNoise(r, c, 1941) < threshold) continue;
-      const items = Phaser.Math.Between(4, 8);
+      const items = Phaser.Math.Between(2, 4);
       for (let i = 0; i < items; i++) {
         const rr = Phaser.Math.Clamp(r + Phaser.Math.Between(-1, 1), 1, MAP_ROWS - 2);
         const cc = Phaser.Math.Clamp(c + Phaser.Math.Between(-1, 1), 1, MAP_COLS - 2);
@@ -3084,7 +3084,7 @@ function buildDecorations(scene) {
   let fieldPocketCount = 0;
   for (let r = 2; r < MAP_ROWS - 2; r++) {
     for (let c = 2; c < MAP_COLS - 2; c++) {
-      if (fieldPocketCount >= 420) break;
+      if (fieldPocketCount >= 70) break;
       if (getCellType(r, c) !== 'grass') continue;
       const nearPath = [[1,0],[-1,0],[0,1],[0,-1]].some(([dr, dc]) =>
         getCellType(r + dr, c + dc) !== 'grass'
@@ -3092,7 +3092,7 @@ function buildDecorations(scene) {
       const zone = getZone(r, c);
       const threshold = zone === 'grasslands' ? 0.978 : 0.986;
       if (nearPath || nearZoneBoundary(r, c) || tileNoise(r, c, 917) < threshold) continue;
-      const items = Phaser.Math.Between(4, 7);
+      const items = Phaser.Math.Between(2, 3);
       for (let i = 0; i < items; i++) {
         const rr = Phaser.Math.Clamp(r + Phaser.Math.Between(-1, 1), 1, MAP_ROWS - 2);
         const cc = Phaser.Math.Clamp(c + Phaser.Math.Between(-1, 1), 1, MAP_COLS - 2);
@@ -4385,7 +4385,7 @@ function buildDecorations(scene) {
   // These give the world "map designer touched this" moments without changing
   // movement or combat rules; every prop here is non-blocking.
   const sceneTiles = [];
-  const sceneZoneCaps = { grasslands: 12, forest: 8, desert: 8, ruins: 8, riverside: 8 };
+  const sceneZoneCaps = { grasslands: 5, forest: 4, desert: 4, ruins: 4, riverside: 4 };
   const sceneZoneCounts = { grasslands: 0, forest: 0, desert: 0, ruins: 0, riverside: 0 };
   const queueScene = (r, c, zoneHint = null) => {
     if (r <= 0 || c <= 0 || r >= MAP_ROWS - 1 || c >= MAP_COLS - 1) return;
@@ -4402,14 +4402,14 @@ function buildDecorations(scene) {
     queueScene(lm.r, lm.c - 2, zone);
     queueScene(lm.r, lm.c + 2, zone);
   }
-  for (let r = 2; r < MAP_ROWS - 2 && sceneTiles.length < 28; r++) {
-    for (let c = 2; c < MAP_COLS - 2 && sceneTiles.length < 28; c++) {
+  for (let r = 2; r < MAP_ROWS - 2 && sceneTiles.length < 14; r++) {
+    for (let c = 2; c < MAP_COLS - 2 && sceneTiles.length < 14; c++) {
       if (getCellType(r, c) !== 'grass' || !adjacentPathDir(r, c)) continue;
       if (tileNoise(r, c, 461) > 0.990) queueScene(r, c);
     }
   }
-  for (let r = 3; r < MAP_ROWS - 3 && sceneTiles.length < 44; r++) {
-    for (let c = 3; c < MAP_COLS - 3 && sceneTiles.length < 44; c++) {
+  for (let r = 3; r < MAP_ROWS - 3 && sceneTiles.length < 24; r++) {
+    for (let c = 3; c < MAP_COLS - 3 && sceneTiles.length < 24; c++) {
       if (getCellType(r, c) !== 'grass') continue;
       if (adjacentPathDir(r, c) || nearZoneBoundary(r, c)) continue;
       const zone = getZone(r, c);
@@ -5581,6 +5581,20 @@ class MonsterController {
     const dy = player.sprite.y - this.sprite.y;
     const dist = Math.hypot(dx, dy);
     const playerAlive = !player.dead;
+    const dormant = !this.provoked && dist > 1700;
+    if (dormant) {
+      this.sprite.setVelocity(0, 0);
+      if (this.sprite.visible) this.sprite.setVisible(false);
+      if (this.shadow.visible) this.shadow.setVisible(false);
+      if (this.auraRing && this.auraRing.visible) this.auraRing.setVisible(false);
+      this.nameTag.setVisible(false);
+      this.hpBarBg.setVisible(false);
+      this.hpBar.setVisible(false);
+      return;
+    }
+    if (!this.sprite.visible) this.sprite.setVisible(true);
+    if (!this.shadow.visible) this.shadow.setVisible(true);
+    if (this.auraRing && !this.auraRing.visible) this.auraRing.setVisible(true);
 
     if (this.cfg.aggressive && playerAlive && dist <= (this.cfg.aggroRange || BLOBLING_AGGRO_RANGE)) {
       this.provoked = true;

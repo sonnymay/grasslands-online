@@ -4,17 +4,61 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 104 broken ruins arch asset pass.**
+**State as of 2026-05-20 — post session 105 fallen column + performance pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 104 wires Sonny's generated
-  `ruins_arch_broken_01.png` into the ancient-tree ruin landmark as a tall
-  hand-placed ruin-gate anchor, continuing Tier 2 ruins depth/texture assets.
-- **Cache version live in `project-grasslands/index.html`:** `?v=208`.
-- **Next change must use:** `?v=209`.
+- **Latest completed work:** session 105 wires Sonny's generated
+  `ruins_column_fallen_01.png` into the ancient-tree ruin landmark and fixes
+  the major lag source by trimming full-map prop/mob budgets, culling distant
+  decorations, and putting far-off monsters into a dormant state.
+- **Cache version live in `project-grasslands/index.html`:** `?v=211`.
+- **Next change must use:** `?v=212`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
-  stage, commit, or revert these.
+  stage, commit, or revert these. Also leave the untracked misspelled
+  `assets/decorations/camfire_01.png` alone unless Sonny explicitly confirms
+  cleanup.
+
+**Where we left off (session 105):**
+- Goal: continue the Tier 2 ruin/landmark asset pipeline after Sonny generated
+  the fallen ruin column PNG in Downloads, while fixing the current laggy/slow
+  browser build.
+- Source asset:
+  `/Users/santipapmay/Downloads/ruins_column_fallen_01.png`. It was 2048x768
+  RGB with a fake checkerboard background and no alpha, so it was normalized
+  locally into
+  `project-grasslands/assets/decorations/ruins_column_fallen_01.png`.
+- Final project asset: `ruins_column_fallen_01.png`, 320x120 RGBA with real
+  alpha. The original Downloads file was left untouched.
+- `preload()` now loads `ruins_column_fallen_01` with cache bust `?v=209`.
+- `addPromptInspiredLandmarks()` places the fallen column as one hand-placed
+  ruin accent near the ancient-tree ruin with a baked/contact mark and a small
+  collision blocker. It is not globally scattered.
+- Performance fix:
+  - Normal monster population was reduced from 440 always-live normal mobs to
+    62, while boss counts stay rare and the spawn showcase pod stays.
+  - Far-off unprovoked monsters now become dormant: they stop wandering and
+    hide sprite/shadow/UI until the player approaches.
+  - Full-map decoration generation was cut from thousands of sprite props to a
+    much smaller authored budget, while keeping landmark/camp/ruin anchors.
+  - World decorations are registered in `scene.__worldDecorations` and culled
+    by camera neighborhood every ~220ms.
+  - Infinite sway tweens are capped tightly; old thousands-of-tweens risk is
+    gone.
+  - Texture key-out canvases now request `{ willReadFrequently: true }`, which
+    removes the browser's repeated Canvas2D readback warnings during load.
+- Static decoration shadows remain disabled. Do not re-enable
+  `addPropShadow()`.
+- Cache bumped to `game.js?v=211`.
+- Verification: `node -c project-grasslands/game.js` passed; `localhost:8001`
+  served `/`, `game.js?v=211`, and
+  `assets/decorations/ruins_column_fallen_01.png?v=209` with HTTP 200; PNG
+  alpha/dimensions were confirmed. Playwright loaded
+  `http://localhost:8001/?codex=perf-v211-final`; live object count dropped
+  from the investigated baseline of ~8,664 children / ~6,230 decorations /
+  ~644 tweens to ~1,861 children / ~1,251 decorations / ~50 tweens, with 68
+  of 72 monsters dormant at spawn. Console readback warnings dropped from ~150
+  to 3 WebGL warnings plus the harmless missing favicon 404.
 
 **Where we left off (session 104):**
 - Goal: continue the Tier 2 ruin/landmark asset pipeline after Sonny generated
