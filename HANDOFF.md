@@ -4,17 +4,39 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 102 wide mossy boulder asset pass.**
+**State as of 2026-05-19 — post session 103 broken ruins wall asset pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 102 wires Sonny's generated
-  `boulder_mossy_02.png` into the ruin/boulder landmark scenes as wider
-  hand-placed accent stones, continuing Tier 2 depth/texture assets.
-- **Cache version live in `project-grasslands/index.html`:** `?v=206`.
-- **Next change must use:** `?v=207`.
+- **Latest completed work:** session 103 wires Sonny's generated
+  `ruins_wall_broken_01.png` into the ancient-tree ruin landmark as a large
+  hand-placed wall anchor, continuing Tier 2 ruins depth/texture assets.
+- **Cache version live in `project-grasslands/index.html`:** `?v=207`.
+- **Next change must use:** `?v=208`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 103):**
+- Goal: continue the Tier 2 ruin/landmark asset pipeline after Sonny generated
+  the broken stone wall PNG in Downloads.
+- Source asset:
+  `/Users/santipapmay/Downloads/ruins_wall_broken_01..png`. Note the source
+  filename has a double dot before `.png`. It was 1512x1040 RGB with a fake
+  checkerboard background and no alpha, so it was normalized locally into
+  `project-grasslands/assets/decorations/ruins_wall_broken_01.png`.
+- Final project asset: `ruins_wall_broken_01.png`, 320x220 RGBA with real
+  alpha. The original Downloads file was left untouched.
+- `preload()` now loads `ruins_wall_broken_01` with cache bust `?v=207`.
+- `addPromptInspiredLandmarks()` now places the wall as one large hand-placed
+  ancient-tree ruin anchor with a structure-only contact mark and collision
+  blocker. It is not globally scattered.
+- Static decoration shadows remain disabled. Do not re-enable
+  `addPropShadow()`.
+- Cache bumped to `game.js?v=207`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md project-grasslands/assets/decorations/ruins_wall_broken_01.png`
+  passed, and PNG alpha/dimensions were confirmed. Browser preview skipped per
+  Sonny's preference; use Gemini Browser for live visual feedback.
 
 **Where we left off (session 102):**
 - Goal: continue the Tier 2 mossy boulder/ruin texture asset pipeline after

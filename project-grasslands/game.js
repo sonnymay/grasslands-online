@@ -757,6 +757,7 @@ function preload() {
   this.load.image('npc_villager_idle_01', 'assets/decorations/npc_villager_idle_01.png?v=203');
   this.load.image('boulder_mossy_01', 'assets/decorations/boulder_mossy_01.png?v=205');
   this.load.image('boulder_mossy_02', 'assets/decorations/boulder_mossy_02.png?v=206');
+  this.load.image('ruins_wall_broken_01', 'assets/decorations/ruins_wall_broken_01.png?v=207');
   // Decorations
   for (let i = 1; i <= 4; i++) this.load.image(`deco_flower_cluster_0${i}`, `assets/decorations/deco_flower_cluster_0${i}.png`);
   for (let i = 1; i <= 3; i++) this.load.image(`deco_rock_0${i}`, `assets/decorations/deco_rock_0${i}.png`);
@@ -3404,6 +3405,7 @@ function buildDecorations(scene) {
   const addPromptInspiredLandmarks = () => {
     const mossyBoulderKey = scene.textures.exists('boulder_mossy_01') ? 'boulder_mossy_01' : null;
     const mossyBoulderWideKey = scene.textures.exists('boulder_mossy_02') ? 'boulder_mossy_02' : mossyBoulderKey;
+    const ruinsWallKey = scene.textures.exists('ruins_wall_broken_01') ? 'ruins_wall_broken_01' : null;
     const ruinX = spX - 760;
     const ruinY = spY - 215;
     placeLandmarkDeco('ruin_base_canvas', ruinX, ruinY + 48, 210, {
@@ -3413,6 +3415,16 @@ function buildDecorations(scene) {
       alpha: 0.94,
       contact: { width: 230, height: 58, yOffset: 30, alpha: 0.105, angle: -3, depth: -773, scuffs: 12 },
     });
+    if (ruinsWallKey) {
+      placeLandmarkDeco(ruinsWallKey, ruinX - 10, ruinY + 118, 178, {
+        alignBottom: true,
+        allowFlip: false,
+        angle: -4,
+        baseCluster: 0.12,
+        contact: { width: 252, height: 36, yOffset: -10, alpha: 0.065, angle: -4, scuffs: 9 },
+      });
+      blockCells(ruinX - 10, ruinY + 118, 2);
+    }
     const ancientTree = placeLandmarkDeco('tree_oak_01', ruinX + 16, ruinY + 34, 326, {
       alignBottom: true,
       allowFlip: false,
