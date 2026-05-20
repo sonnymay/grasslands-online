@@ -1222,7 +1222,25 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 95 (latest)
+## 3. What we did in session 96 (latest)
+
+Cache now at **`?v=215`**. Three code-only fixes for the latest map
+review (cluttered top-left, barren bottom, flat green field).
+
+1. **Critter redistribution.** 4 cozy critters now spawn at SW / NE /
+   SE / NW quadrants of plaza instead of all four clustered at south.
+   Visual weight balanced across all four corners.
+2. **Camp border ring.** 12 props at radius ~520 from spawn, evenly
+   spaced with soft angle/radius jitter. Every 3rd slot is a mid-
+   size tree; rest are rocks of varied size. Defines the cozy camp
+   boundary so the open hunting area beyond reads as "outside" the
+   camp.
+3. **4th warm dirt-tan grass tone** `0xa68a52` added to `addGrassTones`
+   at 700 stamps, low alpha 0.08–0.14. Breaks up uniform green into
+   varied terrain hue.
+4. **Cache bump.** `?v=214` → `?v=215`.
+
+## 3.1. What we did in session 95
 
 Cache now at **`?v=214`**. UI polish pass per Sonny's review — three
 code-only fixes.
@@ -4398,7 +4416,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=214`**. Next change should use `?v=215`.
+  change. Current: **`?v=215`**. Next change should use `?v=216`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
