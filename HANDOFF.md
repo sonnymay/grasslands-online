@@ -1178,7 +1178,45 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 93 (latest)
+## 3. What we did in session 94 (latest)
+
+Cache now at **`?v=213`**. Phase 10d — cozy critter wanderers.
+
+1. **Assets.** Sonny generated chick + bunny idle/walk frames.
+   Resized to max 96 px via `sips`, moved to `assets/decorations/`:
+   - `critter_chick_idle_01.png` (real alpha)
+   - `critter_chick_walk_01.png` (no alpha)
+   - `critter_bunny_idle_01.png` (no alpha)
+   - `critter_bunny_hop_01.png` (no alpha)
+2. **Alpha-key.** Three of four added to `keyOutCheckerboard()` pass
+   to strip baked Photoshop grey checker. `critter_chick_idle_01`
+   skipped (already has real alpha).
+3. **Spawn.** Four critters placed near spawn plaza right after the
+   Phase-10c cozy props block. Two chicks south-west of plaza, two
+   bunnies south-east. Each renders at 56 px display height.
+4. **`tickCozyCritters(scene, time)`** — added to `update()` loop.
+   Each critter tweens to a random nearby point within ±80 px of
+   its base every ~2–5 s. While moving, swap to walk/hop frame and
+   `flipX` based on travel direction. Swap back to idle on tween
+   complete. Depth follows y for correct sort.
+5. **Cache bump.** `?v=212` → `?v=213`.
+
+### Phase 10 status: COMPLETE
+
+Phases 10a (palette + vignette + ambient particles + cozy breath),
+10b (real petal + dust mote art), 10c (5 plaza props), 10d
+(critter wanderers) all shipped. Focus Grove cozy aesthetic overlay
+is in.
+
+### Where to go next
+
+- Resume `MAP_VISION_PLAN.md` Phases 4–9 (mossy boulders, tree
+  variety, soft dirt path, slime cluster spawn behavior, boss-toast
+  sparkle motes, directional prop shadow + tree depth tint + class
+  title polish).
+- Or new direction per Sonny's call.
+
+## 3.1. What we did in session 93
 
 Cache now at **`?v=212`**. Phase 10c — cozy plaza props at spawn.
 
@@ -4287,7 +4325,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=212`**. Next change should use `?v=213`.
+  change. Current: **`?v=213`**. Next change should use `?v=214`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
