@@ -778,6 +778,7 @@ function preload() {
   // Larger props
   this.load.image('tree_oak_01',   'assets/decorations/tree_oak_01.png');
   this.load.image('tree_oak_large_01', 'assets/decorations/tree_oak_large_01.png?v=212');
+  this.load.image('tree_pine_large_01', 'assets/decorations/tree_pine_large_01.png?v=213');
   this.load.image('tree_pine_02',  'assets/decorations/tree_pine_02.png');
   this.load.image('tree_round_03', 'assets/decorations/tree_round_03.png');
   this.load.image('bush_01', 'assets/decorations/bush_01.png');
@@ -2308,6 +2309,7 @@ function buildDecorations(scene) {
   const ruinsPillarKeys = scene.textures.exists('ruins_pillar_broken_01') ? ['ruins_pillar_broken_01'] : [];
   const riversideCattailKeys = scene.textures.exists('riverside_cattail_01') ? ['riverside_cattail_01'] : grassKeys;
   const largeOakKey = scene.textures.exists('tree_oak_large_01') ? 'tree_oak_large_01' : 'tree_oak_01';
+  const largePineKey = scene.textures.exists('tree_pine_large_01') ? 'tree_pine_large_01' : 'tree_pine_02';
   const PERF = {
     scatter: 0.025,
     clusters: 0.015,
@@ -3730,7 +3732,8 @@ function buildDecorations(scene) {
         const r = Math.floor(y / TILE_SIZE);
         const c = Math.floor(x / TILE_SIZE);
         if (getZone(r, c) !== 'grasslands' || getCellType(r, c) !== 'grass') continue;
-        const tree = placeLandmarkDeco(Phaser.Utils.Array.GetRandom(treeKeys), x, y, Phaser.Math.Between(205, 260), {
+        const key = placed % 6 === 2 ? largePineKey : Phaser.Utils.Array.GetRandom(treeKeys);
+        const tree = placeLandmarkDeco(key, x, y, key === largePineKey ? Phaser.Math.Between(292, 340) : Phaser.Math.Between(205, 260), {
           alignBottom: true,
           maxAngle: 3,
           baseCluster: 0.58,
@@ -3822,9 +3825,10 @@ function buildDecorations(scene) {
         placeGround(x + Phaser.Math.Between(-44, 44), y + Phaser.Math.Between(-22, 28),
           pebbleKey, Phaser.Math.Between(60, 92), dry ? 0xb8aa8c : 0xb0bf93, dry ? 0.18 : 0.10);
       }
+      const forestAnchorKey = tileNoise(tile_r, tile_c, 1908) > 0.45 ? largePineKey : Phaser.Utils.Array.GetRandom(treeKeys);
       const anchor = {
         grasslands: { key: Phaser.Utils.Array.GetRandom(treeKeys), h: Phaser.Math.Between(230, 292), opts: { alignBottom: true, maxAngle: 2, blockRadius: 2 } },
-        forest: { key: Phaser.Utils.Array.GetRandom(treeKeys), h: Phaser.Math.Between(260, 330), opts: { alignBottom: true, tint: forestTint, maxAngle: 2, blockRadius: 2 } },
+        forest: { key: forestAnchorKey, h: forestAnchorKey === largePineKey ? Phaser.Math.Between(300, 360) : Phaser.Math.Between(260, 330), opts: { alignBottom: true, tint: forestTint, maxAngle: 2, blockRadius: 2 } },
         desert: { key: 'cactus_set', h: Phaser.Math.Between(130, 172), opts: { alignBottom: true, maxAngle: 4, blockRadius: 1 } },
         ruins: { key: ruinsPillarKeys.length ? Phaser.Utils.Array.GetRandom(ruinsPillarKeys) : Phaser.Utils.Array.GetRandom(rockKeys), h: Phaser.Math.Between(136, 176), opts: { alignBottom: true, tint: ruinsPillarKeys.length ? null : ruinTint, maxAngle: 3, blockRadius: 1 } },
         riverside: { key: Phaser.Utils.Array.GetRandom(treeKeys), h: Phaser.Math.Between(220, 276), opts: { alignBottom: true, maxAngle: 2, blockRadius: 2 } },

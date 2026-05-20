@@ -4,19 +4,41 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-20 — post session 106 large oak landmark pass.**
+**State as of 2026-05-20 — post session 107 large pine landmark pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 106 wires Sonny's generated
-  `tree_oak_large_01.png` as the new ancient-tree ruin anchor, starting the
-  Tier 3 tree-variety/landmark pass without adding global scatter load.
-- **Cache version live in `project-grasslands/index.html`:** `?v=212`.
-- **Next change must use:** `?v=213`.
+- **Latest completed work:** session 107 wires Sonny's generated
+  `tree_pine_large_01.png` as rare large pine anchors in forest/choke-line
+  compositions, continuing Tier 3 tree variety without global scatter spam.
+- **Cache version live in `project-grasslands/index.html`:** `?v=213`.
+- **Next change must use:** `?v=214`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these. Also leave the untracked misspelled
   `assets/decorations/camfire_01.png` alone unless Sonny explicitly confirms
   cleanup.
+
+**Where we left off (session 107):**
+- Goal: continue Tier 3 tree-variety/landmark pass after Sonny generated the
+  large pine PNG in Downloads.
+- Source asset:
+  `/Users/santipapmay/Downloads/tree_pine_large_01.png`. It was 1024x1536
+  RGBA with real alpha, so it only needed resize/export into the project.
+- Final project asset: `tree_pine_large_01.png`, 300x460 RGBA with real
+  alpha. The original Downloads file was left untouched.
+- `preload()` now loads `tree_pine_large_01` with cache bust `?v=213`.
+- `buildDecorations()` defines `largePineKey`; grasslands choke lines use it
+  occasionally as taller tree silhouettes, and forest anchor compositions use
+  it for some major forest landmarks. It is deliberately rare, not global
+  scatter, to preserve session 105 performance gains.
+- Static decoration shadows remain disabled. Do not re-enable
+  `addPropShadow()`.
+- Cache bumped to `game.js?v=213`.
+- Verification: `node -c project-grasslands/game.js` passed; PNG
+  alpha/dimensions were confirmed; `localhost:8001` served `/`,
+  `game.js?v=213`, and
+  `assets/decorations/tree_pine_large_01.png?v=213` with HTTP 200. Browser
+  load check passed at `http://localhost:8001/?codex=pine-v213`.
 
 **Where we left off (session 106):**
 - Goal: continue the roadmap after the performance pass by importing Sonny's
