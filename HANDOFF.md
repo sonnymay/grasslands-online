@@ -1200,7 +1200,36 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 94 (latest)
+## 3. What we did in session 95 (latest)
+
+Cache now at **`?v=214`**. UI polish pass per Sonny's review — three
+code-only fixes.
+
+1. **Softer cozy vignette.** Phase 10a corner ellipses alpha
+   `0.10 → 0.06`, viewport coverage `70% → 55%` (320 px floor).
+   Playable center reads as more open while warm screen-edge hold
+   stays.
+2. **Warm parchment HUD typography.** Bottom HP / EXP / Lv / Zeny
+   text shifted from pure white on black stroke to warm parchment
+   on warm brown stroke:
+   - HP / EXP: `color #fff7ef → #fff4d6`, `stroke #000 → #3a2400`, thickness 4 → 5.
+   - Lv: `color #ffff88 → #ffe066`, same stroke treatment.
+   - Zeny: same warm-brown stroke as Lv.
+   Numbers now match the toolbar / quest panel chrome family.
+3. **Quest + gear/trophy icons.** Top-left quest tracker swapped the
+   generic `■` chip for per-kind unicode (`☠` boss / `✦` clear /
+   `⚔` slay). `gearSummary()` now emits `🛡 Gear:` and
+   `🏆 Trophies:` prefixes so the panel reads as iconography at a
+   glance, matching the cozy theme.
+4. **Cache bump.** `?v=213` → `?v=214`.
+
+### Still queued (review)
+
+- Right toolbar restructure: group with spacing or icons.
+- Character focal-point: nudge tents/campfire to declutter the area
+  immediately around the player label.
+
+## 3.1. What we did in session 94
 
 Cache now at **`?v=213`**. Phase 10d — cozy critter wanderers.
 
@@ -4347,7 +4376,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=213`**. Next change should use `?v=214`.
+  change. Current: **`?v=214`**. Next change should use `?v=215`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
