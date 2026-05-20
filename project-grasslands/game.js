@@ -1747,6 +1747,60 @@ function buildMap(scene) {
   addTerrainRelief(scene);
   addShorelineBanks(scene);
   addGrassTones(scene);
+  addDirtPatchScatter(scene);
+}
+
+// Scatter visible dirt patches + pebble clusters across grasslands so the
+// open field reads as varied terrain instead of one repeating green.
+// Patches use larger feathered radial alpha at noticeable alpha; pebbles
+// are tiny dark dots that read as ground texture.
+function addDirtPatchScatter(scene) {
+  const g = scene.add.graphics().setDepth(-955);
+  // 1) Larger dirt patches — irregular soft blobs.
+  let placed = 0, attempts = 0;
+  while (placed < 140 && attempts < 900) {
+    attempts++;
+    const r = Phaser.Math.Between(0, MAP_ROWS - 1);
+    const c = Phaser.Math.Between(0, MAP_COLS - 1);
+    if (getZone(r, c) !== 'grasslands') continue;
+    if (getCellType(r, c) !== 'grass') continue;
+    placed++;
+    const cx = c * TILE_SIZE + Phaser.Math.Between(20, TILE_SIZE - 20);
+    const cy = r * TILE_SIZE + Phaser.Math.Between(20, TILE_SIZE - 20);
+    const baseR = Phaser.Math.Between(28, 64);
+    const peakAlpha = Phaser.Math.FloatBetween(0.18, 0.32);
+    // Two overlapping circles per patch = irregular silhouette.
+    for (let k = 0; k < 2; k++) {
+      const ox = Phaser.Math.Between(-16, 16);
+      const oy = Phaser.Math.Between(-12, 12);
+      const rad = baseR * Phaser.Math.FloatBetween(0.7, 1.1);
+      // 4-layer feathered falloff.
+      for (let j = 0; j < 4; j++) {
+        const t = j / 3;
+        const a = peakAlpha * (1 - t * t);
+        g.fillStyle(0x8d6a3a, a);
+        g.fillCircle(cx + ox, cy + oy, rad * (1 - t * 0.7));
+      }
+    }
+  }
+  // 2) Tiny pebble specks — small dark dots clustered around dirt patches
+  // and roads. Read as scattered stones underfoot.
+  placed = 0;
+  attempts = 0;
+  while (placed < 900 && attempts < 4000) {
+    attempts++;
+    const r = Phaser.Math.Between(0, MAP_ROWS - 1);
+    const c = Phaser.Math.Between(0, MAP_COLS - 1);
+    if (getZone(r, c) !== 'grasslands') continue;
+    if (getCellType(r, c) !== 'grass') continue;
+    placed++;
+    const cx = c * TILE_SIZE + Phaser.Math.Between(2, TILE_SIZE - 2);
+    const cy = r * TILE_SIZE + Phaser.Math.Between(2, TILE_SIZE - 2);
+    const rad = Phaser.Math.FloatBetween(1.4, 2.6);
+    const a = Phaser.Math.FloatBetween(0.32, 0.55);
+    g.fillStyle(0x4f3a22, a);
+    g.fillCircle(cx, cy, rad);
+  }
 }
 
 function createGrassFieldTexture(scene) {
@@ -1912,9 +1966,10 @@ function addPathWashes(scene) {
       g.lineBetween(a.x, a.y, cx, cy);
       g.lineBetween(cx, cy, b.x, b.y);
     };
-    stroke(outer, 0x6f5a34, 0.075);
-    stroke(mid, 0x94723f, 0.105);
-    stroke(inner, 0xb1894f, 0.058);
+    // Higher contrast worn-trail look — was alpha 0.075 / 0.105 / 0.058.
+    stroke(outer, 0x6f5a34, 0.22);
+    stroke(mid,   0x94723f, 0.38);
+    stroke(inner, 0xc2935a, 0.32);
     const pointAt = (t) => {
       if (t < 0.5) {
         const u = t * 2;
@@ -4646,6 +4701,40 @@ function buildDecorations(scene) {
     img.setAngle(Phaser.Math.Between(0, 359));
     img.setDepth(-780);
     img.setTint(groundOverlayTint(z, false));
+  }
+
+  // Biome border tree wall — densify trees + bushes along the cells that
+  // border a non-grasslands zone. Frames the playable area and makes the
+  // transition between biomes read as a deliberate edge.
+  for (let r = 1; r < MAP_ROWS - 1; r++) {
+    for (let c = 1; c < MAP_COLS - 1; c++) {
+      if (getCellType(r, c) !== 'grass') continue;
+      if (!nearZoneBoundary(r, c)) continue;
+      // Only place on a fraction of border cells — random tile noise so
+      // the wall feels organic, not a perfect fence.
+      if (tileNoise(r, c, 8133) < 0.55) continue;
+      const z = getZone(r, c);
+      const x = c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-40, 40);
+      const y = r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-32, 32);
+      const roll = Math.random();
+      if (roll < 0.55 && treeKeys.length) {
+        placeLandmarkDeco(Phaser.Utils.Array.GetRandom(treeKeys), x, y,
+          Phaser.Math.Between(150, 200), {
+          alignBottom: true, maxAngle: 4, allowFlip: true,
+          tint: z === 'forest' ? forestTint : 0xffffff,
+        });
+      } else if (roll < 0.85 && bushKeys.length) {
+        placeLandmarkDeco(Phaser.Utils.Array.GetRandom(bushKeys), x, y,
+          Phaser.Math.Between(60, 88), {
+          alignBottom: true, maxAngle: 8, allowFlip: true,
+        });
+      } else if (rockKeys.length) {
+        placeLandmarkDeco(Phaser.Utils.Array.GetRandom(rockKeys), x, y,
+          Phaser.Math.Between(44, 70), {
+          alignBottom: true, maxAngle: 12, allowFlip: true,
+        });
+      }
+    }
   }
 }
 
