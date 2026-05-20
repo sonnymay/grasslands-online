@@ -328,3 +328,153 @@ in one focused session with `node -c` + preview screenshot + commit
 **Owner:** Sonny — review and adjust order/scope before any wiring.
 Each phase is independent enough to defer or skip without breaking
 the others.
+
+---
+
+## 8. Addendum — Focus Grove cozy aesthetic overlay
+
+> Added 2026-05-19. Sonny: "I want my game to have beautiful and
+> cute background like the game called Focus Grove." Focus Grove is
+> a cozy productivity / forest-grove app with a soft pastel painterly
+> style. This addendum captures how to bring that vibe to a top-down
+> MMORPG **without** rebuilding the existing scene — it layers on top
+> of the Tier 1–5 plan above.
+
+### 8.1 What Focus Grove gets right
+
+| Element | Focus Grove signature |
+|---|---|
+| **Palette** | Pastel — warm peach, soft pink, sage green, lavender. Low saturation. No pure black, no pure white. |
+| **Lighting** | Diffuse, golden-hour-ish, no harsh shadows. Everything reads "warm late afternoon." |
+| **Ambient motion** | Always-on drifting particles (petals, leaves, dust motes, tiny sparkles). Never busy, always gentle. |
+| **Cute props** | Round, soft silhouettes. Mushrooms with caps bigger than expected, chubby lanterns, friendly little critters. |
+| **Negative space** | Generous breathing room, never overcrowded. |
+| **Music sync** | Visuals breathe with the soundtrack — gentle scale tweens on hero props. |
+
+### 8.2 How each element maps to a top-down 2D MMORPG
+
+Grasslands Online has no sky (camera looks down), so "background"
+here means the **ground plane + ambient particle layer + UI vignette**.
+Six concrete changes:
+
+1. **Pastel palette shift on the grass base.** Today the uniform
+   `TILE.GRASS` reads as a saturated fantasy green. Apply a single
+   global tint to the grass tile pass (`~0xfff3d6` warm cream wash
+   at alpha 0.18) so the field reads as "warm afternoon meadow"
+   instead of "saturated forest floor." This is the single biggest
+   vibe shift; one tint line in `buildMap()`.
+2. **Warm vignette at viewport edges.** Soft peach corners
+   (`~0xffd4a8`, alpha 0.08) on the UI camera so the visible map
+   frame feels held by warm light instead of meeting raw black edges.
+   Mirrors Focus Grove's screen-edge glow.
+3. **Always-on ambient petals.** Existing `tickWeatherBurst` only
+   fires during named weather events. Add a passive `tickCozyAmbient`
+   that drips 1–2 sprites/sec of soft pink petals + tiny dust motes
+   across the camera at all times, regardless of weather. Caps at
+   ~24 alive concurrent. Independent of weather rate bumps in
+   session 83.
+4. **Soft glow under every interactive prop.** Spawn signpost, NPC,
+   campfire, plaza lanterns — each gets a slow 4-second alpha
+   breath glow (16 px wider than prop, warm yellow at 0.12 → 0.22).
+   Reuses the spawn-plaza lantern pattern from session 42.
+5. **Music breath on hero props.** Trees and tents already have
+   sway tweens. Add the same 1.8 s breath tween to any prop with
+   `cozy: true` flag in `placeLandmarkDeco`. Cheap, gives the world
+   a heartbeat.
+6. **Cute critter wanderers (cosmetic).** 1 small painted creature
+   (e.g. round chick, soft bunny) wanders within ±200 px of the
+   spawn plaza, follows a slow random-walk. No combat, no clickable.
+   Just pure ambient cuteness. Reuses `MonsterController` skeleton
+   with combat stripped.
+
+### 8.3 Cozy asset list (one image at a time)
+
+Generate after Phase 2 camp props are done (the camp is the cozy
+visual anchor — these decorate around it). Standard prompt suffix
+**plus** `"warm pastel palette, peach / sage / lavender, very
+soft golden-hour light, low saturation, cute and friendly silhouette,
+Focus Grove cozy app aesthetic, anime / Ragnarok Online cross."`
+
+26. **`prop_lantern_post_warm_01.png` (160×260)** — Single tall
+    wooden lantern post with paper lantern glowing warm yellow,
+    soft halo baked in.
+27. **`prop_paper_lantern_string_01.png` (320×120)** — A horizontal
+    string of small paper lanterns hung between two invisible
+    points. Tileable.
+28. **`prop_garden_flowerbed_01.png` (240×160)** — Low wooden border
+    with a soft cluster of pastel flowers (pink, peach, lavender).
+29. **`prop_mushroom_round_big_01.png` (180×180)** — Big round
+    chubby red-cap mushroom, deliberately oversized, white spots.
+30. **`prop_picnic_blanket_01.png` (260×220)** — Checked picnic
+    blanket spread on grass, basket on top, two pieces of fruit.
+31. **`critter_chick_idle_01.png` (96×96)** — Tiny round yellow
+    chick, idle pose, looking left. South-facing default.
+32. **`critter_chick_walk_01.png` (96×96)** — Same chick, mid-step,
+    one foot lifted.
+33. **`critter_bunny_idle_01.png` (96×96)** — Tiny round soft bunny,
+    pale cream, idle pose facing south.
+34. **`critter_bunny_hop_01.png` (96×96)** — Same bunny, mid-hop.
+35. **`fx_petal_pink_soft_01.png` (32×32)** — Single soft pink
+    cherry-blossom petal, feathered alpha edge.
+36. **`fx_dust_mote_soft_01.png` (24×24)** — Tiny warm dust mote
+    with a soft halo.
+
+### 8.4 Code-only changes (no new art needed)
+
+Ship these as their own session **before** assets land — they're the
+fastest visible payoff:
+
+**A. Pastel grass tint.** In `buildMap()` grass branch, add
+`img.setTint(0xfff3d6)` on every grass cell after the existing
+flip variance. Single line. Existing `addGrassTones` stipple shows
+through and reads as warm meadow instead of saturated forest.
+
+**B. Warm vignette.** In `create()` after the UI camera is built,
+add four corner ellipses (`scene.add.ellipse`) at the four viewport
+corners, color `0xffd4a8`, alpha 0.08, blend mode ADD if available.
+Resize handler keeps them anchored to corners.
+
+**C. `tickCozyAmbient(scene, time, delta)`** — new lifecycle hook
+added to the existing per-frame `update()`. Spawns up to 24 ambient
+sprites total. Each sprite chooses randomly:
+- 60% petal (alpha 0.55, scale 0.6–1.0, drift down-right ~60 px/s,
+  rotate slowly, fade out over 6 s)
+- 40% dust mote (alpha 0.35, smaller, drift up-left, fade over 4 s)
+
+Until `fx_petal_pink_soft_01.png` / `fx_dust_mote_soft_01.png` land,
+use Phaser graphics circles tinted `0xffb7d5` and `0xfff0c8` as
+placeholder geometry.
+
+**D. Cozy breath on hero props.** Tag `placeLandmarkDeco(... , { cozy:
+true })` adds a slow scale 1.0 ↔ 1.025 yoyo tween (1.8 s) so plaza
+hero props (signpost, shrine, well, bridge, obelisk) gently breathe.
+
+**E. Class-title gold pill.** Already partly planned in §4 Phase I.
+Bump priority — Focus Grove makes player labels feel like soft
+chips, not text.
+
+### 8.5 Slot into roadmap
+
+Add as **Phase 10 (cozy palette + ambient)** after Phase 9. Two
+sub-phases:
+
+| Phase | Description | Assets | Cache |
+|---|---|---|---|
+| **10a** | Pastel grass tint + warm vignette + ambient petals/motes (placeholder graphics) + cozy breath tween | code-only | v=195 (next bump after current v=194) |
+| **10b** | Wire `fx_petal_pink_soft_01.png` and `fx_dust_mote_soft_01.png` real art into ambient emitter | 35, 36 | v=196 |
+| **10c** | Lantern post + paper lantern string + flowerbed + chubby mushroom + picnic blanket placed around spawn plaza | 26–30 | v=197 |
+| **10d** | Chick + bunny critter wanderers near spawn (idle + walk frames) | 31–34 | v=198 |
+
+**Recommendation:** ship 10a first. Single session, no asset
+dependency, biggest single-step vibe shift. Sonny sees the change
+immediately, then decides whether to keep going.
+
+### 8.6 Non-goals (cozy edition)
+
+- No sky / cloud parallax. Game is top-down — sky would feel wrong.
+- No day-night palette override. Existing day/night overlay capped
+  at alpha 0.18 stays as-is.
+- No reskinning of combat (damage numbers, boss bars). Cozy applies
+  only to world layer.
+- Don't tint monsters — pink slime + giant boss bosses stay vivid.
+
