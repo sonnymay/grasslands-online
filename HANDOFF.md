@@ -1156,7 +1156,36 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 92 (latest)
+## 3. What we did in session 93 (latest)
+
+Cache now at **`?v=212`**. Phase 10c — cozy plaza props at spawn.
+
+1. **Assets.** Sonny generated all 5 props. Resized to spec via
+   `sips`, moved to `assets/decorations/`:
+   - `prop_lantern_post_warm_01.png` (max 260, no alpha)
+   - `prop_paper_lantern_string_01.png` (max 320, no alpha)
+   - `prop_garden_flowerbed_01.png` (max 240, no alpha)
+   - `prop_mushroom_round_big_01.png` (max 180, no alpha)
+   - `prop_picnic_blanket_01.png` (max 260, **real alpha**)
+2. **Preload + alpha-key.** All 5 keys loaded; 4 passed through
+   `keyOutCheckerboard()` to strip the baked Photoshop grey checker.
+   Picnic blanket skipped (real alpha).
+3. **Spawn plaza dressing.** Six placements around `(spX, spY)`
+   using `placeLandmarkDeco` with `cozy: true` so the 1.8 s breath
+   tween applies:
+   - Two **warm lantern posts** flanking the signpost (±230 X).
+   - **Paper lantern string** hanging 220 px above plaza.
+   - **Flowerbed** east side (+300, +100).
+   - **Chubby mushroom** west side (-300, +110).
+   - **Picnic blanket** south-east on grass (+70, +240).
+4. **Cache bump.** `?v=211` → `?v=212`.
+
+### Next per plan
+
+- **Phase 10d:** chick + bunny critter wanderers near spawn
+  (cute ambient critters, idle + walk frames, slow random-walk).
+
+## 3.1. What we did in session 92
 
 Cache now at **`?v=211`**. Phase 10b — real ambient particle art.
 
@@ -4236,7 +4265,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=211`**. Next change should use `?v=212`.
+  change. Current: **`?v=212`**. Next change should use `?v=213`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
