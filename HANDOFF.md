@@ -1222,7 +1222,35 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 96 (latest)
+## 3. What we did in session 97 (latest)
+
+Cache now at **`?v=216`**. Three code-only fixes for the latest
+terrain review (faint paths, monotonous ground, no zone framing).
+
+1. **Path contrast boost.** `addPathWashes` strokes:
+   - outer alpha `0.075 → 0.22`
+   - mid alpha `0.105 → 0.38`
+   - inner alpha `0.058 → 0.32`, color `0xb1894f → 0xc2935a` (warmer)
+   The cross / loop / diagonal road network now reads as a worn
+   trail instead of a low-opacity wash.
+2. **`addDirtPatchScatter` new pass** after `addGrassTones`:
+   - 140 irregular feathered dirt patches (28–64 px base radius,
+     2-circle overlap, 4-layer falloff, peakAlpha 0.18–0.32).
+   - 900 tiny dark pebble specks (1.4–2.6 px radius, alpha
+     0.32–0.55) across grasslands. Reads as scattered stones
+     underfoot. Breaks up the uniform green without hiding mobs.
+3. **Biome border tree wall.** New post-`buildDecorations` pass
+   walks every grasslands cell that borders a non-grasslands zone
+   (`nearZoneBoundary`) and on ~45% of those cells via `tileNoise`
+   gating places one of:
+   - 55% tree (150–200 px, forest tint at forest borders)
+   - 30% bush (60–88 px)
+   - 15% rock (44–70 px)
+   Frames the playable area and gives the transition between
+   biomes a deliberate edge.
+4. **Cache bump.** `?v=215` → `?v=216`.
+
+## 3.1. What we did in session 96
 
 Cache now at **`?v=215`**. Three code-only fixes for the latest map
 review (cluttered top-left, barren bottom, flat green field).
@@ -4416,7 +4444,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=215`**. Next change should use `?v=216`.
+  change. Current: **`?v=216`**. Next change should use `?v=217`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
