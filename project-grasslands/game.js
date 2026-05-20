@@ -752,6 +752,7 @@ function preload() {
   this.load.image('wooden_cart_01', 'assets/decorations/wooden_cart_01.png?v=199');
   this.load.image('log_fence_horizontal_01', 'assets/decorations/log_fence_horizontal_01.png?v=200');
   this.load.image('log_fence_broken_01', 'assets/decorations/log_fence_broken_01.png?v=201');
+  this.load.image('ladder_wooden_01', 'assets/decorations/ladder_wooden_01.png?v=202');
   // Decorations
   for (let i = 1; i <= 4; i++) this.load.image(`deco_flower_cluster_0${i}`, `assets/decorations/deco_flower_cluster_0${i}.png`);
   for (let i = 1; i <= 3; i++) this.load.image(`deco_rock_0${i}`, `assets/decorations/deco_rock_0${i}.png`);
@@ -3295,6 +3296,15 @@ function buildDecorations(scene) {
         angle: f.angle,
         baseCluster: 0,
         contact: { width: isRealFence ? 168 : 112, height: 16, yOffset: -6, alpha: 0.08, angle: f.angle, scuffs: 5 },
+      });
+    }
+    if (scene.textures.exists('ladder_wooden_01')) {
+      placeLandmarkDeco('ladder_wooden_01', campX + 238, campY + 44, 116, {
+        alignBottom: true,
+        allowFlip: false,
+        angle: -7,
+        baseCluster: 0,
+        contact: { width: 44, height: 18, yOffset: -5, alpha: 0.075, angle: -7, scuffs: 4 },
       });
     }
     const cartKey = scene.textures.exists('wooden_cart_01') ? 'wooden_cart_01' : 'camp_wagon_canvas';

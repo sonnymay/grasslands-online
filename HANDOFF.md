@@ -4,18 +4,39 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 97 broken fence asset pass.**
+**State as of 2026-05-19 — post session 98 ladder asset pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 97 wires Sonny's generated
-  `log_fence_broken_01.png` into the camp scene as the damaged fence segment,
-  adding fence variation without changing the no-generic-decoration-shadow
-  rule.
-- **Cache version live in `project-grasslands/index.html`:** `?v=201`.
-- **Next change must use:** `?v=202`.
+- **Latest completed work:** session 98 wires Sonny's generated
+  `ladder_wooden_01.png` into the camp scene beside the damaged fence,
+  improving the hand-built camp silhouette without changing the
+  no-generic-decoration-shadow rule.
+- **Cache version live in `project-grasslands/index.html`:** `?v=202`.
+- **Next change must use:** `?v=203`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 98):**
+- Goal: continue the camp asset pipeline after Sonny generated the wooden
+  ladder PNG in Downloads.
+- Source asset:
+  `/Users/santipapmay/Downloads/ladder_wooden_01.png`. It was 1024x1536
+  RGBA with a real alpha channel, so it was cropped/scaled locally into
+  `project-grasslands/assets/decorations/ladder_wooden_01.png`.
+- Final project asset: `ladder_wooden_01.png`, 120x260 RGBA with real alpha.
+  The original Downloads file was left untouched.
+- `preload()` now loads `ladder_wooden_01` with cache bust `?v=202`.
+- `addSpawnCamp()` now places the ladder beside the damaged camp fence when
+  the asset exists. It uses the structure-only contact mark system and does
+  not block pathing.
+- Static decoration shadows remain disabled. Do not re-enable
+  `addPropShadow()`.
+- Cache bumped to `game.js?v=202`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md project-grasslands/assets/decorations/ladder_wooden_01.png`
+  passed, and PNG alpha/dimensions were confirmed. Sonny asked to skip local
+  browser preview and use Gemini Browser for visual feedback instead.
 
 **Where we left off (session 97):**
 - Goal: continue the camp asset pipeline after Sonny generated the broken log
