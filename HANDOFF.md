@@ -4,19 +4,42 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-20 — post session 109 cliff-face landmark pass.**
+**State as of 2026-05-20 — post session 110 density + organization pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 109 wires Sonny's generated
-  `rock_cliff_face_01.png` as rare cliff/ledge landmark art in ruins, boulder,
-  desert, and ruins anchor compositions.
-- **Cache version live in `project-grasslands/index.html`:** `?v=215`.
-- **Next change must use:** `?v=216`.
+- **Latest completed work:** session 110 responds to Sonny's feedback that
+  the game felt laggy, decorations looked unorganized, and monsters were too
+  sparse. Monster density is up, far-away mobs sleep harder, and spawn-border
+  decoration changed from an even ring into authored habitat clusters.
+- **Cache version live in `project-grasslands/index.html`:** `?v=217`.
+- **Next change must use:** `?v=218`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these. Also leave the untracked misspelled
   `assets/decorations/camfire_01.png` alone unless Sonny explicitly confirms
   cleanup.
+
+**Where we left off (session 110):**
+- Goal: fix three live-feel complaints at once: lag, decorations feeling
+  unorganized, and too few monsters on the map.
+- Monster population increased from the very conservative session-105 counts
+  to a fuller but still capped world: Blobling 44, MooHam 30, MooWaan 26,
+  MooDeng 20, Cactling 18. Boss counts stay rare.
+- Far-away unprovoked monsters now sleep for 360-620ms while hidden, instead
+  of doing a full wander/UI update every frame. Dormant radius tightened to
+  1450px so nearby combat feels populated while offscreen mobs stay cheap.
+- Decoration organization adjusted:
+  - Roadside meadow cap increased from 32 to 44 so paths feel intentionally
+    dressed.
+  - Open-field pocket cap reduced from 70 to 42 so random scatter is less
+    noisy.
+  - The even 12-point spawn border ring was replaced with five irregular
+    habitat clusters. This keeps camp edges readable without looking like a
+    perfect circle of props.
+- Cache bumped to `game.js?v=217`.
+- Verification target: `node -c project-grasslands/game.js`, HTTP smoke for
+  `/` and `game.js?v=217`, plus a browser metric pass if the local preview
+  server is available.
 
 **Where we left off (session 109):**
 - Goal: start fake-elevation/cliff-face visual pass after Sonny generated the
@@ -1222,7 +1245,31 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 97 (latest)
+## 3. What we did in session 98 (latest)
+
+Cache now at **`?v=217`**. Three code-only fixes for latest review
+(straight path, top cluster, barren south).
+
+1. **Path meander + taper.** `addPathWashes`:
+   - Bend range `±34 → ±70` px for stronger curve per segment.
+   - Per-segment width taper: `taperA` (0.75–1.0) on first half,
+     `taperB` (0.78–1.1) on second half, multiplied into stroke
+     width. A single segment widens and narrows along its length
+     instead of uniform.
+2. **Spread top cluster.**
+   - Picnic blanket: `(spX+70, spY+240) → (spX+560, spY+60)` far
+     east, away from south critter zone.
+   - Chubby mushroom: `(spX-300, spY+110) → (spX-540, spY-80)`
+     far west into quiet area.
+   - Both clear of camp scene now.
+3. **South-half doodad boost.** New `southBoost` helper picks a
+   grasslands grass cell with `row > 55% × MAP_ROWS`. Scatters:
+   - 480 grass tufts, 320 flowers, 180 mushrooms, 140 bushes
+   The bottom half of the playable area now reads as varied
+   terrain instead of empty green.
+4. **Cache bump.** `?v=216` → `?v=217`.
+
+## 3.1. What we did in session 97
 
 Cache now at **`?v=216`**. Three code-only fixes for the latest
 terrain review (faint paths, monotonous ground, no zone framing).
@@ -4444,7 +4491,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=216`**. Next change should use `?v=217`.
+  change. Current: **`?v=217`**. Next change should use `?v=218`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
