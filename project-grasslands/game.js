@@ -1056,7 +1056,35 @@ function create() {
   scene.scale.on('resize', (gameSize) => {
     uiCam.setSize(gameSize.width, gameSize.height);
     if (ui && typeof ui.relayout === 'function') ui.relayout(gameSize.width, gameSize.height);
+    if (scene.__cozyVignette) scene.__cozyVignette.relayout(gameSize.width, gameSize.height);
   });
+
+  // Phase 10a: Focus-Grove-style warm peach vignette at viewport corners.
+  // Sits on the UI camera (scrollFactor 0) so it stays glued to the
+  // browser edges and never dims the world center.
+  const vignette = (() => {
+    const corners = [];
+    const COZY_VIG_COLOR = 0xffd4a8;
+    const make = (x, y) => scene.add.ellipse(x, y, 1, 1, COZY_VIG_COLOR, 0.10)
+      .setScrollFactor(0)
+      .setDepth(15800);
+    for (let i = 0; i < 4; i++) corners.push(make(0, 0));
+    const relayout = (w, h) => {
+      const ew = Math.max(420, w * 0.7);
+      const eh = Math.max(380, h * 0.7);
+      const positions = [
+        { x: 0, y: 0 }, { x: w, y: 0 }, { x: 0, y: h }, { x: w, y: h },
+      ];
+      corners.forEach((c, i) => {
+        c.setSize(ew, eh);
+        c.setDisplaySize(ew, eh);
+        c.setPosition(positions[i].x, positions[i].y);
+      });
+    };
+    relayout(scene.scale.width, scene.scale.height);
+    return { corners, relayout };
+  })();
+  scene.__cozyVignette = vignette;
 
   // Tab cycles to the nearest live monster as the new attack target.
   scene.input.keyboard.on('keydown-TAB', (e) => {
@@ -1211,6 +1239,7 @@ function update(time, delta) {
   if (player && !player.dead) {
     tickRoadSparkles(player.scene, time);
     tickAmbience(player.scene, time, delta);
+    tickCozyAmbient(player.scene, time, delta);
   }
 
   // Off-screen sway tween cull. ~1.3k sway tweens drive grass/flowers; only
@@ -1630,23 +1659,30 @@ function buildMap(scene) {
   // Even a uniform tile still exposes a rhombus grid at this camera angle.
   // Paths remain cell-based, while the open field is one painterly canvas.
   if (scene.textures.exists('grass_field_texture')) {
+    // Phase 10a: warm meadow pastel tint (0xfff3d6) applied to every
+    // grass tilesprite layer so the field reads as Focus-Grove
+    // golden-hour cozy instead of saturated forest green.
+    const COZY_GRASS_TINT = 0xfff3d6;
     scene.add.tileSprite(0, 0, WORLD_W, WORLD_H, 'grass_field_texture')
       .setOrigin(0, 0)
-      .setDepth(-1010);
+      .setDepth(-1010)
+      .setTint(COZY_GRASS_TINT);
     scene.add.tileSprite(0, 0, WORLD_W, WORLD_H, 'grass_field_texture')
       .setOrigin(0, 0)
       .setDepth(-1009.8)
       .setAlpha(0.34)
       .setTilePosition(713, 389)
-      .setTileScale(1.37, 1.19);
+      .setTileScale(1.37, 1.19)
+      .setTint(COZY_GRASS_TINT);
     scene.add.tileSprite(0, 0, WORLD_W, WORLD_H, 'grass_field_texture')
       .setOrigin(0, 0)
       .setDepth(-1009.7)
       .setAlpha(0.18)
       .setTilePosition(231, 947)
-      .setTileScale(0.73, 0.91);
+      .setTileScale(0.73, 0.91)
+      .setTint(COZY_GRASS_TINT);
   } else {
-    scene.add.rectangle(0, 0, WORLD_W, WORLD_H, 0x79a94e, 1)
+    scene.add.rectangle(0, 0, WORLD_W, WORLD_H, 0xc8d8a8, 1)
       .setOrigin(0, 0)
       .setDepth(-1010);
   }
@@ -2841,6 +2877,22 @@ function buildDecorations(scene) {
       });
       (scene.__swayProps || (scene.__swayProps = [])).push({ img, tween: tw });
     }
+    // Phase 10a: cozy breath — slow 1.8s scale yoyo on hero props that
+    // opt in. Gives plaza signposts, shrines, lanterns, tents a gentle
+    // heartbeat like Focus Grove props.
+    if (opts.cozy) {
+      const baseScale = img.scaleX;
+      scene.tweens.add({
+        targets: img,
+        scaleX: baseScale * 1.025,
+        scaleY: baseScale * 1.025,
+        duration: 1800,
+        delay: Phaser.Math.Between(0, 1200),
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+    }
     return img;
   };
 
@@ -3048,11 +3100,11 @@ function buildDecorations(scene) {
     const x = tile_c * TILE_SIZE + TILE_SIZE / 2;
     const y = tile_r * TILE_SIZE + TILE_SIZE / 2 + 8;
     const hero = {
-      grasslands: { key: 'landmark_spawn_signpost', h: 112, opts: { alignBottom: true, shadow: true, maxAngle: 2, baseCluster: 0.24 } },
-      forest: { key: 'landmark_forest_shrine', h: 128, opts: { alignBottom: true, shadow: true, maxAngle: 2, tint: 0xf0ffe0, baseCluster: 0.30 } },
-      desert: { key: 'landmark_desert_obelisk', h: 154, opts: { alignBottom: true, shadow: true, maxAngle: 1 } },
-      ruins: { key: 'landmark_ruins_well', h: 128, opts: { alignBottom: true, shadow: true, maxAngle: 2 } },
-      riverside: { key: 'landmark_riverside_bridge', h: 130, opts: { alignBottom: true, shadow: true, maxAngle: 0, allowFlip: false } },
+      grasslands: { key: 'landmark_spawn_signpost', h: 112, opts: { alignBottom: true, shadow: true, maxAngle: 2, baseCluster: 0.24, cozy: true } },
+      forest: { key: 'landmark_forest_shrine', h: 128, opts: { alignBottom: true, shadow: true, maxAngle: 2, tint: 0xf0ffe0, baseCluster: 0.30, cozy: true } },
+      desert: { key: 'landmark_desert_obelisk', h: 154, opts: { alignBottom: true, shadow: true, maxAngle: 1, cozy: true } },
+      ruins: { key: 'landmark_ruins_well', h: 128, opts: { alignBottom: true, shadow: true, maxAngle: 2, cozy: true } },
+      riverside: { key: 'landmark_riverside_bridge', h: 130, opts: { alignBottom: true, shadow: true, maxAngle: 0, allowFlip: false, cozy: true } },
     }[zone];
     if (!hero) return;
     placeLandmarkDeco(hero.key, x, y, hero.h, hero.opts);
@@ -5774,6 +5826,53 @@ function tickWeatherBurst(scene, time, delta) {
         angle: obj.angle + Phaser.Math.Between(120, 300), alpha: 0, duration: 1500, onComplete: () => obj.destroy() });
     }
     obj.setDepth(15450);
+  }
+}
+
+// Phase 10a: always-on Focus-Grove ambient drift. Independent of the
+// weather scheduler — gentle petals + dust motes always present so the
+// world breathes. Caps at ~24 alive concurrent.
+function tickCozyAmbient(scene, time, delta) {
+  if (!scene.__cozyAmbient) scene.__cozyAmbient = { alive: 0 };
+  const state = scene.__cozyAmbient;
+  if (state.alive >= 24) return;
+  // ~2 spawns per second (delta in ms).
+  const expected = 0.002 * delta;
+  let count = Math.floor(expected);
+  if (Math.random() < expected - count) count += 1;
+  const cam = scene.cameras.main;
+  for (let i = 0; i < count; i++) {
+    if (state.alive >= 24) break;
+    const x = cam.scrollX + Math.random() * cam.width;
+    const y = cam.scrollY + Math.random() * cam.height;
+    const isPetal = Math.random() < 0.6;
+    let obj, duration, ox, oy;
+    if (isPetal) {
+      // Soft pink petal placeholder (graphics until fx_petal_pink_soft_01).
+      obj = scene.add.ellipse(x, y, 10, 6, 0xffb7d5, 0.55)
+        .setAngle(Math.random() * 360);
+      duration = Phaser.Math.Between(5500, 7500);
+      ox = Phaser.Math.Between(40, 120);
+      oy = Phaser.Math.Between(80, 160);
+    } else {
+      // Warm dust mote placeholder.
+      obj = scene.add.circle(x, y, Phaser.Math.Between(2, 4), 0xfff0c8, 0.42);
+      duration = Phaser.Math.Between(3800, 5400);
+      ox = Phaser.Math.Between(-60, 60);
+      oy = Phaser.Math.Between(-80, -30);
+    }
+    obj.setDepth(15400);
+    state.alive++;
+    scene.tweens.add({
+      targets: obj,
+      x: x + ox,
+      y: y + oy,
+      angle: obj.angle + (isPetal ? Phaser.Math.Between(120, 320) : 0),
+      alpha: 0,
+      duration,
+      ease: 'Sine.easeInOut',
+      onComplete: () => { obj.destroy(); state.alive--; },
+    });
   }
 }
 
