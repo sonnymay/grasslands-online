@@ -571,7 +571,7 @@ function gearSummary() {
   const a = item('armor', 'No armor');
   const trophies = Object.values(player.bossTrophies || {}).reduce((sum, n) => sum + n, 0);
   const next = TROPHY_MILESTONES.find(m => trophies < m.total);
-  return `Gear: ${w} / ${a}\nTrophies: ${trophies}${next ? `  Next: ${next.total}` : '  Max bonus'}`;
+  return `🛡 Gear: ${w} / ${a}\n🏆 Trophies: ${trophies}${next ? `  Next: ${next.total}` : '  Max bonus'}`;
 }
 
 function bossTrophyRows() {
@@ -1100,13 +1100,15 @@ function create() {
   const vignette = (() => {
     const corners = [];
     const COZY_VIG_COLOR = 0xffd4a8;
-    const make = (x, y) => scene.add.ellipse(x, y, 1, 1, COZY_VIG_COLOR, 0.10)
+    const make = (x, y) => scene.add.ellipse(x, y, 1, 1, COZY_VIG_COLOR, 0.06)
       .setScrollFactor(0)
       .setDepth(15800);
     for (let i = 0; i < 4; i++) corners.push(make(0, 0));
     const relayout = (w, h) => {
-      const ew = Math.max(420, w * 0.7);
-      const eh = Math.max(380, h * 0.7);
+      // Softer + smaller — was alpha 0.10 at 70% viewport. Now 0.06 at
+      // 55% so the playable center feels more open.
+      const ew = Math.max(360, w * 0.55);
+      const eh = Math.max(320, h * 0.55);
       const positions = [
         { x: 0, y: 0 }, { x: w, y: 0 }, { x: 0, y: h }, { x: w, y: h },
       ];
@@ -7233,7 +7235,7 @@ class UIManager {
     this.hpFill = scene.add.rectangle(hpX, hpY, this.hpBarW, barH, 0xcc3333)
       .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10003);
     this.hpText = scene.add.text(hpX + this.hpBarW / 2, hpY, '', {
-      fontSize: '20px', fontStyle: 'bold', color: '#fff7ef', stroke: '#000', strokeThickness: 4,
+      fontSize: '20px', fontStyle: 'bold', color: '#fff4d6', stroke: '#3a2400', strokeThickness: 5,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
 
     this.expPanel = scene.add.rectangle(expX - 8, expY - panelH / 2, this.expBarW + 16, panelH, PANEL_FILL, 0.72)
@@ -7244,7 +7246,7 @@ class UIManager {
     this.expFill = scene.add.rectangle(expX, expY, this.expBarW, barH, 0x8e50d6)
       .setOrigin(0, 0.5).setScrollFactor(0).setDepth(10003);
     this.expText = scene.add.text(expX + this.expBarW / 2, expY, '', {
-      fontSize: '20px', fontStyle: 'bold', color: '#fff7ef', stroke: '#000', strokeThickness: 4,
+      fontSize: '20px', fontStyle: 'bold', color: '#fff4d6', stroke: '#3a2400', strokeThickness: 5,
     }).setOrigin(0.5).setScrollFactor(0).setDepth(10004);
 
     // Bottom-right status panel: Lv on the left edge, Zeny on the right
@@ -7256,10 +7258,10 @@ class UIManager {
     this.statusDivider = scene.add.rectangle(statusX + Math.floor(statusW * 0.42), bottomY + (this.bottomH - 30) / 2, 1, 30, 0xffe066, 0.45)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10002);
     this.lvlText = scene.add.text(statusX + 18, hpY, 'Lv.1', {
-      fontSize: '24px', fontStyle: 'bold', color: '#ffff88', stroke: '#000', strokeThickness: 4,
+      fontSize: '24px', fontStyle: 'bold', color: '#ffe066', stroke: '#3a2400', strokeThickness: 5,
     }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(10004);
     this.zenyText = scene.add.text(statusX + statusW - 14, hpY, '0z', {
-      fontSize: '19px', fontStyle: 'bold', color: '#ffd24a', stroke: '#000', strokeThickness: 4,
+      fontSize: '19px', fontStyle: 'bold', color: '#ffd24a', stroke: '#3a2400', strokeThickness: 5,
     }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(10004);
 
     // Auto-save indicator — dim idle glyph that pulses whenever saveGame()
@@ -7845,12 +7847,12 @@ class UIManager {
     if (activeQuests.length) {
       const colorFor = (k) => k === 'boss' ? '#ff8866' : k === 'zone' ? '#88c8ff' : '#bce86a';
       const tagFor   = (k) => k === 'boss' ? 'BOSS' : k === 'zone' ? 'CLEAR' : 'SLAY';
-      // Phaser Text doesn't render per-line color out of the box; emulate by
-      // showing a small colored chip glyph at the start of each line.
+      // Per-kind unicode icon makes quest type read at a glance.
+      const iconFor  = (k) => k === 'boss' ? '☠' : k === 'zone' ? '✦' : '⚔';
       const txt = activeQuests.map((q) => {
         const target = q.kind === 'zone' ? q.zoneName : q.monsterName;
         const pity = q.pityTier ? ` ⌛+${25 * q.pityTier}%` : '';
-        return `■ ${tagFor(q.kind)}  ${q.count}/${q.target}  ${target}${pity}`;
+        return `${iconFor(q.kind)} ${tagFor(q.kind)}  ${q.count}/${q.target}  ${target}${pity}`;
       }).join('\n');
       if (this.questText.text !== txt) this.questText.setText(txt);
       // Color the whole block by the highest-priority quest (boss > zone > slay).
