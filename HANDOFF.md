@@ -4,20 +4,42 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-20 — post session 105 fallen column + performance pass.**
+**State as of 2026-05-20 — post session 106 large oak landmark pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 105 wires Sonny's generated
-  `ruins_column_fallen_01.png` into the ancient-tree ruin landmark and fixes
-  the major lag source by trimming full-map prop/mob budgets, culling distant
-  decorations, and putting far-off monsters into a dormant state.
-- **Cache version live in `project-grasslands/index.html`:** `?v=211`.
-- **Next change must use:** `?v=212`.
+- **Latest completed work:** session 106 wires Sonny's generated
+  `tree_oak_large_01.png` as the new ancient-tree ruin anchor, starting the
+  Tier 3 tree-variety/landmark pass without adding global scatter load.
+- **Cache version live in `project-grasslands/index.html`:** `?v=212`.
+- **Next change must use:** `?v=213`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these. Also leave the untracked misspelled
   `assets/decorations/camfire_01.png` alone unless Sonny explicitly confirms
   cleanup.
+
+**Where we left off (session 106):**
+- Goal: continue the roadmap after the performance pass by importing Sonny's
+  generated large oak tree landmark.
+- Source asset:
+  `/Users/santipapmay/Downloads/tree_oak_large_01.png`. It was 1095x1437 RGB
+  with a white background and no alpha, so it was resized/keyed locally into
+  `project-grasslands/assets/decorations/tree_oak_large_01.png`.
+- Final project asset: `tree_oak_large_01.png`, 320x420 RGBA with real alpha.
+  The original Downloads file was left untouched.
+- `preload()` now loads `tree_oak_large_01` with cache bust `?v=212`.
+- `buildDecorations()` defines `largeOakKey`; the ancient-tree ruin landmark
+  now uses `tree_oak_large_01` at 390px display height when present, falling
+  back to `tree_oak_01` otherwise. It is deliberately landmark-only, not
+  global scatter, to preserve the session 105 performance gains.
+- Static decoration shadows remain disabled. Do not re-enable
+  `addPropShadow()`.
+- Cache bumped to `game.js?v=212`.
+- Verification: `node -c project-grasslands/game.js` passed; PNG
+  alpha/dimensions were confirmed; `localhost:8001` served `/`,
+  `game.js?v=212`, and
+  `assets/decorations/tree_oak_large_01.png?v=212` with HTTP 200. Browser load
+  check passed at `http://localhost:8001/?codex=oak-v212`.
 
 **Where we left off (session 105):**
 - Goal: continue the Tier 2 ruin/landmark asset pipeline after Sonny generated

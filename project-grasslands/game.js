@@ -771,6 +771,7 @@ function preload() {
   for (let i = 1; i <= 3; i++) this.load.image(`deco_tallgrass_0${i}`, `assets/decorations/deco_tallgrass_0${i}.png`);
   // Larger props
   this.load.image('tree_oak_01',   'assets/decorations/tree_oak_01.png');
+  this.load.image('tree_oak_large_01', 'assets/decorations/tree_oak_large_01.png?v=212');
   this.load.image('tree_pine_02',  'assets/decorations/tree_pine_02.png');
   this.load.image('tree_round_03', 'assets/decorations/tree_round_03.png');
   this.load.image('bush_01', 'assets/decorations/bush_01.png');
@@ -2292,6 +2293,7 @@ function buildDecorations(scene) {
   const forestFernKeys = scene.textures.exists('forest_fern_01') ? ['forest_fern_01'] : grassKeys;
   const ruinsPillarKeys = scene.textures.exists('ruins_pillar_broken_01') ? ['ruins_pillar_broken_01'] : [];
   const riversideCattailKeys = scene.textures.exists('riverside_cattail_01') ? ['riverside_cattail_01'] : grassKeys;
+  const largeOakKey = scene.textures.exists('tree_oak_large_01') ? 'tree_oak_large_01' : 'tree_oak_01';
   const PERF = {
     scatter: 0.025,
     clusters: 0.015,
@@ -3550,7 +3552,7 @@ function buildDecorations(scene) {
       });
       blockCells(ruinX - 246, ruinY + 156, 2);
     }
-    const ancientTree = placeLandmarkDeco('tree_oak_01', ruinX + 16, ruinY + 34, 326, {
+    const ancientTree = placeLandmarkDeco(largeOakKey, ruinX + 16, ruinY + 34, largeOakKey === 'tree_oak_large_01' ? 390 : 326, {
       alignBottom: true,
       allowFlip: false,
       maxAngle: 2,
