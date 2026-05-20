@@ -4,18 +4,41 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 98 ladder asset pass.**
+**State as of 2026-05-19 — post session 99 villager NPC asset pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 98 wires Sonny's generated
-  `ladder_wooden_01.png` into the camp scene beside the damaged fence,
-  improving the hand-built camp silhouette without changing the
-  no-generic-decoration-shadow rule.
-- **Cache version live in `project-grasslands/index.html`:** `?v=202`.
-- **Next change must use:** `?v=203`.
+- **Latest completed work:** session 99 wires Sonny's generated
+  `npc_villager_idle_01.png` into the spawn camp, replacing the Forager's
+  placeholder class sprite with a real camp-helper NPC asset and subtle idle
+  bob.
+- **Cache version live in `project-grasslands/index.html`:** `?v=203`.
+- **Next change must use:** `?v=204`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 99):**
+- Goal: continue the camp asset pipeline after Sonny generated the villager
+  NPC PNG in Downloads.
+- Source asset:
+  `/Users/santipapmay/Downloads/npc_villager_idle_01.png`. It was 1070x1470
+  RGB with a fake checkerboard background and no alpha, so it was normalized
+  locally into
+  `project-grasslands/assets/decorations/npc_villager_idle_01.png`.
+- Final project asset: `npc_villager_idle_01.png`, 160x220 RGBA with real
+  alpha. The original Downloads file was left untouched.
+- `preload()` now loads `npc_villager_idle_01` with cache bust `?v=203`.
+- `addSpawnCamp()` now uses `npc_villager_idle_01` for the `Forager` NPC when
+  present, falling back to the old mage/rookie sprite chain if missing. The
+  villager has a very subtle idle bob tween and keeps the existing Forager
+  label position adjusted for the taller art.
+- Static decoration shadows remain disabled. Do not re-enable
+  `addPropShadow()`.
+- Cache bumped to `game.js?v=203`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md project-grasslands/assets/decorations/npc_villager_idle_01.png`
+  passed, and PNG alpha/dimensions were confirmed. Sonny asked to skip local
+  browser preview and use Gemini Browser for visual feedback instead.
 
 **Where we left off (session 98):**
 - Goal: continue the camp asset pipeline after Sonny generated the wooden

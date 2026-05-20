@@ -753,6 +753,7 @@ function preload() {
   this.load.image('log_fence_horizontal_01', 'assets/decorations/log_fence_horizontal_01.png?v=200');
   this.load.image('log_fence_broken_01', 'assets/decorations/log_fence_broken_01.png?v=201');
   this.load.image('ladder_wooden_01', 'assets/decorations/ladder_wooden_01.png?v=202');
+  this.load.image('npc_villager_idle_01', 'assets/decorations/npc_villager_idle_01.png?v=203');
   // Decorations
   for (let i = 1; i <= 4; i++) this.load.image(`deco_flower_cluster_0${i}`, `assets/decorations/deco_flower_cluster_0${i}.png`);
   for (let i = 1; i <= 3; i++) this.load.image(`deco_rock_0${i}`, `assets/decorations/deco_rock_0${i}.png`);
@@ -3334,20 +3335,39 @@ function buildDecorations(scene) {
       if (item.block) blockCells(x, y, item.block);
     }
     const npcs = [
-      { key: 'rookie_idle_south', dx: -76, dy: 64, name: 'Guide' },
-      { key: scene.textures.exists('mage_idle_south') ? 'mage_idle_south' : 'rookie_idle_south', dx: 78, dy: 48, name: 'Forager' },
+      { key: 'rookie_idle_south', dx: -76, dy: 64, name: 'Guide', h: 86 },
+      {
+        key: scene.textures.exists('npc_villager_idle_01')
+          ? 'npc_villager_idle_01'
+          : (scene.textures.exists('mage_idle_south') ? 'mage_idle_south' : 'rookie_idle_south'),
+        dx: 78,
+        dy: 48,
+        name: 'Forager',
+        h: scene.textures.exists('npc_villager_idle_01') ? 98 : 86,
+        labelOffset: scene.textures.exists('npc_villager_idle_01') ? 98 : 86,
+      },
     ];
     for (const npc of npcs) {
       const x = campX + npc.dx;
       const y = campY + npc.dy;
-      const img = placeLandmarkDeco(npc.key, x, y, 86, {
+      const img = placeLandmarkDeco(npc.key, x, y, npc.h || 86, {
         alignBottom: true,
         allowFlip: false,
         angle: 0,
         baseCluster: 0,
       });
       if (!img) continue;
-      scene.add.text(x, y - 86, npc.name, {
+      if (npc.key === 'npc_villager_idle_01') {
+        scene.tweens.add({
+          targets: img,
+          y: img.y - 2,
+          duration: 1250,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.inOut',
+        });
+      }
+      scene.add.text(x, y - (npc.labelOffset || 86), npc.name, {
         fontFamily: '"Trebuchet MS", Arial, sans-serif',
         fontSize: '13px',
         color: '#fff3c4',
