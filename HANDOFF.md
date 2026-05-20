@@ -1090,7 +1090,44 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 90 (latest)
+## 3. What we did in session 91 (latest)
+
+Cache now at **`?v=209`**. Phase 10a from
+`MAP_VISION_PLAN.md` §8 — Focus Grove cozy aesthetic baseline.
+Code-only, no asset wait, biggest single-step vibe shift.
+
+1. **Pastel grass tint.** Every `grass_field_texture` tilesprite layer
+   in `buildMap()` now `setTint(0xfff3d6)` (warm cream). Fallback
+   solid rectangle softened from `0x79a94e` → `0xc8d8a8`. Field reads
+   as golden-hour cozy instead of saturated forest.
+2. **Warm peach corner vignette.** Four large soft `0xffd4a8` ellipses
+   anchored to viewport corners on the UI camera (depth 15800, alpha
+   0.10). Sized to ~70% of viewport. `relayout()` repositions on
+   resize. Held to `scene.__cozyVignette` so resize handler can call
+   `.relayout(w, h)`.
+3. **`tickCozyAmbient(scene, time, delta)`** — always-on ambient
+   drift, independent of weather scheduler. ~2 spawns/sec, 24 alive
+   cap, 60% pink petal (alpha 0.55, drift down-right, rotate
+   120–320°, fade 5.5–7.5 s), 40% warm dust mote (alpha 0.42, drift
+   up-left, fade 3.8–5.4 s). Placeholder Phaser ellipse/circle
+   geometry until Phase 10b `fx_petal_pink_soft_01.png` and
+   `fx_dust_mote_soft_01.png` land.
+4. **`cozy: true` flag on `placeLandmarkDeco`.** Slow 1.8 s scale
+   `1.0 ↔ 1.025` yoyo with randomized phase. Applied to all 5
+   plaza hero props (spawn signpost, forest shrine, desert
+   obelisk, ruins well, riverside bridge) so they breathe.
+5. **Cache bump.** `?v=208` → `?v=209`.
+
+### Next per plan
+
+- **Phase 10b:** generate + wire `fx_petal_pink_soft_01.png` (32×32)
+  and `fx_dust_mote_soft_01.png` (24×24); swap the placeholder
+  geometry in `tickCozyAmbient` for real art.
+- **Phase 10c:** cozy plaza props (lantern post, paper lantern
+  string, flowerbed, chubby mushroom, picnic blanket).
+- **Phase 10d:** chick + bunny critter wanderers near spawn.
+
+## 3.1. What we did in session 90
 
 Cache now at **`?v=194`**. This session starts executing
 `MAP_VISION_PLAN.md` Phase 1 from the actual current state rather than the old
@@ -4106,7 +4143,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=177`**. Next change should use `?v=178`.
+  change. Current: **`?v=209`**. Next change should use `?v=210`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
