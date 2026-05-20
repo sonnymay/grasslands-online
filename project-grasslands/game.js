@@ -41,6 +41,7 @@ const LOOT_MAGNET_SPEED  = 700; // px/s pull velocity
 const BLOBLING_ATTACK_COOLDOWN = 1500;
 const BLOBLING_AGGRO_RANGE = 200;
 const BLOBLING_ATTACK_RANGE = 80;
+const DECOR_ANIMATIONS_ENABLED = false; // static world art while performance is under review
 // Live monster population. Each monster owns a physics body, sprite, shadow,
 // name label, and HP bars, so over-populating the whole 19200px map tanks FPS
 // even when most monsters are off camera. Keep density readable through pods
@@ -1280,10 +1281,12 @@ function update(time, delta) {
 
   // Road sparkles + biome ambience particles. Pure feel, no rules.
   if (player && !player.dead) {
-    tickRoadSparkles(player.scene, time);
-    tickAmbience(player.scene, time, delta);
-    tickCozyAmbient(player.scene, time, delta);
-    tickCozyCritters(player.scene, time);
+    if (DECOR_ANIMATIONS_ENABLED) {
+      tickRoadSparkles(player.scene, time);
+      tickAmbience(player.scene, time, delta);
+      tickCozyAmbient(player.scene, time, delta);
+      tickCozyCritters(player.scene, time);
+    }
   }
 
   // Off-screen sway tween cull. ~1.3k sway tweens drive grass/flowers; only
@@ -1318,7 +1321,13 @@ function update(time, delta) {
     for (const obj of player.scene.__worldDecorations) {
       if (!obj || !obj.active) continue;
       const visible = obj.x >= left && obj.x <= right && obj.y >= top && obj.y <= bottom;
-      if (obj.visible !== visible) obj.setVisible(visible);
+      if (visible) {
+        if (!obj.displayList) player.scene.children.add(obj);
+        if (!obj.visible) obj.setVisible(true);
+      } else {
+        if (obj.visible) obj.setVisible(false);
+        if (obj.displayList) player.scene.children.remove(obj);
+      }
     }
   }
 
@@ -2862,7 +2871,7 @@ function buildDecorations(scene) {
     }
     // Water shimmer: pond decorations breathe between two near-identical
     // scales so the surface looks like it's catching light.
-    if (opts.shimmer) {
+    if (DECOR_ANIMATIONS_ENABLED && opts.shimmer) {
       const base = img.scaleX;
       // Slow breathing — pond surface catching light.
       scene.tweens.add({
@@ -2989,15 +2998,17 @@ function buildDecorations(scene) {
     const halo = scene.add.ellipse(x, y + 6, 118, 36, color, 0.012)
       .setStrokeStyle(1, color, 0.035)
       .setDepth(-620);
-    scene.tweens.add({
-      targets: halo,
-      alpha: 0.028,
-      scaleX: 1.04,
-      scaleY: 1.06,
-      duration: 1600,
-      yoyo: true,
-      repeat: -1,
-    });
+    if (DECOR_ANIMATIONS_ENABLED) {
+      scene.tweens.add({
+        targets: halo,
+        alpha: 0.028,
+        scaleX: 1.04,
+        scaleY: 1.06,
+        duration: 1600,
+        yoyo: true,
+        repeat: -1,
+      });
+    }
   };
   for (const p of landmarkTiles()) {
     const z = getZone(p.r, p.c);
@@ -3048,7 +3059,7 @@ function buildDecorations(scene) {
     // Phase 10a: cozy breath — slow 1.8s scale yoyo on hero props that
     // opt in. Gives plaza signposts, shrines, lanterns, tents a gentle
     // heartbeat like Focus Grove props.
-    if (opts.cozy) {
+    if (DECOR_ANIMATIONS_ENABLED && opts.cozy) {
       const baseScale = img.scaleX;
       scene.tweens.add({
         targets: img,
@@ -3300,12 +3311,14 @@ function buildDecorations(scene) {
     // Warm lantern centerpiece (reuse spawn-lantern style, single).
     const glow = scene.add.ellipse(cx, cy + 4, 42, 18, 0xc58d34, 0.055)
       .setDepth(-620);
-    scene.tweens.add({ targets: glow, alpha: 0.09, scaleX: 1.05, scaleY: 1.05,
-      duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     const core = scene.add.ellipse(cx, cy - 4, 9, 9, 0xfff2a8, 0.68)
       .setDepth(cy);
-    scene.tweens.add({ targets: core, alpha: 0.42, scaleX: 1.12, scaleY: 1.12,
-      duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    if (DECOR_ANIMATIONS_ENABLED) {
+      scene.tweens.add({ targets: glow, alpha: 0.09, scaleX: 1.05, scaleY: 1.05,
+        duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      scene.tweens.add({ targets: core, alpha: 0.42, scaleX: 1.12, scaleY: 1.12,
+        duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    }
   };
 
   for (const p of landmarkTiles()) {
@@ -3335,13 +3348,15 @@ function buildDecorations(scene) {
     // Warm glow disc (under feet depth).
     const glow = scene.add.ellipse(lx, ly + 4, 46, 20, 0xc58d34, 0.06)
       .setDepth(-620);
-    scene.tweens.add({ targets: glow, alpha: 0.10, scaleX: 1.05, scaleY: 1.05,
-      duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     // Small bright core.
     const core = scene.add.ellipse(lx, ly - 6, 10, 10, 0xfff2a8, 0.66)
       .setDepth(ly);
-    scene.tweens.add({ targets: core, alpha: 0.42, scaleX: 1.12, scaleY: 1.12,
-      duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    if (DECOR_ANIMATIONS_ENABLED) {
+      scene.tweens.add({ targets: glow, alpha: 0.10, scaleX: 1.05, scaleY: 1.05,
+        duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      scene.tweens.add({ targets: core, alpha: 0.42, scaleX: 1.12, scaleY: 1.12,
+        duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    }
   }
 
   // Phase 10c: cozy plaza props around spawn — Focus Grove style hub
@@ -3561,26 +3576,28 @@ function buildDecorations(scene) {
     });
     if (fire) {
       const glow = scene.add.ellipse(fire.x, fire.y + 2, 124, 44, 0xffaa44, 0.12).setDepth(-618);
-      scene.tweens.add({
-        targets: fire,
-        alpha: 0.88,
-        scaleX: fire.scaleX * 1.055,
-        scaleY: fire.scaleY * 1.075,
-        duration: 150,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.inOut',
-      });
-      scene.tweens.add({
-        targets: glow,
-        alpha: 0.20,
-        scaleX: 1.10,
-        scaleY: 1.18,
-        duration: 980,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.inOut',
-      });
+      if (DECOR_ANIMATIONS_ENABLED) {
+        scene.tweens.add({
+          targets: fire,
+          alpha: 0.88,
+          scaleX: fire.scaleX * 1.055,
+          scaleY: fire.scaleY * 1.075,
+          duration: 150,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.inOut',
+        });
+        scene.tweens.add({
+          targets: glow,
+          alpha: 0.20,
+          scaleX: 1.10,
+          scaleY: 1.18,
+          duration: 980,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.inOut',
+        });
+      }
     }
     const fences = [
       { dx: -210, dy:  70, angle: -6 },

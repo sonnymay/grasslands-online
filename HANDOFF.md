@@ -4,18 +4,51 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-20 — post session 112 performance + organization pass.**
+**State as of 2026-05-20 — post session 114 static-decoration performance pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 112 fixed the new slow-map regression and
-  made the south-half decorations less sprayed/algorithmic.
-- **Cache version live in `project-grasslands/index.html`:** `?v=221`.
-- **Next change must use:** `?v=222`.
+- **Latest completed work:** session 114 disabled decorative ambient animation
+  loops while performance is under review.
+- **Cache version live in `project-grasslands/index.html`:** `?v=223`.
+- **Next change must use:** `?v=224`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these. Also leave the untracked misspelled
   `assets/decorations/camfire_01.png` alone unless Sonny explicitly confirms
   cleanup.
+
+**Where we left off (session 114):**
+- Goal: keep going after v222 reduced display-list weight but browser metrics
+  still showed many decorative tweens and slow frame pacing.
+- Added `DECOR_ANIMATIONS_ENABLED = false`. This keeps the map art static for
+  now and skips road sparkles, biome ambience, cozy ambient particles, cozy
+  critter movement, pond shimmer, landmark halo pulses, plaza lantern pulses,
+  cozy prop breathing, and campfire/glow tweens.
+- Reason: static RO-style world art is preferable to a pretty slideshow. These
+  animation loops can be re-enabled selectively later after the base map is
+  smooth.
+- Cache bumped to `game.js?v=223`.
+- Verification: `node -c project-grasslands/game.js` passed, diff check
+  passed, `localhost:8001` served `/` and `game.js?v=223` with HTTP 200.
+  Browser metric at v223: children 1,365, decorations 1,759, active
+  decorations in display list 219, visible decorations 219, monsters 148,
+  dormant monsters 138. A follow-up tween-target probe showed active tweens
+  settled to 6 after load.
+
+**Where we left off (session 113):**
+- Goal: continue the slow-game investigation after session 112 improved but
+  did not fully solve the browser metric.
+- Root cause after v220 metric: offscreen world decorations were hidden, but
+  still remained in Phaser's display list. This left ~2,721 display children
+  even after the decoration-count reduction.
+- Changed the decoration culler so offscreen tracked decorations are removed
+  from `scene.children` and re-added when they enter the camera margin. This
+  preserves the full map art while reducing the active render/display list
+  around the player.
+- Cache bumped to `game.js?v=222`.
+- Verification target: `node -c project-grasslands/game.js`, diff check,
+  HTTP smoke for `/` and `game.js?v=222`, and a browser metric pass to confirm
+  the display-list count drops after the first cull tick.
 
 **Where we left off (session 112):**
 - Goal: re-check the game because it still felt very slow, while preserving
