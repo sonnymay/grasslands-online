@@ -4,18 +4,34 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 99 villager NPC asset pass.**
+**State as of 2026-05-19 — post session 100 camp NPC dialogue pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 99 wires Sonny's generated
-  `npc_villager_idle_01.png` into the spawn camp, replacing the Forager's
-  placeholder class sprite with a real camp-helper NPC asset and subtle idle
-  bob.
-- **Cache version live in `project-grasslands/index.html`:** `?v=203`.
-- **Next change must use:** `?v=204`.
+- **Latest completed work:** session 100 adds a lightweight camp NPC dialogue
+  panel for the Guide and Forager, making the finished camp asset set feel
+  interactive instead of purely decorative.
+- **Cache version live in `project-grasslands/index.html`:** `?v=204`.
+- **Next change must use:** `?v=205`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 100):**
+- Goal: continue after Tier 1 camp assets by adding the roadmap's first
+  code-only NPC interaction layer.
+- Added `npcDialogueOpen` modal state so world clicks are blocked while an
+  NPC dialogue panel is open.
+- Added `showNpcDialogue(scene, npc)`: a small bottom dialogue panel with a
+  dark screen intercept, parchment-toned panel, NPC name, line cycling, Next /
+  Close button, and X close control.
+- Guide and Forager camp sprites are now interactive and open their own
+  dialogue lines. Forager uses the generated villager asset when present and
+  still falls back to the old mage/rookie chain if missing.
+- Cache bumped to `game.js?v=204`.
+- Verification: `node -c project-grasslands/game.js` passed and
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md`
+  passed. Browser preview intentionally skipped per Sonny's preference; use
+  Gemini Browser for live visual/interaction feedback.
 
 **Where we left off (session 99):**
 - Goal: continue the camp asset pipeline after Sonny generated the villager

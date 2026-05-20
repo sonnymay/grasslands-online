@@ -330,6 +330,7 @@ let classSelectOpen = false;
 let shopOpen = false;
 let travelOpen = false;
 let trophyOpen = false;
+let npcDialogueOpen = false;
 let hardMode = false; // doubles monster damage, EXP, and zeny drops
 let hudCompact = false;
 let minimapZoom = 1;
@@ -1103,7 +1104,7 @@ function create() {
   // Pointer: click a Blobling to fight it; click ground to walk there.
   scene.input.on('pointerdown', (pointer) => {
     // Block world clicks while any modal overlay is up.
-    if (classSelectOpen || shopOpen || travelOpen || trophyOpen) return;
+    if (classSelectOpen || shopOpen || travelOpen || trophyOpen || npcDialogueOpen) return;
     // Ignore clicks that landed on a UI button (mute / autopilot / return /
     // class cards). Phaser's scene-level pointerdown fires regardless of
     // which interactive object was hit, so we check the hit list ourselves.
@@ -3335,7 +3336,18 @@ function buildDecorations(scene) {
       if (item.block) blockCells(x, y, item.block);
     }
     const npcs = [
-      { key: 'rookie_idle_south', dx: -76, dy: 64, name: 'Guide', h: 86 },
+      {
+        key: 'rookie_idle_south',
+        dx: -76,
+        dy: 64,
+        name: 'Guide',
+        h: 86,
+        lines: [
+          'Welcome to the Grasslands camp.',
+          'Follow the road if you get turned around.',
+          'The Forager knows where the forest gets dangerous.',
+        ],
+      },
       {
         key: scene.textures.exists('npc_villager_idle_01')
           ? 'npc_villager_idle_01'
@@ -3345,6 +3357,11 @@ function buildDecorations(scene) {
         name: 'Forager',
         h: scene.textures.exists('npc_villager_idle_01') ? 98 : 86,
         labelOffset: scene.textures.exists('npc_villager_idle_01') ? 98 : 86,
+        lines: [
+          'Welcome, traveler!',
+          'The forest grows thicker the further north you walk.',
+          'Watch out for the boss in the deep woods.',
+        ],
       },
     ];
     for (const npc of npcs) {
@@ -3367,6 +3384,11 @@ function buildDecorations(scene) {
           ease: 'Sine.inOut',
         });
       }
+      img.setInteractive({ useHandCursor: true });
+      img.on('pointerdown', (_pointer, _lx, _ly, ev) => {
+        ev && ev.stopPropagation && ev.stopPropagation();
+        showNpcDialogue(scene, npc);
+      });
       scene.add.text(x, y - (npc.labelOffset || 86), npc.name, {
         fontFamily: '"Trebuchet MS", Arial, sans-serif',
         fontSize: '13px',
@@ -6181,6 +6203,92 @@ function showTravel(scene) {
       });
     }
   });
+}
+
+function showNpcDialogue(scene, npc = {}) {
+  if (npcDialogueOpen) return;
+  npcDialogueOpen = true;
+  const name = npc.name || 'Villager';
+  const lines = Array.isArray(npc.lines) && npc.lines.length
+    ? npc.lines
+    : ['Welcome, traveler!'];
+  let lineIndex = 0;
+  const cont = scene.add.container(0, 0).setScrollFactor(0).setDepth(20000);
+  const close = () => {
+    cont.destroy();
+    npcDialogueOpen = false;
+  };
+
+  const bg = scene.add.rectangle(0, 0, GAME_W, GAME_H, 0x000000, 0.22)
+    .setOrigin(0, 0).setScrollFactor(0).setInteractive();
+  bg.on('pointerdown', (_p, _lx, _ly, ev) => {
+    ev && ev.stopPropagation && ev.stopPropagation();
+    close();
+  });
+  cont.add(bg);
+
+  const panelW = Math.min(640, GAME_W - 36);
+  const panelH = 150;
+  const x = GAME_W / 2;
+  const y = GAME_H - 108;
+  const panel = scene.add.rectangle(x, y, panelW, panelH, 0x2a1b10, 0.96)
+    .setStrokeStyle(3, 0xb88943, 0.95).setScrollFactor(0);
+  const inset = scene.add.rectangle(x, y + 8, panelW - 18, panelH - 24, 0xf1d59b, 0.10)
+    .setStrokeStyle(1, 0xffe0a3, 0.20).setScrollFactor(0);
+  const title = scene.add.text(x - panelW / 2 + 22, y - panelH / 2 + 18, name, {
+    fontFamily: '"Trebuchet MS", Arial, sans-serif',
+    fontSize: '20px',
+    fontStyle: 'bold',
+    color: '#ffe6a3',
+    stroke: '#2a1608',
+    strokeThickness: 4,
+  }).setOrigin(0, 0.5).setScrollFactor(0).setResolution(UI_TEXT_RESOLUTION);
+  const body = scene.add.text(x - panelW / 2 + 24, y - 16, lines[0], {
+    fontFamily: '"Trebuchet MS", Arial, sans-serif',
+    fontSize: '17px',
+    color: '#fff7db',
+    stroke: '#2a1608',
+    strokeThickness: 3,
+    wordWrap: { width: panelW - 170 },
+  }).setOrigin(0, 0.5).setScrollFactor(0).setResolution(UI_TEXT_RESOLUTION);
+  const nextBg = scene.add.rectangle(x + panelW / 2 - 76, y + panelH / 2 - 34, 108, 34, 0x4a2b15, 0.95)
+    .setStrokeStyle(2, 0xe0b25c, 0.95).setScrollFactor(0)
+    .setInteractive(new Phaser.Geom.Rectangle(-54, -17, 108, 34), Phaser.Geom.Rectangle.Contains);
+  nextBg.input.cursor = 'pointer';
+  const nextText = scene.add.text(nextBg.x, nextBg.y, lines.length > 1 ? 'Next' : 'Close', {
+    fontFamily: '"Trebuchet MS", Arial, sans-serif',
+    fontSize: '15px',
+    fontStyle: 'bold',
+    color: '#fff1c8',
+    stroke: '#1b0f08',
+    strokeThickness: 3,
+  }).setOrigin(0.5).setScrollFactor(0).setResolution(UI_TEXT_RESOLUTION);
+  const closeText = scene.add.text(x + panelW / 2 - 24, y - panelH / 2 + 22, 'X', {
+    fontSize: '20px',
+    fontStyle: 'bold',
+    color: '#fff1c8',
+    stroke: '#1b0f08',
+    strokeThickness: 3,
+  }).setOrigin(0.5).setScrollFactor(0)
+    .setInteractive(new Phaser.Geom.Rectangle(-16, -16, 32, 32), Phaser.Geom.Rectangle.Contains)
+    .setResolution(UI_TEXT_RESOLUTION);
+  closeText.input.cursor = 'pointer';
+  const advance = (_p, _lx, _ly, ev) => {
+    ev && ev.stopPropagation && ev.stopPropagation();
+    if (lineIndex >= lines.length - 1) {
+      close();
+      return;
+    }
+    lineIndex++;
+    body.setText(lines[lineIndex]);
+    nextText.setText(lineIndex >= lines.length - 1 ? 'Close' : 'Next');
+  };
+  nextBg.on('pointerdown', advance);
+  closeText.on('pointerdown', (_p, _lx, _ly, ev) => {
+    ev && ev.stopPropagation && ev.stopPropagation();
+    close();
+  });
+  cont.add([panel, inset, title, body, nextBg, nextText, closeText]);
 }
 
 function showTrophyInspector(scene) {
