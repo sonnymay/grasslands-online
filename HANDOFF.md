@@ -4,19 +4,41 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-20 — post session 108 large willow landmark pass.**
+**State as of 2026-05-20 — post session 109 cliff-face landmark pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 108 wires Sonny's generated
-  `tree_willow_large_01.png` as rare riverside anchor trees, continuing Tier 3
-  tree variety without global scatter spam.
-- **Cache version live in `project-grasslands/index.html`:** `?v=214`.
-- **Next change must use:** `?v=215`.
+- **Latest completed work:** session 109 wires Sonny's generated
+  `rock_cliff_face_01.png` as rare cliff/ledge landmark art in ruins, boulder,
+  desert, and ruins anchor compositions.
+- **Cache version live in `project-grasslands/index.html`:** `?v=215`.
+- **Next change must use:** `?v=216`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these. Also leave the untracked misspelled
   `assets/decorations/camfire_01.png` alone unless Sonny explicitly confirms
   cleanup.
+
+**Where we left off (session 109):**
+- Goal: start fake-elevation/cliff-face visual pass after Sonny generated the
+  cliff PNG in Downloads.
+- Source asset:
+  `/Users/santipapmay/Downloads/rock_cliff_face_01.png`. It was 1536x1024
+  RGBA with real alpha, so it only needed resize/export into the project.
+- Final project asset: `rock_cliff_face_01.png`, 420x260 RGBA with real
+  alpha. The original Downloads file was left untouched.
+- `preload()` now loads `rock_cliff_face_01` with cache bust `?v=215`.
+- `buildDecorations()` defines `cliffFaceKey`; the prompt-inspired ruin and
+  boulder scenes now use hand-placed cliff faces as fake ledge anchors, and
+  desert/ruins anchor compositions can rarely choose cliff art. This is still
+  mostly visual: small blockers are added, but full cliff/ramp collision logic
+  is intentionally not implemented yet.
+- Static decoration shadows remain disabled. Do not re-enable
+  `addPropShadow()`.
+- Cache bumped to `game.js?v=215`.
+- Verification: `node -c project-grasslands/game.js` passed; PNG
+  alpha/dimensions were confirmed; `localhost:8001` served `/`,
+  `game.js?v=215`, and
+  `assets/decorations/rock_cliff_face_01.png?v=215` with HTTP 200.
 
 **Where we left off (session 108):**
 - Goal: continue Tier 3 tree-variety/landmark pass after Sonny generated the

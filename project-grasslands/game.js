@@ -776,6 +776,7 @@ function preload() {
   this.load.image('ruins_wall_broken_01', 'assets/decorations/ruins_wall_broken_01.png?v=207');
   this.load.image('ruins_arch_broken_01', 'assets/decorations/ruins_arch_broken_01.png?v=208');
   this.load.image('ruins_column_fallen_01', 'assets/decorations/ruins_column_fallen_01.png?v=209');
+  this.load.image('rock_cliff_face_01', 'assets/decorations/rock_cliff_face_01.png?v=215');
   // Decorations
   for (let i = 1; i <= 4; i++) this.load.image(`deco_flower_cluster_0${i}`, `assets/decorations/deco_flower_cluster_0${i}.png`);
   for (let i = 1; i <= 3; i++) this.load.image(`deco_rock_0${i}`, `assets/decorations/deco_rock_0${i}.png`);
@@ -2322,6 +2323,7 @@ function buildDecorations(scene) {
   const forestFernKeys = scene.textures.exists('forest_fern_01') ? ['forest_fern_01'] : grassKeys;
   const ruinsPillarKeys = scene.textures.exists('ruins_pillar_broken_01') ? ['ruins_pillar_broken_01'] : [];
   const riversideCattailKeys = scene.textures.exists('riverside_cattail_01') ? ['riverside_cattail_01'] : grassKeys;
+  const cliffFaceKey = scene.textures.exists('rock_cliff_face_01') ? 'rock_cliff_face_01' : null;
   const largeOakKey = scene.textures.exists('tree_oak_large_01') ? 'tree_oak_large_01' : 'tree_oak_01';
   const largePineKey = scene.textures.exists('tree_pine_large_01') ? 'tree_pine_large_01' : 'tree_pine_02';
   const largeWillowKey = scene.textures.exists('tree_willow_large_01') ? 'tree_willow_large_01' : 'tree_round_03';
@@ -3616,6 +3618,16 @@ function buildDecorations(scene) {
       });
       blockCells(ruinX - 246, ruinY + 156, 2);
     }
+    if (cliffFaceKey) {
+      placeLandmarkDeco(cliffFaceKey, ruinX + 42, ruinY + 226, 156, {
+        alignBottom: true,
+        allowFlip: false,
+        angle: -2,
+        baseCluster: 0.10,
+        contact: { width: 250, height: 34, yOffset: -8, alpha: 0.055, angle: -2, scuffs: 7 },
+      });
+      blockCells(ruinX + 42, ruinY + 226, 3);
+    }
     const ancientTree = placeLandmarkDeco(largeOakKey, ruinX + 16, ruinY + 34, largeOakKey === 'tree_oak_large_01' ? 390 : 326, {
       alignBottom: true,
       allowFlip: false,
@@ -3730,6 +3742,16 @@ function buildDecorations(scene) {
         });
         blockCells(x, y, 1);
       }
+    }
+    if (cliffFaceKey) {
+      placeLandmarkDeco(cliffFaceKey, rockX - 12, rockY + 190, 138, {
+        alignBottom: true,
+        allowFlip: true,
+        angle: 3,
+        baseCluster: 0.08,
+        contact: { width: 220, height: 30, yOffset: -8, alpha: 0.045, angle: 3, scuffs: 6 },
+      });
+      blockCells(rockX - 12, rockY + 190, 2);
     }
     for (const p of [
       { dx: -96, dy: 62, key: Phaser.Utils.Array.GetRandom(bushKeys), h: 74 },
@@ -3861,11 +3883,12 @@ function buildDecorations(scene) {
       }
       const forestAnchorKey = tileNoise(tile_r, tile_c, 1908) > 0.45 ? largePineKey : Phaser.Utils.Array.GetRandom(treeKeys);
       const riversideAnchorKey = tileNoise(tile_r, tile_c, 1911) > 0.38 ? largeWillowKey : Phaser.Utils.Array.GetRandom(treeKeys);
+      const dryCliffAnchor = cliffFaceKey && tileNoise(tile_r, tile_c, 1917) > 0.66;
       const anchor = {
         grasslands: { key: Phaser.Utils.Array.GetRandom(treeKeys), h: Phaser.Math.Between(230, 292), opts: { alignBottom: true, maxAngle: 2, blockRadius: 2 } },
         forest: { key: forestAnchorKey, h: forestAnchorKey === largePineKey ? Phaser.Math.Between(300, 360) : Phaser.Math.Between(260, 330), opts: { alignBottom: true, tint: forestTint, maxAngle: 2, blockRadius: 2 } },
-        desert: { key: 'cactus_set', h: Phaser.Math.Between(130, 172), opts: { alignBottom: true, maxAngle: 4, blockRadius: 1 } },
-        ruins: { key: ruinsPillarKeys.length ? Phaser.Utils.Array.GetRandom(ruinsPillarKeys) : Phaser.Utils.Array.GetRandom(rockKeys), h: Phaser.Math.Between(136, 176), opts: { alignBottom: true, tint: ruinsPillarKeys.length ? null : ruinTint, maxAngle: 3, blockRadius: 1 } },
+        desert: { key: dryCliffAnchor ? cliffFaceKey : 'cactus_set', h: dryCliffAnchor ? Phaser.Math.Between(124, 150) : Phaser.Math.Between(130, 172), opts: { alignBottom: true, maxAngle: 4, blockRadius: dryCliffAnchor ? 2 : 1 } },
+        ruins: { key: dryCliffAnchor ? cliffFaceKey : (ruinsPillarKeys.length ? Phaser.Utils.Array.GetRandom(ruinsPillarKeys) : Phaser.Utils.Array.GetRandom(rockKeys)), h: dryCliffAnchor ? Phaser.Math.Between(130, 158) : Phaser.Math.Between(136, 176), opts: { alignBottom: true, tint: dryCliffAnchor || ruinsPillarKeys.length ? null : ruinTint, maxAngle: 3, blockRadius: dryCliffAnchor ? 2 : 1 } },
         riverside: { key: riversideAnchorKey, h: riversideAnchorKey === largeWillowKey ? Phaser.Math.Between(305, 350) : Phaser.Math.Between(220, 276), opts: { alignBottom: true, maxAngle: 2, blockRadius: 2 } },
       }[zone] || { key: Phaser.Utils.Array.GetRandom(treeKeys), h: 240, opts: { alignBottom: true, maxAngle: 2, blockRadius: 2 } };
       placeLandmarkDeco(anchor.key, x, y, anchor.h, anchor.opts);
