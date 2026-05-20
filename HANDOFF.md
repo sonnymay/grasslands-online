@@ -1090,7 +1090,34 @@ On death: 1.5 s dead pose → despawn → respawn 5 s later via
 
 ---
 
-## 3. What we did in session 91 (latest)
+## 3. What we did in session 92 (latest)
+
+Cache now at **`?v=211`**. Phase 10b — real ambient particle art.
+
+1. **Assets.** Sonny generated `fx_petal_pink_soft_01.png` (1254×1254,
+   no alpha, checker baked in) and `fx_dust_mote_soft_01.png`
+   (1024×1024, real alpha). Both resized to max 64 px via `sips`
+   and moved to `assets/decorations/`.
+2. **Preload.** Both keys loaded in `preload()` next to the tent
+   canvas lines.
+3. **Alpha key.** Added `fx_petal_pink_soft_01` to the
+   `keyOutCheckerboard` post-preload pass to strip the baked grey
+   checker. Dust mote skipped (already has real alpha).
+4. **`tickCozyAmbient` upgraded.** Both branches now use
+   `scene.add.image()` when the texture exists. Petal display
+   height 28–44 px at alpha 0.85; dust mote 14–22 px at alpha
+   0.65. Graphics ellipse/circle remain as fallback if the
+   texture is missing.
+5. **Cache bump.** `?v=209` → `?v=211` (Codex's tent-canvas commit
+   also bumped 209 → 210 in between).
+
+### Next per plan
+
+- **Phase 10c:** lantern post + paper lantern string + flowerbed +
+  chubby mushroom + picnic blanket at spawn plaza.
+- **Phase 10d:** chick + bunny critter wanderers near spawn.
+
+## 3.1. What we did in session 91
 
 Cache now at **`?v=209`**. Phase 10a from
 `MAP_VISION_PLAN.md` §8 — Focus Grove cozy aesthetic baseline.
@@ -4143,7 +4170,7 @@ Big push focused on user feedback + RO-feel polish. Cache now at
 - Mini-map redraws every frame.
 - Phaser banner spams the console on every reload. Cosmetic.
 - `?v=N` cache-bust lives in `index.html`. Bump on every `game.js`
-  change. Current: **`?v=209`**. Next change should use `?v=210`.
+  change. Current: **`?v=211`**. Next change should use `?v=212`.
 - `.vercel/` is gitignored. `node_modules/`, `*.log`, `.claude/`, and
   `.DS_Store` are also ignored.
 
