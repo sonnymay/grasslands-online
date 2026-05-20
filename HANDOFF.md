@@ -4,17 +4,40 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 103 broken ruins wall asset pass.**
+**State as of 2026-05-19 — post session 104 broken ruins arch asset pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 103 wires Sonny's generated
-  `ruins_wall_broken_01.png` into the ancient-tree ruin landmark as a large
-  hand-placed wall anchor, continuing Tier 2 ruins depth/texture assets.
-- **Cache version live in `project-grasslands/index.html`:** `?v=207`.
-- **Next change must use:** `?v=208`.
+- **Latest completed work:** session 104 wires Sonny's generated
+  `ruins_arch_broken_01.png` into the ancient-tree ruin landmark as a tall
+  hand-placed ruin-gate anchor, continuing Tier 2 ruins depth/texture assets.
+- **Cache version live in `project-grasslands/index.html`:** `?v=208`.
+- **Next change must use:** `?v=209`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 104):**
+- Goal: continue the Tier 2 ruin/landmark asset pipeline after Sonny generated
+  the broken stone arch PNG in Downloads.
+- Source asset:
+  `/Users/santipapmay/Downloads/ruins_arch_broken_01.png`. It was 1131x1391
+  RGB with a fake checkerboard background and no alpha, so it was normalized
+  locally into
+  `project-grasslands/assets/decorations/ruins_arch_broken_01.png`.
+- Final project asset: `ruins_arch_broken_01.png`, 260x320 RGBA with real
+  alpha. The original Downloads file was left untouched.
+- `preload()` now loads `ruins_arch_broken_01` with cache bust `?v=208`.
+- `addPromptInspiredLandmarks()` now places the arch as one tall hand-placed
+  ruin-gate anchor near the ancient-tree ruin with a structure-only contact
+  mark and collision blocker. It is not globally scattered.
+- Static decoration shadows remain disabled. Do not re-enable
+  `addPropShadow()`.
+- Cache bumped to `game.js?v=208`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md project-grasslands/assets/decorations/ruins_arch_broken_01.png`
+  passed, and PNG alpha/dimensions were confirmed. Browser preview skipped
+  because `http://localhost:8001/` was unavailable in this session; use Gemini
+  Browser for live visual feedback when the preview server is back.
 
 **Where we left off (session 103):**
 - Goal: continue the Tier 2 ruin/landmark asset pipeline after Sonny generated
