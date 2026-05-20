@@ -2219,6 +2219,9 @@ function addGrassTones(scene) {
     { color: 0x2f582b, alphaRange: [0.16, 0.24], stamps: 1400, length: [8, 22] },
     { color: 0x8fb86a, alphaRange: [0.10, 0.18], stamps: 1000, length: [6, 18] },
     { color: 0x5f8444, alphaRange: [0.12, 0.20], stamps: 1200, length: [7, 20] },
+    // 4th warm dirt-tan tone — breaks up the uniform green so the open
+    // field reads as varied terrain instead of one repeating texture.
+    { color: 0xa68a52, alphaRange: [0.08, 0.14], stamps: 700,  length: [5, 14] },
   ];
   tones.forEach(({ color, alphaRange, stamps, length }) => {
     const g = scene.add.graphics().setDepth(-960);
@@ -3289,10 +3292,36 @@ function buildDecorations(scene) {
       baseX, baseY, nextHopAt: 0, hopping: false,
     });
   };
-  spawnCritter('critter_chick_idle_01', 'critter_chick_walk_01', spX - 180, spY + 320);
-  spawnCritter('critter_chick_idle_01', 'critter_chick_walk_01', spX - 80,  spY + 380);
-  spawnCritter('critter_bunny_idle_01', 'critter_bunny_hop_01',  spX + 180, spY + 360);
-  spawnCritter('critter_bunny_idle_01', 'critter_bunny_hop_01',  spX + 280, spY + 300);
+  // Spread critters across all 4 sides of plaza so they don't all huddle
+  // at the bottom and unbalance the visual weight of the map.
+  spawnCritter('critter_chick_idle_01', 'critter_chick_walk_01', spX - 180, spY + 320); // SW
+  spawnCritter('critter_chick_idle_01', 'critter_chick_walk_01', spX + 220, spY - 280); // NE
+  spawnCritter('critter_bunny_idle_01', 'critter_bunny_hop_01',  spX + 320, spY + 220); // SE
+  spawnCritter('critter_bunny_idle_01', 'critter_bunny_hop_01',  spX - 320, spY - 200); // NW
+
+  // Spawn border ring — 12 mid-size trees + rocks at radius ~520 from
+  // plaza center, evenly distributed. Defines the cozy camp boundary so
+  // the open hunting areas read as "outside" the camp.
+  const borderRing = (count, radius) => {
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + (i % 2 ? 0.12 : -0.08); // soft jitter
+      const rJitter = radius + Phaser.Math.Between(-30, 30);
+      const bx = spX + Math.cos(a) * rJitter;
+      const by = spY + Math.sin(a) * rJitter;
+      // Alternate trees and rocks for natural variation.
+      if (i % 3 === 0 && treeKeys.length) {
+        placeLandmarkDeco(Phaser.Utils.Array.GetRandom(treeKeys), bx, by, 170, {
+          alignBottom: true, maxAngle: 4, allowFlip: true,
+        });
+      } else if (rockKeys.length) {
+        placeLandmarkDeco(Phaser.Utils.Array.GetRandom(rockKeys), bx, by,
+          Phaser.Math.Between(46, 72), {
+          alignBottom: true, maxAngle: 12, allowFlip: true,
+        });
+      }
+    }
+  };
+  borderRing(12, 520);
 
   const addSpawnHubDressing = () => {
     const groundKey = scene.textures.exists('deco_sand_scuff_soft_01')
