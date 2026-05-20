@@ -4,17 +4,39 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-19 — post session 100 camp NPC dialogue pass.**
+**State as of 2026-05-19 — post session 101 mossy boulder asset pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 100 adds a lightweight camp NPC dialogue
-  panel for the Guide and Forager, making the finished camp asset set feel
-  interactive instead of purely decorative.
-- **Cache version live in `project-grasslands/index.html`:** `?v=204`.
-- **Next change must use:** `?v=205`.
+- **Latest completed work:** session 101 wires Sonny's generated
+  `boulder_mossy_01.png` into the ruin/boulder landmark scenes as hand-placed
+  accent stones, starting Tier 2 depth/texture assets.
+- **Cache version live in `project-grasslands/index.html`:** `?v=205`.
+- **Next change must use:** `?v=206`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these.
+
+**Where we left off (session 101):**
+- Goal: continue the roadmap after Tier 1 camp/NPC work by starting Tier 2
+  mossy boulder/ruin texture assets.
+- Source asset:
+  `/Users/santipapmay/Downloads/boulder_mossy_01.png`. It was 1254x1254 RGB
+  with a fake checkerboard background and no alpha, so it was normalized
+  locally into
+  `project-grasslands/assets/decorations/boulder_mossy_01.png`.
+- Final project asset: `boulder_mossy_01.png`, 192x192 RGBA with real alpha.
+  The original Downloads file was left untouched.
+- `preload()` now loads `boulder_mossy_01` with cache bust `?v=205`.
+- `addPromptInspiredLandmarks()` now places four mossy boulders by the
+  ancient-tree ruin and boulder anchor landmark scenes when the asset exists.
+  These are deliberately hand-placed, not globally scattered.
+- Static decoration shadows remain disabled. Do not re-enable
+  `addPropShadow()`.
+- Cache bumped to `game.js?v=205`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html HANDOFF.md project-grasslands/assets/decorations/boulder_mossy_01.png`
+  passed, and PNG alpha/dimensions were confirmed. Browser preview skipped per
+  Sonny's preference; use Gemini Browser for live visual feedback.
 
 **Where we left off (session 100):**
 - Goal: continue after Tier 1 camp assets by adding the roadmap's first

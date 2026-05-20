@@ -755,6 +755,7 @@ function preload() {
   this.load.image('log_fence_broken_01', 'assets/decorations/log_fence_broken_01.png?v=201');
   this.load.image('ladder_wooden_01', 'assets/decorations/ladder_wooden_01.png?v=202');
   this.load.image('npc_villager_idle_01', 'assets/decorations/npc_villager_idle_01.png?v=203');
+  this.load.image('boulder_mossy_01', 'assets/decorations/boulder_mossy_01.png?v=205');
   // Decorations
   for (let i = 1; i <= 4; i++) this.load.image(`deco_flower_cluster_0${i}`, `assets/decorations/deco_flower_cluster_0${i}.png`);
   for (let i = 1; i <= 3; i++) this.load.image(`deco_rock_0${i}`, `assets/decorations/deco_rock_0${i}.png`);
@@ -3400,6 +3401,7 @@ function buildDecorations(scene) {
   };
 
   const addPromptInspiredLandmarks = () => {
+    const mossyBoulderKey = scene.textures.exists('boulder_mossy_01') ? 'boulder_mossy_01' : null;
     const ruinX = spX - 760;
     const ruinY = spY - 215;
     placeLandmarkDeco('ruin_base_canvas', ruinX, ruinY + 48, 210, {
@@ -3433,6 +3435,23 @@ function buildDecorations(scene) {
       });
       blockCells(x, y, 1);
     }
+    if (mossyBoulderKey) {
+      for (const b of [
+        { dx: -214, dy: 94, h: 104, angle: -9 },
+        { dx:  206, dy: 116, h: 88, angle: 7 },
+      ]) {
+        const x = ruinX + b.dx;
+        const y = ruinY + b.dy;
+        placeLandmarkDeco(mossyBoulderKey, x, y, b.h, {
+          alignBottom: true,
+          allowFlip: true,
+          angle: b.angle,
+          baseCluster: 0.18,
+          contact: { width: b.h * 0.78, height: 22, yOffset: -6, alpha: 0.045, angle: b.angle, scuffs: 4 },
+        });
+        blockCells(x, y, 1);
+      }
+    }
     for (let i = 0; i < 9; i++) {
       const a = -2.7 + i * 0.46 + Phaser.Math.FloatBetween(-0.12, 0.12);
       const x = ruinX + Math.cos(a) * Phaser.Math.Between(118, 196);
@@ -3456,6 +3475,23 @@ function buildDecorations(scene) {
       contact: { width: 150, height: 42, yOffset: -12, alpha: 0.09, angle: 4, scuffs: 10 },
     });
     blockCells(rockX, rockY, 2);
+    if (mossyBoulderKey) {
+      for (const b of [
+        { dx: -150, dy: 28, h: 100, angle: -5 },
+        { dx:  142, dy: 76, h: 82, angle: 9 },
+      ]) {
+        const x = rockX + b.dx;
+        const y = rockY + b.dy;
+        placeLandmarkDeco(mossyBoulderKey, x, y, b.h, {
+          alignBottom: true,
+          allowFlip: true,
+          angle: b.angle,
+          baseCluster: 0.22,
+          contact: { width: b.h * 0.78, height: 20, yOffset: -6, alpha: 0.045, angle: b.angle, scuffs: 4 },
+        });
+        blockCells(x, y, 1);
+      }
+    }
     for (const p of [
       { dx: -96, dy: 62, key: Phaser.Utils.Array.GetRandom(bushKeys), h: 74 },
       { dx:  94, dy: 56, key: Phaser.Utils.Array.GetRandom(grassKeys), h: 58 },
