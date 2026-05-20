@@ -45,11 +45,11 @@ const BLOBLING_ATTACK_RANGE = 80;
 // name label, and HP bars, so over-populating the whole 19200px map tanks FPS
 // even when most monsters are off camera. Keep density readable through pods
 // and respawns instead of hundreds of simultaneous display objects.
-const BLOBLING_COUNT = 20;
-const MOOHAM_COUNT = 14;
-const MOOWAAN_COUNT = 12;
-const MOODENG_COUNT = 8;
-const DUNE_BLOB_COUNT = 8;
+const BLOBLING_COUNT = 44;
+const MOOHAM_COUNT = 30;
+const MOOWAAN_COUNT = 26;
+const MOODENG_COUNT = 20;
+const DUNE_BLOB_COUNT = 18;
 const BIGFOOT_COUNT = 1;
 const BIOME_BOSS_COUNT = 1;
 
@@ -1958,12 +1958,18 @@ function addPathWashes(scene) {
     const len = Math.hypot(dx, dy) || 1;
     const nx = -dy / len;
     const ny = dx / len;
-    const bend = Phaser.Math.FloatBetween(-34, 34);
+    // Bigger meander so paths curve like real foot-trails.
+    const bend = Phaser.Math.FloatBetween(-70, 70);
     const cx = (a.x + b.x) / 2 + nx * bend;
     const cy = (a.y + b.y) / 2 + ny * bend * 0.55;
+    // Per-segment width taper — vary stroke width ±25% so the trail
+    // widens and narrows along its length instead of looking uniform.
+    const taperA = Phaser.Math.FloatBetween(0.75, 1.0);
+    const taperB = Phaser.Math.FloatBetween(0.78, 1.1);
     const stroke = (width, color, alpha) => {
-      g.lineStyle(width, color, alpha);
+      g.lineStyle(width * taperA, color, alpha);
       g.lineBetween(a.x, a.y, cx, cy);
+      g.lineStyle(width * taperB, color, alpha);
       g.lineBetween(cx, cy, b.x, b.y);
     };
     // Higher contrast worn-trail look — was alpha 0.075 / 0.105 / 0.058.
@@ -3151,7 +3157,7 @@ function buildDecorations(scene) {
   let roadsideMeadowCount = 0;
   for (let r = 2; r < MAP_ROWS - 2; r++) {
     for (let c = 2; c < MAP_COLS - 2; c++) {
-      if (roadsideMeadowCount >= 32) break;
+      if (roadsideMeadowCount >= 44) break;
       if (getCellType(r, c) !== 'grass' || !adjacentPathDir(r, c)) continue;
       const zone = getZone(r, c);
       const threshold = zone === 'grasslands' ? 0.80 : 0.88;
@@ -3177,7 +3183,7 @@ function buildDecorations(scene) {
   let fieldPocketCount = 0;
   for (let r = 2; r < MAP_ROWS - 2; r++) {
     for (let c = 2; c < MAP_COLS - 2; c++) {
-      if (fieldPocketCount >= 70) break;
+      if (fieldPocketCount >= 42) break;
       if (getCellType(r, c) !== 'grass') continue;
       const nearPath = [[1,0],[-1,0],[0,1],[0,-1]].some(([dr, dc]) =>
         getCellType(r + dr, c + dc) !== 'grass'
@@ -3330,8 +3336,12 @@ function buildDecorations(scene) {
   cozyPlaceCozy('prop_lantern_post_warm_01', spX + 230, spY - 40, 180, { alignBottom: true, maxAngle: 2, cozy: true, allowFlip: false });
   cozyPlaceCozy('prop_paper_lantern_string_01', spX, spY - 220, 90, { maxAngle: 0, alpha: 0.95, allowFlip: false, depth: -550, cozy: true });
   cozyPlaceCozy('prop_garden_flowerbed_01', spX + 300, spY + 100, 110, { maxAngle: 4, alpha: 0.95, depth: -540, cozy: true });
-  cozyPlaceCozy('prop_mushroom_round_big_01', spX - 300, spY + 110, 130, { alignBottom: true, maxAngle: 3, cozy: true });
-  cozyPlaceCozy('prop_picnic_blanket_01', spX + 70, spY + 240, 160, { maxAngle: 2, alpha: 0.96, depth: -550, allowFlip: false, cozy: true });
+  // Push the chubby mushroom and the picnic blanket out of the camp
+  // cluster — mushroom moves far west into a safe quiet area, picnic
+  // blanket moves far east away from MooWaan / Blobling spawn zones,
+  // so neither competes with the camp scene visually.
+  cozyPlaceCozy('prop_mushroom_round_big_01', spX - 540, spY - 80,  130, { alignBottom: true, maxAngle: 3, cozy: true });
+  cozyPlaceCozy('prop_picnic_blanket_01',     spX + 560, spY + 60,  160, { maxAngle: 2, alpha: 0.96, depth: -550, allowFlip: false, cozy: true });
 
   // Phase 10d: cozy critter wanderers. Two chicks + two bunnies live near
   // spawn plaza and slowly wander ±80 px around a base point, idle/walk
@@ -3354,29 +3364,44 @@ function buildDecorations(scene) {
   spawnCritter('critter_bunny_idle_01', 'critter_bunny_hop_01',  spX + 320, spY + 220); // SE
   spawnCritter('critter_bunny_idle_01', 'critter_bunny_hop_01',  spX - 320, spY - 200); // NW
 
-  // Spawn border ring — 12 mid-size trees + rocks at radius ~520 from
-  // plaza center, evenly distributed. Defines the cozy camp boundary so
-  // the open hunting areas read as "outside" the camp.
-  const borderRing = (count, radius) => {
-    for (let i = 0; i < count; i++) {
-      const a = (i / count) * Math.PI * 2 + (i % 2 ? 0.12 : -0.08); // soft jitter
-      const rJitter = radius + Phaser.Math.Between(-30, 30);
-      const bx = spX + Math.cos(a) * rJitter;
-      const by = spY + Math.sin(a) * rJitter;
-      // Alternate trees and rocks for natural variation.
-      if (i % 3 === 0 && treeKeys.length) {
-        placeLandmarkDeco(Phaser.Utils.Array.GetRandom(treeKeys), bx, by, 170, {
-          alignBottom: true, maxAngle: 4, allowFlip: true,
-        });
-      } else if (rockKeys.length) {
-        placeLandmarkDeco(Phaser.Utils.Array.GetRandom(rockKeys), bx, by,
-          Phaser.Math.Between(46, 72), {
-          alignBottom: true, maxAngle: 12, allowFlip: true,
-        });
-      }
+  // Spawn border habitat clusters. Avoid an even decorative ring; use a few
+  // authored thickets with clear gaps so camp reads designed, not sprinkled.
+  const addBorderCluster = (cx, cy, kind, angle = 0) => {
+    const cluster = kind === 'grove'
+      ? [
+          { key: Phaser.Utils.Array.GetRandom(treeKeys), dx: -60, dy: -24, h: 190 },
+          { key: Phaser.Utils.Array.GetRandom(treeKeys), dx:  32, dy: -42, h: 166 },
+          { key: Phaser.Utils.Array.GetRandom(bushKeys), dx: -18, dy:  42, h: 74 },
+          { key: Phaser.Utils.Array.GetRandom(rockKeys), dx:  66, dy:  46, h: 58 },
+        ]
+      : [
+          { key: Phaser.Utils.Array.GetRandom(rockKeys), dx: -52, dy:  6, h: 70 },
+          { key: Phaser.Utils.Array.GetRandom(bushKeys), dx:  12, dy: -20, h: 78 },
+          { key: Phaser.Utils.Array.GetRandom(grassKeys), dx:  58, dy:  30, h: 54 },
+        ];
+    const ca = Math.cos(angle);
+    const sa = Math.sin(angle);
+    for (const item of cluster) {
+      if (!scene.textures.exists(item.key)) continue;
+      const x = cx + item.dx * ca - item.dy * sa + Phaser.Math.Between(-10, 10);
+      const y = cy + item.dx * sa + item.dy * ca + Phaser.Math.Between(-8, 8);
+      const standing = treeKeys.includes(item.key) || bushKeys.includes(item.key) || rockKeys.includes(item.key);
+      placeLandmarkDeco(item.key, x, y, item.h, {
+        alignBottom: standing,
+        maxAngle: standing ? 5 : 18,
+        allowFlip: true,
+        baseCluster: standing ? 0.10 : 0,
+      });
+      if (treeKeys.includes(item.key)) blockCells(x, y, 1);
     }
   };
-  borderRing(12, 520);
+  [
+    { dx: -520, dy: -310, kind: 'grove', angle: -0.4 },
+    { dx:  470, dy: -250, kind: 'rocks', angle:  0.7 },
+    { dx: -560, dy:  260, kind: 'rocks', angle: -0.2 },
+    { dx:  520, dy:  310, kind: 'grove', angle:  0.3 },
+    { dx:   40, dy:  560, kind: 'grove', angle: -0.7 },
+  ].forEach((p) => addBorderCluster(spX + p.dx, spY + p.dy, p.kind, p.angle));
 
   const addSpawnHubDressing = () => {
     const groundKey = scene.textures.exists('deco_sand_scuff_soft_01')
@@ -4016,6 +4041,28 @@ function buildDecorations(scene) {
   for (let i = 0; i < perfCount(95, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(mushroomKeys), 44, Phaser.Math.Between(4, 7), { maxAngle: 10, zoneFilter: 'grasslands', spread: TILE_SIZE * 0.72 });
   for (let i = 0; i < perfCount(85, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(bushKeys), 72, Phaser.Math.Between(3, 5), { maxAngle: 8, alignBottom: true, zoneFilter: 'grasslands', spread: TILE_SIZE * 1.2 });
   for (let i = 0; i < perfCount(46, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(treeKeys), 166, Phaser.Math.Between(2, 4), { maxAngle: 4, alignBottom: true, zoneFilter: 'grasslands', spread: TILE_SIZE * 1.5 });
+
+  // South-half doodad boost — reviewer flagged the bottom of the map as
+  // barren. Drop extra flowers + grass + bushes in the south half of
+  // grasslands (rows > 55% of MAP_ROWS) so the bottom reads varied.
+  const southBoost = (key, displayH, opts = {}) => {
+    let attempts = 0;
+    while (attempts < 80) {
+      attempts++;
+      const r = Phaser.Math.Between(Math.floor(MAP_ROWS * 0.55), MAP_ROWS - 1);
+      const c = Phaser.Math.Between(0, MAP_COLS - 1);
+      if (getZone(r, c) !== 'grasslands') continue;
+      if (getCellType(r, c) !== 'grass') continue;
+      const x = c * TILE_SIZE + Phaser.Math.Between(8, TILE_SIZE - 8);
+      const y = r * TILE_SIZE + Phaser.Math.Between(8, TILE_SIZE - 8);
+      placeLandmarkDeco(key, x, y, displayH, opts);
+      return;
+    }
+  };
+  for (let i = 0; i < 480; i++) southBoost(Phaser.Utils.Array.GetRandom(grassKeys),    52, { alpha: 0.9, maxAngle: 18, sway: true, swayAmp: 3 });
+  for (let i = 0; i < 320; i++) southBoost(Phaser.Utils.Array.GetRandom(flowerKeys),   60, { maxAngle: 15, sway: true, swayAmp: 2 });
+  for (let i = 0; i < 180; i++) southBoost(Phaser.Utils.Array.GetRandom(mushroomKeys), 44, { maxAngle: 10 });
+  for (let i = 0; i < 140; i++) southBoost(Phaser.Utils.Array.GetRandom(bushKeys),     68, { maxAngle: 8, alignBottom: true });
 
   // Forest (north) — heavy trees, dark bushes, mushrooms. Tinted darker green.
   for (let i = 0; i < perfCount(760); i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     200, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'forest', tint: forestTint, shadow: true });
@@ -5791,7 +5838,8 @@ class MonsterController {
     const dy = player.sprite.y - this.sprite.y;
     const dist = Math.hypot(dx, dy);
     const playerAlive = !player.dead;
-    const dormant = !this.provoked && dist > 1700;
+    if (!this.provoked && this._dormantUntil && time < this._dormantUntil) return;
+    const dormant = !this.provoked && dist > 1450;
     if (dormant) {
       this.sprite.setVelocity(0, 0);
       if (this.sprite.visible) this.sprite.setVisible(false);
@@ -5800,8 +5848,10 @@ class MonsterController {
       this.nameTag.setVisible(false);
       this.hpBarBg.setVisible(false);
       this.hpBar.setVisible(false);
+      this._dormantUntil = time + Phaser.Math.Between(360, 620);
       return;
     }
+    this._dormantUntil = 0;
     if (!this.sprite.visible) this.sprite.setVisible(true);
     if (!this.shadow.visible) this.shadow.setVisible(true);
     if (this.auraRing && !this.auraRing.visible) this.auraRing.setVisible(true);
