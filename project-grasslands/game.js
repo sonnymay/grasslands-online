@@ -755,6 +755,12 @@ function preload() {
   // Phase 10b: Focus-Grove ambient particle art (replaces graphics placeholders in tickCozyAmbient).
   this.load.image('fx_petal_pink_soft_01', 'assets/decorations/fx_petal_pink_soft_01.png');
   this.load.image('fx_dust_mote_soft_01',  'assets/decorations/fx_dust_mote_soft_01.png');
+  // Phase 10c: cozy plaza props (Focus Grove aesthetic).
+  this.load.image('prop_lantern_post_warm_01',     'assets/decorations/prop_lantern_post_warm_01.png');
+  this.load.image('prop_paper_lantern_string_01',  'assets/decorations/prop_paper_lantern_string_01.png');
+  this.load.image('prop_garden_flowerbed_01',      'assets/decorations/prop_garden_flowerbed_01.png');
+  this.load.image('prop_mushroom_round_big_01',    'assets/decorations/prop_mushroom_round_big_01.png');
+  this.load.image('prop_picnic_blanket_01',        'assets/decorations/prop_picnic_blanket_01.png');
   this.load.image('wooden_cart_01', 'assets/decorations/wooden_cart_01.png?v=199');
   this.load.image('log_fence_horizontal_01', 'assets/decorations/log_fence_horizontal_01.png?v=200');
   this.load.image('log_fence_broken_01', 'assets/decorations/log_fence_broken_01.png?v=201');
@@ -888,6 +894,14 @@ function create() {
   }
   // fx_petal_pink_soft_01 shipped without alpha (checker baked in); fx_dust_mote_soft_01 has real alpha already.
   keyOutCheckerboard(scene, 'fx_petal_pink_soft_01');
+  // Phase 10c: 4 of the 5 cozy plaza props shipped without alpha
+  // (Photoshop checker baked in). Picnic blanket already has real alpha.
+  for (const k of [
+    'prop_lantern_post_warm_01',
+    'prop_paper_lantern_string_01',
+    'prop_garden_flowerbed_01',
+    'prop_mushroom_round_big_01',
+  ]) keyOutCheckerboard(scene, k);
 
   // Slice every 4x4 tileset into 16 frames named `tile_0`..`tile_15` on that
   // texture key. buildMap picks which tileset key to draw from per zone.
@@ -3227,6 +3241,20 @@ function buildDecorations(scene) {
     scene.tweens.add({ targets: core, alpha: 0.42, scaleX: 1.12, scaleY: 1.12,
       duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
   }
+
+  // Phase 10c: cozy plaza props around spawn — Focus Grove style hub
+  // dressing. Pure cosmetic, sits inside the existing plaza protect
+  // zone so A* and movement stay clean.
+  const cozyPlaceCozy = (key, x, y, displayH, opts = {}) => {
+    if (!scene.textures.exists(key)) return;
+    placeLandmarkDeco(key, x, y, displayH, opts);
+  };
+  cozyPlaceCozy('prop_lantern_post_warm_01', spX - 230, spY - 40, 180, { alignBottom: true, maxAngle: 2, cozy: true });
+  cozyPlaceCozy('prop_lantern_post_warm_01', spX + 230, spY - 40, 180, { alignBottom: true, maxAngle: 2, cozy: true, allowFlip: false });
+  cozyPlaceCozy('prop_paper_lantern_string_01', spX, spY - 220, 90, { maxAngle: 0, alpha: 0.95, allowFlip: false, depth: -550, cozy: true });
+  cozyPlaceCozy('prop_garden_flowerbed_01', spX + 300, spY + 100, 110, { maxAngle: 4, alpha: 0.95, depth: -540, cozy: true });
+  cozyPlaceCozy('prop_mushroom_round_big_01', spX - 300, spY + 110, 130, { alignBottom: true, maxAngle: 3, cozy: true });
+  cozyPlaceCozy('prop_picnic_blanket_01', spX + 70, spY + 240, 160, { maxAngle: 2, alpha: 0.96, depth: -550, allowFlip: false, cozy: true });
 
   const addSpawnHubDressing = () => {
     const groundKey = scene.textures.exists('deco_sand_scuff_soft_01')
