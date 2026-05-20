@@ -761,6 +761,11 @@ function preload() {
   this.load.image('prop_garden_flowerbed_01',      'assets/decorations/prop_garden_flowerbed_01.png');
   this.load.image('prop_mushroom_round_big_01',    'assets/decorations/prop_mushroom_round_big_01.png');
   this.load.image('prop_picnic_blanket_01',        'assets/decorations/prop_picnic_blanket_01.png');
+  // Phase 10d: cozy critter wanderers (chick + bunny, idle + walk frames).
+  this.load.image('critter_chick_idle_01', 'assets/decorations/critter_chick_idle_01.png');
+  this.load.image('critter_chick_walk_01', 'assets/decorations/critter_chick_walk_01.png');
+  this.load.image('critter_bunny_idle_01', 'assets/decorations/critter_bunny_idle_01.png');
+  this.load.image('critter_bunny_hop_01',  'assets/decorations/critter_bunny_hop_01.png');
   this.load.image('wooden_cart_01', 'assets/decorations/wooden_cart_01.png?v=199');
   this.load.image('log_fence_horizontal_01', 'assets/decorations/log_fence_horizontal_01.png?v=200');
   this.load.image('log_fence_broken_01', 'assets/decorations/log_fence_broken_01.png?v=201');
@@ -902,6 +907,11 @@ function create() {
     'prop_paper_lantern_string_01',
     'prop_garden_flowerbed_01',
     'prop_mushroom_round_big_01',
+    // Phase 10d: 3 of 4 critter frames shipped without alpha. chick_idle
+    // already has real alpha, skipped.
+    'critter_chick_walk_01',
+    'critter_bunny_idle_01',
+    'critter_bunny_hop_01',
   ]) keyOutCheckerboard(scene, k);
 
   // Slice every 4x4 tileset into 16 frames named `tile_0`..`tile_15` on that
@@ -1264,6 +1274,7 @@ function update(time, delta) {
     tickRoadSparkles(player.scene, time);
     tickAmbience(player.scene, time, delta);
     tickCozyAmbient(player.scene, time, delta);
+    tickCozyCritters(player.scene, time);
   }
 
   // Off-screen sway tween cull. ~1.3k sway tweens drive grass/flowers; only
@@ -3257,6 +3268,25 @@ function buildDecorations(scene) {
   cozyPlaceCozy('prop_garden_flowerbed_01', spX + 300, spY + 100, 110, { maxAngle: 4, alpha: 0.95, depth: -540, cozy: true });
   cozyPlaceCozy('prop_mushroom_round_big_01', spX - 300, spY + 110, 130, { alignBottom: true, maxAngle: 3, cozy: true });
   cozyPlaceCozy('prop_picnic_blanket_01', spX + 70, spY + 240, 160, { maxAngle: 2, alpha: 0.96, depth: -550, allowFlip: false, cozy: true });
+
+  // Phase 10d: cozy critter wanderers. Two chicks + two bunnies live near
+  // spawn plaza and slowly wander ±80 px around a base point, idle/walk
+  // frame swap on each tween. Pure cosmetic; no combat, no clickable.
+  if (!scene.__cozyCritters) scene.__cozyCritters = [];
+  const spawnCritter = (idleKey, walkKey, baseX, baseY) => {
+    if (!scene.textures.exists(idleKey)) return;
+    const img = scene.add.image(baseX, baseY, idleKey);
+    img.setScale(56 / img.height);
+    img.setDepth(baseY);
+    scene.__cozyCritters.push({
+      sprite: img, idleKey, walkKey,
+      baseX, baseY, nextHopAt: 0, hopping: false,
+    });
+  };
+  spawnCritter('critter_chick_idle_01', 'critter_chick_walk_01', spX - 180, spY + 320);
+  spawnCritter('critter_chick_idle_01', 'critter_chick_walk_01', spX - 80,  spY + 380);
+  spawnCritter('critter_bunny_idle_01', 'critter_bunny_hop_01',  spX + 180, spY + 360);
+  spawnCritter('critter_bunny_idle_01', 'critter_bunny_hop_01',  spX + 280, spY + 300);
 
   const addSpawnHubDressing = () => {
     const groundKey = scene.textures.exists('deco_sand_scuff_soft_01')
@@ -5941,6 +5971,33 @@ function tickWeatherBurst(scene, time, delta) {
 // Phase 10a: always-on Focus-Grove ambient drift. Independent of the
 // weather scheduler — gentle petals + dust motes always present so the
 // world breathes. Caps at ~24 alive concurrent.
+// Phase 10d: chick + bunny critter wanderers. Each critter sits at a base
+// (baseX, baseY), waits a randomized delay, walks/hops to a nearby point
+// within ±80 px, swaps to its walk frame during motion and back to idle
+// when it arrives. Flip X based on travel direction.
+function tickCozyCritters(scene, time) {
+  const list = scene.__cozyCritters;
+  if (!list || !list.length) return;
+  for (const c of list) {
+    if (c.hopping || time < c.nextHopAt) continue;
+    const tx = c.baseX + Phaser.Math.Between(-80, 80);
+    const ty = c.baseY + Phaser.Math.Between(-60, 60);
+    c.sprite.setTexture(c.walkKey);
+    c.sprite.setFlipX(tx < c.sprite.x);
+    c.hopping = true;
+    const dur = Phaser.Math.Between(900, 1600);
+    scene.tweens.add({
+      targets: c.sprite, x: tx, y: ty, duration: dur, ease: 'Sine.easeInOut',
+      onUpdate: () => { if (c.sprite && c.sprite.active) c.sprite.setDepth(c.sprite.y); },
+      onComplete: () => {
+        c.hopping = false;
+        c.nextHopAt = time + dur + Phaser.Math.Between(2200, 4500);
+        if (c.sprite && c.sprite.active) c.sprite.setTexture(c.idleKey);
+      },
+    });
+  }
+}
+
 function tickCozyAmbient(scene, time, delta) {
   if (!scene.__cozyAmbient) scene.__cozyAmbient = { alive: 0 };
   const state = scene.__cozyAmbient;
