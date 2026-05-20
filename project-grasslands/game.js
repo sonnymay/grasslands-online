@@ -41,15 +41,15 @@ const LOOT_MAGNET_SPEED  = 700; // px/s pull velocity
 const BLOBLING_ATTACK_COOLDOWN = 1500;
 const BLOBLING_AGGRO_RANGE = 200;
 const BLOBLING_ATTACK_RANGE = 80;
-// Monster population scales with world area. Original counts were tuned
-// for a 6400×6400 map; the world is now 19200×19200 (9× area), so the
-// per-type populations are scaled ~5× to keep encounter density similar
-// without rebuilding the world every frame. Bosses stay rare (count 1).
-const BLOBLING_COUNT = 150;
-const MOOHAM_COUNT = 100;
-const MOOWAAN_COUNT = 75;
-const MOODENG_COUNT = 55;
-const DUNE_BLOB_COUNT = 60;
+// Live monster population. Each monster owns a physics body, sprite, shadow,
+// name label, and HP bars, so over-populating the whole 19200px map tanks FPS
+// even when most monsters are off camera. Keep density readable through pods
+// and respawns instead of hundreds of simultaneous display objects.
+const BLOBLING_COUNT = 60;
+const MOOHAM_COUNT = 40;
+const MOOWAAN_COUNT = 32;
+const MOODENG_COUNT = 24;
+const DUNE_BLOB_COUNT = 24;
 const BIGFOOT_COUNT = 1;
 const BIOME_BOSS_COUNT = 1;
 
@@ -309,6 +309,7 @@ const config = {
 };
 
 const game = new Phaser.Game(config);
+window.__grasslandsGame = game;
 
 // Globals carried by scene (kept on `this` where possible)
 let player;
@@ -326,6 +327,7 @@ let ui;
 let autopilotOn = false;
 let autopilotLastScan = 0;
 let lastSwayCull = 0; // throttles off-screen sway tween pause/resume sweep
+let lastDecorCull = 0; // throttles off-screen decoration visibility sweep
 let classSelectOpen = false;
 let shopOpen = false;
 let travelOpen = false;
@@ -750,6 +752,9 @@ function preload() {
   this.load.image('campfire_01', 'assets/decorations/campfire_01.png');
   this.load.image('tent_canvas_front_01', 'assets/decorations/tent_canvas_front_01.png');
   this.load.image('tent_canvas_side_01', 'assets/decorations/tent_canvas_side_01.png');
+  // Phase 10b: Focus-Grove ambient particle art (replaces graphics placeholders in tickCozyAmbient).
+  this.load.image('fx_petal_pink_soft_01', 'assets/decorations/fx_petal_pink_soft_01.png');
+  this.load.image('fx_dust_mote_soft_01',  'assets/decorations/fx_dust_mote_soft_01.png');
   this.load.image('wooden_cart_01', 'assets/decorations/wooden_cart_01.png?v=199');
   this.load.image('log_fence_horizontal_01', 'assets/decorations/log_fence_horizontal_01.png?v=200');
   this.load.image('log_fence_broken_01', 'assets/decorations/log_fence_broken_01.png?v=201');
@@ -759,6 +764,7 @@ function preload() {
   this.load.image('boulder_mossy_02', 'assets/decorations/boulder_mossy_02.png?v=206');
   this.load.image('ruins_wall_broken_01', 'assets/decorations/ruins_wall_broken_01.png?v=207');
   this.load.image('ruins_arch_broken_01', 'assets/decorations/ruins_arch_broken_01.png?v=208');
+  this.load.image('ruins_column_fallen_01', 'assets/decorations/ruins_column_fallen_01.png?v=209');
   // Decorations
   for (let i = 1; i <= 4; i++) this.load.image(`deco_flower_cluster_0${i}`, `assets/decorations/deco_flower_cluster_0${i}.png`);
   for (let i = 1; i <= 3; i++) this.load.image(`deco_rock_0${i}`, `assets/decorations/deco_rock_0${i}.png`);
@@ -879,6 +885,8 @@ function create() {
   for (const k of ['biome_forest_blob', 'biome_desert_blob', 'biome_ruins_blob', 'biome_riverside_blob']) {
     keyOutCheckerboard(scene, k);
   }
+  // fx_petal_pink_soft_01 shipped without alpha (checker baked in); fx_dust_mote_soft_01 has real alpha already.
+  keyOutCheckerboard(scene, 'fx_petal_pink_soft_01');
 
   // Slice every 4x4 tileset into 16 frames named `tile_0`..`tile_15` on that
   // texture key. buildMap picks which tileset key to draw from per zone.
@@ -1258,6 +1266,23 @@ function update(time, delta) {
       const far = (dx * dx + dy * dy) > R2;
       if (far && !e.tween.isPaused()) e.tween.pause();
       else if (!far && e.tween.isPaused()) e.tween.resume();
+    }
+  }
+
+  if (player && !player.dead && player.scene && player.scene.__worldDecorations &&
+      time - lastDecorCull > 220) {
+    lastDecorCull = time;
+    const cam = player.scene.cameras.main;
+    const view = cam.worldView;
+    const margin = 900;
+    const left = view.x - margin;
+    const right = view.x + view.width + margin;
+    const top = view.y - margin;
+    const bottom = view.y + view.height + margin;
+    for (const obj of player.scene.__worldDecorations) {
+      if (!obj || !obj.active) continue;
+      const visible = obj.x >= left && obj.x <= right && obj.y >= top && obj.y <= bottom;
+      if (obj.visible !== visible) obj.setVisible(visible);
     }
   }
 
@@ -2233,7 +2258,7 @@ function addTerrainSeamBlends(scene) {
     const closeness = Phaser.Math.Clamp(4 - (distance || 3), 1, 3);
     const x = c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-72, 72);
     const y = r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-64, 64);
-    const img = scene.add.image(x, y, key);
+    const img = trackWorldDecoration(scene.add.image(x, y, key));
     img.setScale(Phaser.Math.Between(620, 1180) / img.height);
     img.setAngle(Phaser.Math.Between(0, 359));
     img.setAlpha(Phaser.Math.FloatBetween(0.055, 0.115) * closeness);
@@ -2267,6 +2292,23 @@ function buildDecorations(scene) {
   const forestFernKeys = scene.textures.exists('forest_fern_01') ? ['forest_fern_01'] : grassKeys;
   const ruinsPillarKeys = scene.textures.exists('ruins_pillar_broken_01') ? ['ruins_pillar_broken_01'] : [];
   const riversideCattailKeys = scene.textures.exists('riverside_cattail_01') ? ['riverside_cattail_01'] : grassKeys;
+  const PERF = {
+    scatter: 0.025,
+    clusters: 0.015,
+    ponds: 0.08,
+    overlays: 0.04,
+    swayChance: 0.008,
+    clusterSwayChance: 0.006,
+    maxSwayProps: 10,
+  };
+  let swayPropCount = 0;
+  const perfCount = (count, scale = PERF.scatter, min = 0) => Math.max(min, Math.round(count * scale));
+  const canStartSway = (chance) => {
+    if (swayPropCount >= PERF.maxSwayProps) return false;
+    if (Math.random() >= chance) return false;
+    swayPropCount++;
+    return true;
+  };
 
   const addCanvasTexture = (key, width, height, draw) => {
     if (scene.textures.exists(key)) return;
@@ -2592,7 +2634,7 @@ function buildDecorations(scene) {
     }
   };
   const addBaseOverlapCluster = (x, y, opts = {}, countRange = [1, 3]) => {
-    const baseClusterChance = opts.baseCluster ?? 0;
+    const baseClusterChance = (opts.baseCluster ?? 0) * 0.35;
     if (!baseClusterChance || !opts.alignBottom || Math.random() >= baseClusterChance) return;
     const count = Phaser.Math.Between(countRange[0], countRange[1]);
     for (let i = 0; i < count; i++) {
@@ -2612,7 +2654,13 @@ function buildDecorations(scene) {
       spr.setAlpha(Phaser.Math.FloatBetween(0.82, 0.96));
       if (opts.tint && Math.random() < 0.5) spr.setTint(opts.tint);
       spr.setDepth(y + 0.15 + i * 0.01);
+      trackWorldDecoration(spr);
     }
+  };
+  const trackWorldDecoration = (obj) => {
+    if (!obj) return obj;
+    (scene.__worldDecorations || (scene.__worldDecorations = [])).push(obj);
+    return obj;
   };
 
   // Generic scatter. By default decorations are flat overlays under entities.
@@ -2638,7 +2686,7 @@ function buildDecorations(scene) {
     const cy = Math.floor(y / CELL_SIZE);
     if (walkable && walkable[cy] && walkable[cy][cx] === false) return null;
 
-    const img = scene.add.image(x, y, key);
+    const img = trackWorldDecoration(scene.add.image(x, y, key));
     const baseScale = displayH / img.height;
     const scaleJitter = opts.noJitter ? 1 : Phaser.Math.FloatBetween(0.85, 1.15);
     img.setScale(baseScale * scaleJitter);
@@ -2655,9 +2703,9 @@ function buildDecorations(scene) {
     img.setAlpha(opts.alpha ?? 1);
     if (opts.tint) img.setTint(opts.tint);
     if (opts.shadow) addPropShadow(img, x, y, opts);
-    const baseClusterChance = opts.baseCluster ?? (opts.alignBottom && !opts.shimmer ? 0.34 : 0);
+    const baseClusterChance = opts.baseCluster ?? (opts.alignBottom && !opts.shimmer ? 0.04 : 0);
     if (baseClusterChance && opts.alignBottom && Math.random() < baseClusterChance) {
-      const count = Phaser.Math.Between(2, 4);
+      const count = Phaser.Math.Between(1, 2);
       for (let i = 0; i < count; i++) {
         const underKey = Phaser.Utils.Array.GetRandom(
           i === 0 ? grassKeys : [...grassKeys, ...flowerKeys, ...mushroomKeys]
@@ -2673,6 +2721,7 @@ function buildDecorations(scene) {
         spr.setAlpha(Phaser.Math.FloatBetween(0.82, 0.96));
         if (opts.tint && Math.random() < 0.55) spr.setTint(opts.tint);
         spr.setDepth(y + 0.15 + i * 0.01);
+        trackWorldDecoration(spr);
       }
     }
 
@@ -2681,7 +2730,7 @@ function buildDecorations(scene) {
     // Wind sway: small angle oscillation makes grass/flower tufts feel
     // alive without animating sprites. Random duration + offset prevents
     // every tuft swaying in lock-step.
-    if (opts.sway) {
+    if (opts.sway && canStartSway(PERF.swayChance)) {
       const base = img.angle;
       const amp = opts.swayAmp ?? 3;
       const dur = Phaser.Math.Between(1600, 3200);
@@ -2767,7 +2816,7 @@ function buildDecorations(scene) {
       const cx = Math.floor(x / CELL_SIZE);
       const cy = Math.floor(y / CELL_SIZE);
       if (walkable && walkable[cy] && walkable[cy][cx] === false) continue;
-      const img = scene.add.image(x, y, key);
+      const img = trackWorldDecoration(scene.add.image(x, y, key));
       const baseScale = (displayH / img.height) * Phaser.Math.FloatBetween(0.85, 1.15);
       img.setScale(baseScale);
       if (opts.allowFlip !== false && Math.random() < 0.5) img.setFlipX(true);
@@ -2781,7 +2830,7 @@ function buildDecorations(scene) {
       img.setAlpha(opts.alpha ?? 1);
       if (opts.tint) img.setTint(opts.tint);
       if (opts.shadow) addPropShadow(img, x, y, opts);
-      const clusterChance = opts.baseCluster ?? (opts.alignBottom ? 0.24 : 0);
+      const clusterChance = opts.baseCluster ?? (opts.alignBottom ? 0.03 : 0);
       if (clusterChance && opts.alignBottom && Math.random() < clusterChance) {
         const underKey = Phaser.Utils.Array.GetRandom([...grassKeys, ...flowerKeys, ...mushroomKeys]);
         if (scene.textures.exists(underKey)) {
@@ -2793,11 +2842,12 @@ function buildDecorations(scene) {
           spr.setAlpha(Phaser.Math.FloatBetween(0.82, 0.95));
           if (opts.tint && Math.random() < 0.55) spr.setTint(opts.tint);
           spr.setDepth(y + 0.12);
+          trackWorldDecoration(spr);
         }
       }
-      // Sway 40% of clustered tufts — keeps total tween count sane
-      // while still giving the patch a hint of motion.
-      if (opts.sway && Math.random() < 0.4) {
+      // Sway only a small capped subset of clustered tufts. Thousands of
+      // independent infinite tweens were the biggest source of map slowdown.
+      if (opts.sway && canStartSway(PERF.clusterSwayChance)) {
         const base = img.angle;
         const amp = opts.swayAmp ?? 3;
         const dur = Phaser.Math.Between(1600, 3200);
@@ -2845,7 +2895,7 @@ function buildDecorations(scene) {
 
   const placeLandmarkDeco = (key, x, y, displayH, opts = {}) => {
     if (!scene.textures.exists(key)) return null;
-    const img = scene.add.image(x, y, key);
+    const img = trackWorldDecoration(scene.add.image(x, y, key));
     const baseScale = displayH / img.height;
     img.setScale(baseScale * (opts.scale ?? Phaser.Math.FloatBetween(0.9, 1.12)));
     if (opts.allowFlip !== false && Math.random() < 0.5) img.setFlipX(true);
@@ -2862,7 +2912,7 @@ function buildDecorations(scene) {
     addStructureContact(img, x, y, opts);
     addBaseOverlapCluster(x, y, opts, [1, 3]);
     if (opts.blockRadius) blockCells(x, y, opts.blockRadius);
-    if (opts.sway) {
+    if (opts.sway && canStartSway(PERF.clusterSwayChance)) {
       const base = img.angle;
       const amp = opts.swayAmp ?? 2;
       const dur = Phaser.Math.Between(1800, 3200);
@@ -3460,6 +3510,7 @@ function buildDecorations(scene) {
     const mossyBoulderWideKey = scene.textures.exists('boulder_mossy_02') ? 'boulder_mossy_02' : mossyBoulderKey;
     const ruinsWallKey = scene.textures.exists('ruins_wall_broken_01') ? 'ruins_wall_broken_01' : null;
     const ruinsArchKey = scene.textures.exists('ruins_arch_broken_01') ? 'ruins_arch_broken_01' : null;
+    const ruinsColumnKey = scene.textures.exists('ruins_column_fallen_01') ? 'ruins_column_fallen_01' : null;
     const ruinX = spX - 760;
     const ruinY = spY - 215;
     placeLandmarkDeco('ruin_base_canvas', ruinX, ruinY + 48, 210, {
@@ -3488,6 +3539,16 @@ function buildDecorations(scene) {
         contact: { width: 126, height: 28, yOffset: -8, alpha: 0.06, angle: 4, scuffs: 7 },
       });
       blockCells(ruinX + 284, ruinY + 88, 2);
+    }
+    if (ruinsColumnKey) {
+      placeLandmarkDeco(ruinsColumnKey, ruinX - 246, ruinY + 156, 92, {
+        alignBottom: true,
+        allowFlip: false,
+        angle: -9,
+        baseCluster: 0.08,
+        contact: { width: 184, height: 22, yOffset: -5, alpha: 0.055, angle: -9, scuffs: 6 },
+      });
+      blockCells(ruinX - 246, ruinY + 156, 2);
     }
     const ancientTree = placeLandmarkDeco('tree_oak_01', ruinX + 16, ruinY + 34, 326, {
       alignBottom: true,
@@ -3739,7 +3800,7 @@ function buildDecorations(scene) {
         riverside: { key: Phaser.Utils.Array.GetRandom(treeKeys), h: Phaser.Math.Between(220, 276), opts: { alignBottom: true, maxAngle: 2, blockRadius: 2 } },
       }[zone] || { key: Phaser.Utils.Array.GetRandom(treeKeys), h: 240, opts: { alignBottom: true, maxAngle: 2, blockRadius: 2 } };
       placeLandmarkDeco(anchor.key, x, y, anchor.h, anchor.opts);
-      support(x, y + 12, zone, zone === 'desert' || zone === 'ruins' ? 126 : 152, Phaser.Math.Between(9, 14), variant);
+      support(x, y + 12, zone, zone === 'desert' || zone === 'ruins' ? 126 : 152, Phaser.Math.Between(5, 7), variant);
     };
 
     const sites = [];
@@ -3752,7 +3813,7 @@ function buildDecorations(scene) {
     }
     let placed = 0;
     for (const site of sites) {
-      if (placed >= 18) break;
+      if (placed >= 8) break;
       if (site.r <= 2 || site.c <= 2 || site.r >= MAP_ROWS - 3 || site.c >= MAP_COLS - 3) continue;
       if (getCellType(site.r, site.c) !== 'grass') continue;
       addAnchor(site.r, site.c, site.zone, placed);
@@ -3764,58 +3825,58 @@ function buildDecorations(scene) {
   // Grasslands (center) — dense ground cover + scattered focal trees.
   // Keep a light singleton pass, then let dense patches and anchors do the
   // heavy lifting so flowers/bushes no longer read as pepper-shaker scatter.
-  for (let i = 0; i < 900; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),    52, { alpha: 0.9, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3 });
-  for (let i = 0; i < 240; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),   60, { maxAngle: 15, zoneFilter: 'grasslands', sway: true, swayAmp: 2 });
-  for (let i = 0; i < 140; i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys), 44, { maxAngle: 10, zoneFilter: 'grasslands' });
-  for (let i = 0; i < 130; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),     72, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'grasslands' });
-  for (let i = 0; i < 160; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),    180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'grasslands' });
-  for (let i = 0; i <  14; i++) {
+  for (let i = 0; i < perfCount(900); i++) place(Phaser.Utils.Array.GetRandom(grassKeys),    52, { alpha: 0.9, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3 });
+  for (let i = 0; i < perfCount(240); i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),   60, { maxAngle: 15, zoneFilter: 'grasslands', sway: true, swayAmp: 2 });
+  for (let i = 0; i < perfCount(140); i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys), 44, { maxAngle: 10, zoneFilter: 'grasslands' });
+  for (let i = 0; i < perfCount(130); i++) place(Phaser.Utils.Array.GetRandom(bushKeys),     72, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'grasslands' });
+  for (let i = 0; i < perfCount(160); i++) place(Phaser.Utils.Array.GetRandom(treeKeys),    180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'grasslands' });
+  for (let i = 0; i < perfCount(14, PERF.ponds, 1); i++) {
     const pond = place('pond_01', 220, { maxAngle:  0, alignBottom: true, blockRadius: 6, allowFlip: false, zoneFilter: 'grasslands', shimmer: true });
     addPondEdgeDressing(pond, 'grasslands');
   }
   // Grasslands clusters: grass-tuft thickets + flower patches.
-  for (let i = 0; i < 260; i++) placeCluster(Phaser.Utils.Array.GetRandom(grassKeys),  52, Phaser.Math.Between(6, 11), { alpha: 0.95, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3, spread: TILE_SIZE * 1.1 });
-  for (let i = 0; i < 210; i++) placeCluster(Phaser.Utils.Array.GetRandom(flowerKeys), 58, Phaser.Math.Between(5, 9), { maxAngle: 14, zoneFilter: 'grasslands', sway: true, swayAmp: 2, spread: TILE_SIZE * 0.92 });
-  for (let i = 0; i <  95; i++) placeCluster(Phaser.Utils.Array.GetRandom(mushroomKeys), 44, Phaser.Math.Between(4, 7), { maxAngle: 10, zoneFilter: 'grasslands', spread: TILE_SIZE * 0.72 });
-  for (let i = 0; i <  85; i++) placeCluster(Phaser.Utils.Array.GetRandom(bushKeys), 72, Phaser.Math.Between(3, 5), { maxAngle: 8, alignBottom: true, zoneFilter: 'grasslands', spread: TILE_SIZE * 1.2 });
-  for (let i = 0; i <  46; i++) placeCluster(Phaser.Utils.Array.GetRandom(treeKeys), 166, Phaser.Math.Between(2, 4), { maxAngle: 4, alignBottom: true, zoneFilter: 'grasslands', spread: TILE_SIZE * 1.5 });
+  for (let i = 0; i < perfCount(260, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(grassKeys),  52, Phaser.Math.Between(6, 11), { alpha: 0.95, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3, spread: TILE_SIZE * 1.1 });
+  for (let i = 0; i < perfCount(210, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(flowerKeys), 58, Phaser.Math.Between(5, 9), { maxAngle: 14, zoneFilter: 'grasslands', sway: true, swayAmp: 2, spread: TILE_SIZE * 0.92 });
+  for (let i = 0; i < perfCount(95, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(mushroomKeys), 44, Phaser.Math.Between(4, 7), { maxAngle: 10, zoneFilter: 'grasslands', spread: TILE_SIZE * 0.72 });
+  for (let i = 0; i < perfCount(85, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(bushKeys), 72, Phaser.Math.Between(3, 5), { maxAngle: 8, alignBottom: true, zoneFilter: 'grasslands', spread: TILE_SIZE * 1.2 });
+  for (let i = 0; i < perfCount(46, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(treeKeys), 166, Phaser.Math.Between(2, 4), { maxAngle: 4, alignBottom: true, zoneFilter: 'grasslands', spread: TILE_SIZE * 1.5 });
 
   // Forest (north) — heavy trees, dark bushes, mushrooms. Tinted darker green.
-  for (let i = 0; i < 760; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     200, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'forest', tint: forestTint, shadow: true });
-  for (let i = 0; i < 420; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      78, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'forest', tint: forestTint, shadow: true });
-  for (let i = 0; i < 520; i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  48, { maxAngle: 10, zoneFilter: 'forest' });
-  for (let i = 0; i < 340; i++) place(Phaser.Utils.Array.GetRandom(forestFernKeys), 52, { alpha: 0.95, maxAngle: 16, zoneFilter: 'forest', shadow: true });
-  for (let i = 0; i < 500; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     54, { alpha: 0.9, maxAngle: 18, zoneFilter: 'forest', tint: forestTint, sway: true, swayAmp: 2.5 });
+  for (let i = 0; i < perfCount(760); i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     200, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'forest', tint: forestTint, shadow: true });
+  for (let i = 0; i < perfCount(420); i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      78, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'forest', tint: forestTint, shadow: true });
+  for (let i = 0; i < perfCount(520); i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  48, { maxAngle: 10, zoneFilter: 'forest' });
+  for (let i = 0; i < perfCount(340); i++) place(Phaser.Utils.Array.GetRandom(forestFernKeys), 52, { alpha: 0.95, maxAngle: 16, zoneFilter: 'forest', shadow: true });
+  for (let i = 0; i < perfCount(500); i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     54, { alpha: 0.9, maxAngle: 18, zoneFilter: 'forest', tint: forestTint, sway: true, swayAmp: 2.5 });
   // Forest mushroom rings — classic RO-y woodland touch.
-  for (let i = 0; i <  40; i++) placeCluster(Phaser.Utils.Array.GetRandom(mushroomKeys), 46, Phaser.Math.Between(4, 8), { maxAngle: 10, zoneFilter: 'forest', spread: TILE_SIZE });
+  for (let i = 0; i < perfCount(40, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(mushroomKeys), 46, Phaser.Math.Between(4, 8), { maxAngle: 10, zoneFilter: 'forest', spread: TILE_SIZE });
 
   // Desert (south) — real sand tiles below, scatter cacti + dunes + sun-bleached rocks.
-  for (let i = 0; i < 460; i++) place(Phaser.Utils.Array.GetRandom(rockKeys),      54, { maxAngle: 12, alignBottom: true, blockRadius: 1, zoneFilter: 'desert', tint: desertRockTint, shadow: true });
-  for (let i = 0; i < 340; i++) place('cactus_set',                                90, { maxAngle:  6, alignBottom: true, blockRadius: 1, zoneFilter: 'desert', shadow: true });
-  for (let i = 0; i < 150; i++) place('deco_sand_dune',                           120, { maxAngle:  0, alpha: 0.85, zoneFilter: 'desert', allowFlip: false });
-  for (let i = 0; i <  90; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     32, { alpha: 0.4, maxAngle: 20, zoneFilter: 'desert', tint: 0xd6c178 });
+  for (let i = 0; i < perfCount(460); i++) place(Phaser.Utils.Array.GetRandom(rockKeys),      54, { maxAngle: 12, alignBottom: true, blockRadius: 1, zoneFilter: 'desert', tint: desertRockTint, shadow: true });
+  for (let i = 0; i < perfCount(340); i++) place('cactus_set',                                90, { maxAngle:  6, alignBottom: true, blockRadius: 1, zoneFilter: 'desert', shadow: true });
+  for (let i = 0; i < perfCount(150); i++) place('deco_sand_dune',                           120, { maxAngle:  0, alpha: 0.85, zoneFilter: 'desert', allowFlip: false });
+  for (let i = 0; i < perfCount(90); i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     32, { alpha: 0.4, maxAngle: 20, zoneFilter: 'desert', tint: 0xd6c178 });
   // Desert cactus clusters — oases of vegetation.
-  for (let i = 0; i <  26; i++) placeCluster('cactus_set', 88, Phaser.Math.Between(3, 6), { maxAngle: 6, alignBottom: true, blockRadius: 1, zoneFilter: 'desert', spread: TILE_SIZE, shadow: true });
+  for (let i = 0; i < perfCount(26, PERF.clusters); i++) placeCluster('cactus_set', 88, Phaser.Math.Between(3, 6), { maxAngle: 6, alignBottom: true, blockRadius: 1, zoneFilter: 'desert', spread: TILE_SIZE, shadow: true });
 
   // Ruins (west) — heavy rocks, occasional dead bush. Greyish.
-  for (let i = 0; i < 740; i++) place(Phaser.Utils.Array.GetRandom(rockKeys),      58, { maxAngle: 14, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: ruinTint, shadow: true });
-  for (let i = 0; i < 200; i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      66, { maxAngle:  6, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: 0xa89878, shadow: true });
-  for (let i = 0; i < 120; i++) place(Phaser.Utils.Array.GetRandom(ruinsPillarKeys), 118, { maxAngle:  6, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', shadow: true });
-  for (let i = 0; i < 290; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     46, { alpha: 0.7, maxAngle: 18, zoneFilter: 'ruins', tint: ruinTint, sway: true, swayAmp: 2 });
+  for (let i = 0; i < perfCount(740); i++) place(Phaser.Utils.Array.GetRandom(rockKeys),      58, { maxAngle: 14, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: ruinTint, shadow: true });
+  for (let i = 0; i < perfCount(200); i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      66, { maxAngle:  6, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: 0xa89878, shadow: true });
+  for (let i = 0; i < perfCount(120); i++) place(Phaser.Utils.Array.GetRandom(ruinsPillarKeys), 118, { maxAngle:  6, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', shadow: true });
+  for (let i = 0; i < perfCount(290); i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     46, { alpha: 0.7, maxAngle: 18, zoneFilter: 'ruins', tint: ruinTint, sway: true, swayAmp: 2 });
   // Rock piles — broken architecture feeling without new art.
-  for (let i = 0; i <  32; i++) placeCluster(Phaser.Utils.Array.GetRandom(rockKeys), 56, Phaser.Math.Between(4, 7), { maxAngle: 14, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: ruinTint, spread: TILE_SIZE * 0.9, shadow: true });
+  for (let i = 0; i < perfCount(32, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(rockKeys), 56, Phaser.Math.Between(4, 7), { maxAngle: 14, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: ruinTint, spread: TILE_SIZE * 0.9, shadow: true });
 
   // Riverside (east) — ponds, tall grass, flowers, occasional tree.
-  for (let i = 0; i <  30; i++) {
+  for (let i = 0; i < perfCount(30, PERF.ponds, 1); i++) {
     const pond = place('pond_01', 240, { maxAngle:  0, alignBottom: true, blockRadius: 7, allowFlip: false, zoneFilter: 'riverside', shimmer: true });
     addPondEdgeDressing(pond, 'riverside');
   }
-  for (let i = 0; i < 700; i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     56, { alpha: 0.95, maxAngle: 18, zoneFilter: 'riverside', sway: true, swayAmp: 3 });
-  for (let i = 0; i < 500; i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),    60, { maxAngle: 15, zoneFilter: 'riverside', sway: true, swayAmp: 2 });
-  for (let i = 0; i < 360; i++) place(Phaser.Utils.Array.GetRandom(riversideCattailKeys), 68, { maxAngle: 10, alignBottom: true, zoneFilter: 'riverside', shadow: true, sway: true, swayAmp: 1.5 });
-  for (let i = 0; i < 180; i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'riverside', shadow: true });
+  for (let i = 0; i < perfCount(700); i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     56, { alpha: 0.95, maxAngle: 18, zoneFilter: 'riverside', sway: true, swayAmp: 3 });
+  for (let i = 0; i < perfCount(500); i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),    60, { maxAngle: 15, zoneFilter: 'riverside', sway: true, swayAmp: 2 });
+  for (let i = 0; i < perfCount(360); i++) place(Phaser.Utils.Array.GetRandom(riversideCattailKeys), 68, { maxAngle: 10, alignBottom: true, zoneFilter: 'riverside', shadow: true, sway: true, swayAmp: 1.5 });
+  for (let i = 0; i < perfCount(180); i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'riverside', shadow: true });
   // Riverside flower patches by the water.
-  for (let i = 0; i <  54; i++) placeCluster(Phaser.Utils.Array.GetRandom(flowerKeys), 58, Phaser.Math.Between(5, 9), { maxAngle: 14, zoneFilter: 'riverside', sway: true, swayAmp: 2 });
+  for (let i = 0; i < perfCount(54, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(flowerKeys), 58, Phaser.Math.Between(5, 9), { maxAngle: 14, zoneFilter: 'riverside', sway: true, swayAmp: 2 });
 
   // Always keep spawn, plazas, and roads walkable after blocking decorations.
   const protect = (wx, wy) => {
@@ -3909,7 +3970,7 @@ function buildDecorations(scene) {
     const y = r * TILE_SIZE + TILE_SIZE / 2
       + dir.dr * (opts.edgeOffset ?? 30)
       + Phaser.Math.Between(-(opts.jitterY ?? 26), opts.jitterY ?? 26);
-    const img = scene.add.image(x, y, key);
+    const img = trackWorldDecoration(scene.add.image(x, y, key));
     img.setScale((opts.h ?? Phaser.Math.Between(96, 190)) / img.height);
     img.setAlpha(opts.alpha ?? Phaser.Math.FloatBetween(0.10, 0.18));
     img.setAngle(Phaser.Math.Between(0, 359));
@@ -3920,7 +3981,7 @@ function buildDecorations(scene) {
 
   const placeSceneGround = (x, y, key, h, opts = {}) => {
     if (!key || !scene.textures.exists(key)) return null;
-    const img = scene.add.image(x, y, key);
+    const img = trackWorldDecoration(scene.add.image(x, y, key));
     img.setScale(h / img.height);
     img.setAlpha(opts.alpha ?? 0.14);
     img.setAngle(opts.angle ?? Phaser.Math.Between(0, 359));
@@ -3950,7 +4011,7 @@ function buildDecorations(scene) {
     if (!key || !scene.textures.exists(key)) return null;
     const x = tile_c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-44, 44);
     const y = tile_r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-38, 38);
-    const img = scene.add.image(x, y, key);
+    const img = trackWorldDecoration(scene.add.image(x, y, key));
     img.setScale(size / img.height);
     img.setAlpha(alpha);
     img.setAngle(Phaser.Math.Between(0, 359));
@@ -4143,7 +4204,7 @@ function buildDecorations(scene) {
     if (r <= 1 || c <= 1 || r >= MAP_ROWS - 2 || c >= MAP_COLS - 2) return;
     if (getCellType(r, c) !== 'grass') return;
     const zone = zoneHint || getZone(r, c);
-    if (identityCounts[zone] >= 5) return;
+    if (identityCounts[zone] >= 2) return;
     identityCounts[zone]++;
     identityTiles.push({ r, c, zone });
   };
@@ -4155,7 +4216,7 @@ function buildDecorations(scene) {
   for (let r = 2; r < MAP_ROWS - 2; r++) {
     for (let c = 2; c < MAP_COLS - 2; c++) {
       const zone = getZone(r, c);
-      if (identityCounts[zone] >= 5) continue;
+      if (identityCounts[zone] >= 2) continue;
       if (getCellType(r, c) !== 'grass' || !adjacentPathDir(r, c)) continue;
       if (tileNoise(r, c, 481) > 0.994) queueIdentity(r, c, zone);
     }
@@ -4171,7 +4232,7 @@ function buildDecorations(scene) {
   const shorelineTiles = [];
   const queueShoreline = (r, c) => {
     if (r <= 1 || c <= 1 || r >= MAP_ROWS - 2 || c >= MAP_COLS - 2) return;
-    if (shorelineTiles.length >= 18) return;
+    if (shorelineTiles.length >= 6) return;
     if (getCellType(r, c) !== 'grass' || getZone(r, c) !== 'riverside') return;
     if (!adjacentPathDir(r, c) && !nearZoneBoundary(r, c)) return;
     shorelineTiles.push({ r, c });
@@ -4182,8 +4243,8 @@ function buildDecorations(scene) {
     queueShoreline(lm.r - 2, lm.c - 1);
     queueShoreline(lm.r + 2, lm.c - 1);
   }
-  for (let r = 2; r < MAP_ROWS - 2 && shorelineTiles.length < 18; r++) {
-    for (let c = 2; c < MAP_COLS - 2 && shorelineTiles.length < 18; c++) {
+  for (let r = 2; r < MAP_ROWS - 2 && shorelineTiles.length < 6; r++) {
+    for (let c = 2; c < MAP_COLS - 2 && shorelineTiles.length < 6; c++) {
       if (tileNoise(r, c, 521) > 0.992) queueShoreline(r, c);
     }
   }
@@ -4198,7 +4259,7 @@ function buildDecorations(scene) {
   const forestGroveTiles = [];
   const queueForestGrove = (r, c) => {
     if (r <= 1 || c <= 1 || r >= MAP_ROWS - 2 || c >= MAP_COLS - 2) return;
-    if (forestGroveTiles.length >= 16) return;
+    if (forestGroveTiles.length >= 5) return;
     if (getCellType(r, c) !== 'grass' || getZone(r, c) !== 'forest') return;
     if (!adjacentPathDir(r, c) && !nearZoneBoundary(r, c)) return;
     forestGroveTiles.push({ r, c });
@@ -4209,8 +4270,8 @@ function buildDecorations(scene) {
     queueForestGrove(lm.r + 1, lm.c - 2);
     queueForestGrove(lm.r + 1, lm.c + 2);
   }
-  for (let r = 2; r < MAP_ROWS - 2 && forestGroveTiles.length < 16; r++) {
-    for (let c = 2; c < MAP_COLS - 2 && forestGroveTiles.length < 16; c++) {
+  for (let r = 2; r < MAP_ROWS - 2 && forestGroveTiles.length < 5; r++) {
+    for (let c = 2; c < MAP_COLS - 2 && forestGroveTiles.length < 5; c++) {
       if (tileNoise(r, c, 551) > 0.992) queueForestGrove(r, c);
     }
   }
@@ -4225,7 +4286,7 @@ function buildDecorations(scene) {
   const ruinsWallTiles = [];
   const queueRuinsWall = (r, c) => {
     if (r <= 1 || c <= 1 || r >= MAP_ROWS - 2 || c >= MAP_COLS - 2) return;
-    if (ruinsWallTiles.length >= 16) return;
+    if (ruinsWallTiles.length >= 5) return;
     if (getCellType(r, c) !== 'grass' || getZone(r, c) !== 'ruins') return;
     if (!adjacentPathDir(r, c) && !nearZoneBoundary(r, c)) return;
     ruinsWallTiles.push({ r, c });
@@ -4236,8 +4297,8 @@ function buildDecorations(scene) {
     queueRuinsWall(lm.r - 1, lm.c + 2);
     queueRuinsWall(lm.r + 1, lm.c + 2);
   }
-  for (let r = 2; r < MAP_ROWS - 2 && ruinsWallTiles.length < 16; r++) {
-    for (let c = 2; c < MAP_COLS - 2 && ruinsWallTiles.length < 16; c++) {
+  for (let r = 2; r < MAP_ROWS - 2 && ruinsWallTiles.length < 5; r++) {
+    for (let c = 2; c < MAP_COLS - 2 && ruinsWallTiles.length < 5; c++) {
       if (tileNoise(r, c, 581) > 0.992) queueRuinsWall(r, c);
     }
   }
@@ -4252,7 +4313,7 @@ function buildDecorations(scene) {
   let floorWashCount = 0;
   for (let r = 1; r < MAP_ROWS - 1; r++) {
     for (let c = 1; c < MAP_COLS - 1; c++) {
-      if (getCellType(r, c) !== 'grass' || floorWashCount >= 150) continue;
+      if (getCellType(r, c) !== 'grass' || floorWashCount >= 24) continue;
       const zone = getZone(r, c);
       const nearRoad = !!adjacentPathDir(r, c);
       const nearEdge = nearZoneBoundary(r, c);
@@ -4282,7 +4343,7 @@ function buildDecorations(scene) {
       if (getCellType(r, c) !== 'grass') continue;
       const zone = getZone(r, c);
       const pathDir = adjacentPathDir(r, c);
-      if (pathDir && roadBlendCount < 700 && tileNoise(r, c, 301) > 0.24) {
+      if (pathDir && roadBlendCount < 90 && tileNoise(r, c, 301) > 0.24) {
         const key = transitionOverlayKey(zone, zone, true);
         placeGroundTransition(r, c, key, {
           dir: pathDir,
@@ -4307,7 +4368,7 @@ function buildDecorations(scene) {
 
       const zones = [...neighborZones(r, c)].filter((z) => z !== zone);
       const neighborZone = zones[0];
-      if (neighborZone && biomeBlendCount < 420 && tileNoise(r, c, 311) > 0.28) {
+      if (neighborZone && biomeBlendCount < 50 && tileNoise(r, c, 311) > 0.28) {
         const key = transitionOverlayKey(zone, neighborZone, false);
         placeGroundTransition(r, c, key, {
           h: Phaser.Math.Between(150, 280),
@@ -4324,7 +4385,7 @@ function buildDecorations(scene) {
   // These give the world "map designer touched this" moments without changing
   // movement or combat rules; every prop here is non-blocking.
   const sceneTiles = [];
-  const sceneZoneCaps = { grasslands: 56, forest: 34, desert: 34, ruins: 34, riverside: 34 };
+  const sceneZoneCaps = { grasslands: 12, forest: 8, desert: 8, ruins: 8, riverside: 8 };
   const sceneZoneCounts = { grasslands: 0, forest: 0, desert: 0, ruins: 0, riverside: 0 };
   const queueScene = (r, c, zoneHint = null) => {
     if (r <= 0 || c <= 0 || r >= MAP_ROWS - 1 || c >= MAP_COLS - 1) return;
@@ -4341,14 +4402,14 @@ function buildDecorations(scene) {
     queueScene(lm.r, lm.c - 2, zone);
     queueScene(lm.r, lm.c + 2, zone);
   }
-  for (let r = 2; r < MAP_ROWS - 2 && sceneTiles.length < 86; r++) {
-    for (let c = 2; c < MAP_COLS - 2 && sceneTiles.length < 86; c++) {
+  for (let r = 2; r < MAP_ROWS - 2 && sceneTiles.length < 28; r++) {
+    for (let c = 2; c < MAP_COLS - 2 && sceneTiles.length < 28; c++) {
       if (getCellType(r, c) !== 'grass' || !adjacentPathDir(r, c)) continue;
       if (tileNoise(r, c, 461) > 0.990) queueScene(r, c);
     }
   }
-  for (let r = 3; r < MAP_ROWS - 3 && sceneTiles.length < 142; r++) {
-    for (let c = 3; c < MAP_COLS - 3 && sceneTiles.length < 142; c++) {
+  for (let r = 3; r < MAP_ROWS - 3 && sceneTiles.length < 44; r++) {
+    for (let c = 3; c < MAP_COLS - 3 && sceneTiles.length < 44; c++) {
       if (getCellType(r, c) !== 'grass') continue;
       if (adjacentPathDir(r, c) || nearZoneBoundary(r, c)) continue;
       const zone = getZone(r, c);
@@ -4371,7 +4432,7 @@ function buildDecorations(scene) {
   const softKeys = [...flowerKeys, ...grassKeys];
   // Mid-size overlay layer — sparse and low-alpha so it adds organic
   // variation without drawing attention as another large patch pattern.
-  const softCount = 720;
+  const softCount = perfCount(720, PERF.overlays);
   for (let i = 0; i < softCount; i++) {
     const x = Phaser.Math.Between(0, WORLD_W);
     const y = Phaser.Math.Between(0, WORLD_H);
@@ -4385,7 +4446,7 @@ function buildDecorations(scene) {
     if (z === 'grasslands') continue;
     const key = groundOverlayKey(z, false) || Phaser.Utils.Array.GetRandom(softKeys);
     if (!scene.textures.exists(key)) continue;
-    const img = scene.add.image(x, y, key);
+    const img = trackWorldDecoration(scene.add.image(x, y, key));
     const dry = z === 'desert' || z === 'ruins';
     const floorKey = key.startsWith('floor_');
     const baseH = floorKey
@@ -4402,7 +4463,7 @@ function buildDecorations(scene) {
 
   // Macro-blob layer — larger, fainter sprites that span multiple tiles,
   // adding broad value variance and breaking long axis-aligned tile rows.
-  const macroCount = 220;
+  const macroCount = perfCount(220, PERF.overlays);
   for (let i = 0; i < macroCount; i++) {
     const x = Phaser.Math.Between(0, WORLD_W);
     const y = Phaser.Math.Between(0, WORLD_H);
@@ -4414,7 +4475,7 @@ function buildDecorations(scene) {
     if (z === 'grasslands') continue;
     const key = groundOverlayKey(z, true) || Phaser.Utils.Array.GetRandom(softKeys);
     if (!scene.textures.exists(key)) continue;
-    const img = scene.add.image(x, y, key);
+    const img = trackWorldDecoration(scene.add.image(x, y, key));
     const dry = z === 'desert' || z === 'ruins';
     const floorKey = key.startsWith('floor_');
     const baseH = floorKey
@@ -4432,7 +4493,7 @@ function buildDecorations(scene) {
   // Small ground accents — low-contrast pebble/crack/tuft details below
   // props. These make dry and rocky regions feel authored without adding
   // blockers or visual noise around combat readability.
-  const accentCount = 300;
+  const accentCount = perfCount(300, PERF.overlays);
   for (let i = 0; i < accentCount; i++) {
     const x = Phaser.Math.Between(0, WORLD_W);
     const y = Phaser.Math.Between(0, WORLD_H);
@@ -5848,15 +5909,29 @@ function tickCozyAmbient(scene, time, delta) {
     const isPetal = Math.random() < 0.6;
     let obj, duration, ox, oy;
     if (isPetal) {
-      // Soft pink petal placeholder (graphics until fx_petal_pink_soft_01).
-      obj = scene.add.ellipse(x, y, 10, 6, 0xffb7d5, 0.55)
-        .setAngle(Math.random() * 360);
+      // Real art if loaded; graphics ellipse fallback if texture missing.
+      if (scene.textures.exists('fx_petal_pink_soft_01')) {
+        obj = scene.add.image(x, y, 'fx_petal_pink_soft_01')
+          .setAngle(Math.random() * 360)
+          .setAlpha(0.85);
+        const target = Phaser.Math.Between(28, 44);
+        obj.setScale(target / obj.height);
+      } else {
+        obj = scene.add.ellipse(x, y, 10, 6, 0xffb7d5, 0.55)
+          .setAngle(Math.random() * 360);
+      }
       duration = Phaser.Math.Between(5500, 7500);
       ox = Phaser.Math.Between(40, 120);
       oy = Phaser.Math.Between(80, 160);
     } else {
-      // Warm dust mote placeholder.
-      obj = scene.add.circle(x, y, Phaser.Math.Between(2, 4), 0xfff0c8, 0.42);
+      if (scene.textures.exists('fx_dust_mote_soft_01')) {
+        obj = scene.add.image(x, y, 'fx_dust_mote_soft_01')
+          .setAlpha(0.65);
+        const target = Phaser.Math.Between(14, 22);
+        obj.setScale(target / obj.height);
+      } else {
+        obj = scene.add.circle(x, y, Phaser.Math.Between(2, 4), 0xfff0c8, 0.42);
+      }
       duration = Phaser.Math.Between(3800, 5400);
       ox = Phaser.Math.Between(-60, 60);
       oy = Phaser.Math.Between(-80, -30);
