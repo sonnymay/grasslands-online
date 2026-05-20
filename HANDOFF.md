@@ -4,20 +4,49 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-20 — post session 110 density + organization pass.**
+**State as of 2026-05-20 — post session 112 performance + organization pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 110 responds to Sonny's feedback that
-  the game felt laggy, decorations looked unorganized, and monsters were too
-  sparse. Monster density is up, far-away mobs sleep harder, and spawn-border
-  decoration changed from an even ring into authored habitat clusters.
-- **Cache version live in `project-grasslands/index.html`:** `?v=217`.
-- **Next change must use:** `?v=218`.
+- **Latest completed work:** session 112 fixed the new slow-map regression and
+  made the south-half decorations less sprayed/algorithmic.
+- **Cache version live in `project-grasslands/index.html`:** `?v=221`.
+- **Next change must use:** `?v=222`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these. Also leave the untracked misspelled
   `assets/decorations/camfire_01.png` alone unless Sonny explicitly confirms
   cleanup.
+
+**Where we left off (session 112):**
+- Goal: re-check the game because it still felt very slow, while preserving
+  the fuller monster population and improving decoration organization.
+- Root cause found live in browser: the session-98 south-half doodad boost was
+  bypassing the performance scaler and adding 1,120 singleton decorations by
+  itself. This made the field slow and made props look pepper-shaker random.
+- Replaced that spray with 42 clustered meadow patches. Decorations now group
+  into small organic pockets instead of even singleton scatter, and total
+  tracked world decorations dropped from ~2,542 to ~1,712 in the browser metric
+  pass.
+- Runtime throttles kept from the same pass: decoration visibility cull now
+  uses a 420px camera margin, weather burst rates are lower, cozy ambient
+  particles cap at 8, and the minimap redraw throttle is 250ms.
+- Monster population stayed full: browser metric showed 149 monsters after the
+  pass, with far unprovoked monsters sleeping while offscreen. Dormant monster
+  update now returns before distance math until its sleep timer expires.
+- Cache bumped to `game.js?v=221`.
+- Verification: `node -c project-grasslands/game.js` passed,
+  `git diff --check -- project-grasslands/game.js project-grasslands/index.html`
+  passed, `localhost:8001` served `/` and `game.js?v=220` with HTTP 200 before
+  the final v221 cache bump. Browser metric at v220: children 2,721,
+  decorations 1,712, visible decorations 217, tweens 61, monsters 149. If the
+  next session continues, re-smoke `game.js?v=221`.
+
+**Where we left off (session 111):**
+- Goal: Clear the review queue of minor UI/layout items and complete the missing formatting for the Phase 10a title tag.
+- Nudged the spawn camp tents and campfire outwards to declutter the area immediately around the player label.
+- Implemented the "Class-title gold pill" formatting from Phase 10a: bumped `titleTag` font from 13 to 18 px bold, added a thin gold underline, and adjusted the Y offset from -18 to -28.
+- Cache bumped to `game.js?v=218`.
+
 
 **Where we left off (session 110):**
 - Goal: fix three live-feel complaints at once: lag, decorations feeling

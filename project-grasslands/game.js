@@ -914,6 +914,11 @@ function create() {
     'critter_chick_walk_01',
     'critter_bunny_idle_01',
     'critter_bunny_hop_01',
+    'rock_cliff_face_01',
+    'ruins_wall_broken_01',
+    'ruins_arch_broken_01',
+    'ruins_column_fallen_01',
+    'landmark_ruins_well',
   ]) keyOutCheckerboard(scene, k);
 
   // Slice every 4x4 tileset into 16 frames named `tile_0`..`tile_15` on that
@@ -1301,11 +1306,11 @@ function update(time, delta) {
   }
 
   if (player && !player.dead && player.scene && player.scene.__worldDecorations &&
-      time - lastDecorCull > 220) {
+      time - lastDecorCull > 180) {
     lastDecorCull = time;
     const cam = player.scene.cameras.main;
     const view = cam.worldView;
-    const margin = 900;
+    const margin = 420;
     const left = view.x - margin;
     const right = view.x + view.width + margin;
     const top = view.y - margin;
@@ -1921,7 +1926,11 @@ function addGrassWorldWashes(scene) {
 }
 
 function addPathWashes(scene) {
-  const g = scene.add.graphics().setDepth(-1002);
+  const gOuter = scene.add.graphics().setDepth(-1002);
+  const gMid = scene.add.graphics().setDepth(-1001);
+  const gInner = scene.add.graphics().setDepth(-1000);
+  const gFleck = scene.add.graphics().setDepth(-999);
+
   const isPath = (r, c) => r >= 0 && c >= 0 && r < MAP_ROWS && c < MAP_COLS
     && getCellType(r, c) !== 'grass';
   const pathPoint = (r, c) => {
@@ -1937,15 +1946,15 @@ function addPathWashes(scene) {
   const addPathEdgeFleck = (x, y, color, alpha, longAxis, side) => {
     const w = Phaser.Math.Between(7, 24);
     const h = Phaser.Math.Between(3, 9);
-    g.fillStyle(color, alpha);
+    gFleck.fillStyle(color, alpha);
     if (Phaser.Math.Between(0, 2) === 0) {
-      g.fillTriangle(
+      gFleck.fillTriangle(
         x - longAxis.x * w * 0.55, y - longAxis.y * w * 0.55,
         x + longAxis.x * w * 0.55, y + longAxis.y * w * 0.55,
         x + side.x * h, y + side.y * h,
       );
     } else {
-      g.fillRect(x - w * 0.5, y - h * 0.5, w, h);
+      gFleck.fillRect(x - w * 0.5, y - h * 0.5, w, h);
     }
   };
   const roadSegment = (a, b) => {
@@ -1966,16 +1975,20 @@ function addPathWashes(scene) {
     // widens and narrows along its length instead of looking uniform.
     const taperA = Phaser.Math.FloatBetween(0.75, 1.0);
     const taperB = Phaser.Math.FloatBetween(0.78, 1.1);
-    const stroke = (width, color, alpha) => {
-      g.lineStyle(width * taperA, color, alpha);
-      g.lineBetween(a.x, a.y, cx, cy);
-      g.lineStyle(width * taperB, color, alpha);
-      g.lineBetween(cx, cy, b.x, b.y);
+    const stroke = (targetG, width, color) => {
+      targetG.lineStyle(width * taperA, color, 1);
+      targetG.lineBetween(a.x, a.y, cx, cy);
+      targetG.fillStyle(color, 1);
+      targetG.fillCircle(a.x, a.y, (width * taperA) / 2);
+      targetG.fillCircle(cx, cy, (width * taperA) / 2);
+      targetG.lineStyle(width * taperB, color, 1);
+      targetG.lineBetween(cx, cy, b.x, b.y);
+      targetG.fillCircle(b.x, b.y, (width * taperB) / 2);
     };
-    // Higher contrast worn-trail look — was alpha 0.075 / 0.105 / 0.058.
-    stroke(outer, 0x6f5a34, 0.22);
-    stroke(mid,   0x94723f, 0.38);
-    stroke(inner, 0xc2935a, 0.32);
+    // Higher contrast worn-trail look — rendering opaquely to avoid overlaps
+    stroke(gOuter, outer, 0x7b964c);
+    stroke(gMid, mid,   0x86934b);
+    stroke(gInner, inner, 0x94a155);
     const pointAt = (t) => {
       if (t < 0.5) {
         const u = t * 2;
@@ -2018,8 +2031,8 @@ function addPathWashes(scene) {
         const p1 = pointAt(t1);
         const edge = outer * 0.48 + Phaser.Math.Between(-12, 18);
         const side = { x: normal.x * sign, y: normal.y * sign };
-        g.lineStyle(Phaser.Math.Between(1, 3), Phaser.Utils.Array.GetRandom([0x5b4a30, 0x8a683c, 0x587240]), Phaser.Math.FloatBetween(0.20, 0.34));
-        g.lineBetween(
+        gFleck.lineStyle(Phaser.Math.Between(1, 3), Phaser.Utils.Array.GetRandom([0x5b4a30, 0x8a683c, 0x587240]), Phaser.Math.FloatBetween(0.20, 0.34));
+        gFleck.lineBetween(
           p0.x + side.x * edge + Phaser.Math.Between(-5, 5),
           p0.y + side.y * edge + Phaser.Math.Between(-4, 4),
           p1.x + side.x * edge + Phaser.Math.Between(-5, 5),
@@ -2032,18 +2045,18 @@ function addPathWashes(scene) {
     const p = pathPoint(r, c);
     const radius = p.wide ? 72 : 58;
     const blob = (cx, cy, rx, ry, color, alpha, salt) => {
-      g.fillStyle(color, alpha);
-      g.beginPath();
+      gFleck.fillStyle(color, alpha);
+      gFleck.beginPath();
       for (let i = 0; i < 18; i++) {
         const a = (i / 18) * Math.PI * 2;
         const n = 0.76 + tileNoise(r + i, c + salt, 1470 + i) * 0.34;
         const x = cx + Math.cos(a) * rx * n;
         const y = cy + Math.sin(a) * ry * n;
-        if (i === 0) g.moveTo(x, y);
-        else g.lineTo(x, y);
+        if (i === 0) gFleck.moveTo(x, y);
+        else gFleck.lineTo(x, y);
       }
-      g.closePath();
-      g.fillPath();
+      gFleck.closePath();
+      gFleck.fillPath();
     };
     blob(p.x, p.y, radius, radius * 0.72, 0x80613a, p.wide ? 0.15 : 0.13, 1);
     blob(
@@ -2061,8 +2074,8 @@ function addPathWashes(scene) {
       const dist = radius * Phaser.Math.FloatBetween(0.65, 1.12);
       const x = p.x + Math.cos(a) * dist + Phaser.Math.Between(-10, 10);
       const y = p.y + Math.sin(a) * dist * 0.72 + Phaser.Math.Between(-8, 8);
-      g.fillStyle(i % 2 === 0 ? 0x5f7f47 : 0x6b5734, i % 2 === 0 ? 0.035 : 0.062);
-      g.fillEllipse(x, y, Phaser.Math.Between(28, 74), Phaser.Math.Between(12, 32));
+      gFleck.fillStyle(i % 2 === 0 ? 0x5f7f47 : 0x6b5734, i % 2 === 0 ? 0.035 : 0.062);
+      gFleck.fillEllipse(x, y, Phaser.Math.Between(28, 74), Phaser.Math.Between(12, 32));
     }
     for (let i = 0; i < 12; i++) {
       if (tileNoise(r, c, 1450 + i) < 0.28) continue;
@@ -2779,6 +2792,9 @@ function buildDecorations(scene) {
     const jitterY = Phaser.Math.Between(-TILE_SIZE / 2 + 12, TILE_SIZE / 2 - 12);
     const x = tile_c * TILE_SIZE + TILE_SIZE / 2 + jitterX;
     const y = tile_r * TILE_SIZE + TILE_SIZE / 2 + jitterY;
+    const spX = MAP_COLS * TILE_SIZE / 2;
+    const spY = MAP_ROWS * TILE_SIZE / 2;
+    if (!opts.ignoreSpawnLimit && Math.abs(x - spX) < 450 && Math.abs(y - spY) < 320) return null;
 
     // Skip if the spot is already blocked (e.g. another tree).
     const cx = Math.floor(x / CELL_SIZE);
@@ -2905,6 +2921,9 @@ function buildDecorations(scene) {
     }
     const ax = anchorC * TILE_SIZE + TILE_SIZE / 2;
     const ay = anchorR * TILE_SIZE + TILE_SIZE / 2;
+    const spX = MAP_COLS * TILE_SIZE / 2;
+    const spY = MAP_ROWS * TILE_SIZE / 2;
+    if (!opts.ignoreSpawnLimit && Math.abs(ax - spX) < 450 && Math.abs(ay - spY) < 320) return;
     const spread = opts.spread ?? TILE_SIZE * 1.4;
     for (let i = 0; i < count; i++) {
       const dx = Phaser.Math.Between(-spread, spread);
@@ -3336,12 +3355,10 @@ function buildDecorations(scene) {
   cozyPlaceCozy('prop_lantern_post_warm_01', spX + 230, spY - 40, 180, { alignBottom: true, maxAngle: 2, cozy: true, allowFlip: false });
   cozyPlaceCozy('prop_paper_lantern_string_01', spX, spY - 220, 90, { maxAngle: 0, alpha: 0.95, allowFlip: false, depth: -550, cozy: true });
   cozyPlaceCozy('prop_garden_flowerbed_01', spX + 300, spY + 100, 110, { maxAngle: 4, alpha: 0.95, depth: -540, cozy: true });
-  // Push the chubby mushroom and the picnic blanket out of the camp
-  // cluster — mushroom moves far west into a safe quiet area, picnic
-  // blanket moves far east away from MooWaan / Blobling spawn zones,
-  // so neither competes with the camp scene visually.
-  cozyPlaceCozy('prop_mushroom_round_big_01', spX - 540, spY - 80,  130, { alignBottom: true, maxAngle: 3, cozy: true });
-  cozyPlaceCozy('prop_picnic_blanket_01',     spX + 560, spY + 60,  160, { maxAngle: 2, alpha: 0.96, depth: -550, allowFlip: false, cozy: true });
+  // Move the magical mushroom deep into a distant biome to keep the spawn grounded.
+  // The picnic blanket is grounded near the camp, making the area feel lived-in.
+  cozyPlaceCozy('prop_mushroom_round_big_01', spX - 2500, spY - 800,  80, { alignBottom: true, maxAngle: 3, cozy: true });
+  cozyPlaceCozy('prop_picnic_blanket_01',     spX + 180, spY + 120,  160, { maxAngle: 2, alpha: 0.96, depth: -550, alignBottom: true, allowFlip: false, cozy: true });
 
   // Phase 10d: cozy critter wanderers. Two chicks + two bunnies live near
   // spawn plaza and slowly wander ±80 px around a base point, idle/walk
@@ -3519,9 +3536,9 @@ function buildDecorations(scene) {
     const frontTentKey = scene.textures.exists('tent_canvas_front_01') ? 'tent_canvas_front_01' : 'camp_tent_canvas';
     const sideTentKey = scene.textures.exists('tent_canvas_side_01') ? 'tent_canvas_side_01' : 'camp_tent_canvas';
     const tents = [
-      { dx: -128, dy: -28, angle: -7, key: frontTentKey, h: frontTentKey === 'tent_canvas_front_01' ? 136 : 112 },
-      { dx:   36, dy: -60, angle:  4, key: sideTentKey, h: sideTentKey === 'tent_canvas_side_01' ? 132 : 112 },
-      { dx:  150, dy:  38, angle:  8, key: frontTentKey, h: frontTentKey === 'tent_canvas_front_01' ? 132 : 112 },
+      { dx: -140, dy: -42, angle: -7, key: frontTentKey, h: frontTentKey === 'tent_canvas_front_01' ? 136 : 112 },
+      { dx:   36, dy: -85, angle:  4, key: sideTentKey, h: sideTentKey === 'tent_canvas_side_01' ? 132 : 112 },
+      { dx:  165, dy:  45, angle:  8, key: frontTentKey, h: frontTentKey === 'tent_canvas_front_01' ? 132 : 112 },
     ];
     for (const tent of tents) {
       const x = campX + tent.dx;
@@ -3536,7 +3553,7 @@ function buildDecorations(scene) {
       blockCells(x, y, 2);
     }
     const fireKey = scene.textures.exists('campfire_01') ? 'campfire_01' : 'camp_fire_canvas';
-    const fire = placeLandmarkDeco(fireKey, campX - 16, campY + 38, fireKey === 'campfire_01' ? 92 : 74, {
+    const fire = placeLandmarkDeco(fireKey, campX - 24, campY + 54, fireKey === 'campfire_01' ? 92 : 74, {
       alignBottom: true,
       allowFlip: false,
       angle: 0,
@@ -3688,8 +3705,9 @@ function buildDecorations(scene) {
     const ruinsWallKey = scene.textures.exists('ruins_wall_broken_01') ? 'ruins_wall_broken_01' : null;
     const ruinsArchKey = scene.textures.exists('ruins_arch_broken_01') ? 'ruins_arch_broken_01' : null;
     const ruinsColumnKey = scene.textures.exists('ruins_column_fallen_01') ? 'ruins_column_fallen_01' : null;
-    const ruinX = spX - 760;
-    const ruinY = spY - 215;
+    // Push the ruins cluster far away from the spawn area so it serves as a distinct POI
+    const ruinX = spX - 2800;
+    const ruinY = spY - 1400;
     placeLandmarkDeco('ruin_base_canvas', ruinX, ruinY + 48, 210, {
       depth: -772,
       allowFlip: false,
@@ -3727,16 +3745,8 @@ function buildDecorations(scene) {
       });
       blockCells(ruinX - 246, ruinY + 156, 2);
     }
-    if (cliffFaceKey) {
-      placeLandmarkDeco(cliffFaceKey, ruinX + 42, ruinY + 226, 156, {
-        alignBottom: true,
-        allowFlip: false,
-        angle: -2,
-        baseCluster: 0.10,
-        contact: { width: 250, height: 34, yOffset: -8, alpha: 0.055, angle: -2, scuffs: 7 },
-      });
-      blockCells(ruinX + 42, ruinY + 226, 3);
-    }
+    // cliffFaceKey placement removed from here to avoid exposing its hard-cut edge
+    // inside the map. It should ideally only be used bordering the left edge of the world.
     const ancientTree = placeLandmarkDeco(largeOakKey, ruinX + 16, ruinY + 34, largeOakKey === 'tree_oak_large_01' ? 390 : 326, {
       alignBottom: true,
       allowFlip: false,
@@ -3925,7 +3935,7 @@ function buildDecorations(scene) {
     }
   };
   addSpawnHubDressing();
-  addOcclusionTestGrove();
+  // addOcclusionTestGrove();
   addSpawnCamp();
   addPromptInspiredLandmarks();
   addGrasslandsChokeLines();
@@ -4026,26 +4036,30 @@ function buildDecorations(scene) {
   // Grasslands (center) — dense ground cover + scattered focal trees.
   // Keep a light singleton pass, then let dense patches and anchors do the
   // heavy lifting so flowers/bushes no longer read as pepper-shaker scatter.
-  for (let i = 0; i < perfCount(900); i++) place(Phaser.Utils.Array.GetRandom(grassKeys),    52, { alpha: 0.9, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3 });
-  for (let i = 0; i < perfCount(240); i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),   60, { maxAngle: 15, zoneFilter: 'grasslands', sway: true, swayAmp: 2 });
-  for (let i = 0; i < perfCount(140); i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys), 44, { maxAngle: 10, zoneFilter: 'grasslands' });
-  for (let i = 0; i < perfCount(130); i++) place(Phaser.Utils.Array.GetRandom(bushKeys),     72, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'grasslands' });
-  for (let i = 0; i < perfCount(160); i++) place(Phaser.Utils.Array.GetRandom(treeKeys),    180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'grasslands' });
+  for (let i = 0; i < perfCount(500); i++) place(Phaser.Utils.Array.GetRandom(grassKeys),    52, { alpha: 0.9, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3 });
+  for (let i = 0; i < perfCount(60); i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),   60, { maxAngle: 15, zoneFilter: 'grasslands', sway: true, swayAmp: 2 });
+  for (let i = 0; i < perfCount(60); i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys), 44, { maxAngle: 10, zoneFilter: 'grasslands' });
+  for (let i = 0; i < perfCount(40); i++) place(Phaser.Utils.Array.GetRandom(bushKeys),     72, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'grasslands' });
+  for (let i = 0; i < perfCount(60); i++) place(Phaser.Utils.Array.GetRandom(treeKeys),    180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'grasslands' });
   for (let i = 0; i < perfCount(14, PERF.ponds, 1); i++) {
     const pond = place('pond_01', 220, { maxAngle:  0, alignBottom: true, blockRadius: 6, allowFlip: false, zoneFilter: 'grasslands', shimmer: true });
     addPondEdgeDressing(pond, 'grasslands');
   }
   // Grasslands clusters: grass-tuft thickets + flower patches.
-  for (let i = 0; i < perfCount(260, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(grassKeys),  52, Phaser.Math.Between(6, 11), { alpha: 0.95, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3, spread: TILE_SIZE * 1.1 });
-  for (let i = 0; i < perfCount(210, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(flowerKeys), 58, Phaser.Math.Between(5, 9), { maxAngle: 14, zoneFilter: 'grasslands', sway: true, swayAmp: 2, spread: TILE_SIZE * 0.92 });
-  for (let i = 0; i < perfCount(95, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(mushroomKeys), 44, Phaser.Math.Between(4, 7), { maxAngle: 10, zoneFilter: 'grasslands', spread: TILE_SIZE * 0.72 });
-  for (let i = 0; i < perfCount(85, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(bushKeys), 72, Phaser.Math.Between(3, 5), { maxAngle: 8, alignBottom: true, zoneFilter: 'grasslands', spread: TILE_SIZE * 1.2 });
-  for (let i = 0; i < perfCount(46, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(treeKeys), 166, Phaser.Math.Between(2, 4), { maxAngle: 4, alignBottom: true, zoneFilter: 'grasslands', spread: TILE_SIZE * 1.5 });
+  for (let i = 0; i < perfCount(340, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(grassKeys),  52, Phaser.Math.Between(6, 11), { alpha: 0.95, maxAngle: 18, zoneFilter: 'grasslands', sway: true, swayAmp: 3, spread: TILE_SIZE * 1.1 });
+  for (let i = 0; i < perfCount(280, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(flowerKeys), 58, Phaser.Math.Between(5, 9), { maxAngle: 14, zoneFilter: 'grasslands', sway: true, swayAmp: 2, spread: TILE_SIZE * 0.92 });
+  for (let i = 0; i < perfCount(140, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(mushroomKeys), 44, Phaser.Math.Between(4, 7), { maxAngle: 10, zoneFilter: 'grasslands', spread: TILE_SIZE * 0.72 });
+  for (let i = 0; i < perfCount(120, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(bushKeys), 72, Phaser.Math.Between(3, 5), { maxAngle: 8, alignBottom: true, zoneFilter: 'grasslands', spread: TILE_SIZE * 1.2 });
+  for (let i = 0; i < perfCount(60, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(treeKeys), 166, Phaser.Math.Between(2, 4), { maxAngle: 4, alignBottom: true, zoneFilter: 'grasslands', spread: TILE_SIZE * 1.5 });
 
   // South-half doodad boost — reviewer flagged the bottom of the map as
-  // barren. Drop extra flowers + grass + bushes in the south half of
-  // grasslands (rows > 55% of MAP_ROWS) so the bottom reads varied.
-  const southBoost = (key, displayH, opts = {}) => {
+  // barren. Keep it as clustered meadow pockets instead of a uniform spray;
+  // the old 1,120 singleton pass made the field slow and visibly algorithmic.
+  const southBoostAt = (x, y, key, displayH, opts = {}) => {
+    if (!scene.textures.exists(key)) return;
+    placeLandmarkDeco(key, x, y, displayH, opts);
+  };
+  const southBoostPatch = () => {
     let attempts = 0;
     while (attempts < 80) {
       attempts++;
@@ -4053,16 +4067,38 @@ function buildDecorations(scene) {
       const c = Phaser.Math.Between(0, MAP_COLS - 1);
       if (getZone(r, c) !== 'grasslands') continue;
       if (getCellType(r, c) !== 'grass') continue;
-      const x = c * TILE_SIZE + Phaser.Math.Between(8, TILE_SIZE - 8);
-      const y = r * TILE_SIZE + Phaser.Math.Between(8, TILE_SIZE - 8);
-      placeLandmarkDeco(key, x, y, displayH, opts);
+      const x = c * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-40, 40);
+      const y = r * TILE_SIZE + TILE_SIZE / 2 + Phaser.Math.Between(-34, 34);
+      const items = Phaser.Math.Between(5, 9);
+      const radius = Phaser.Math.Between(44, 108);
+      for (let i = 0; i < items; i++) {
+        const a = Phaser.Math.FloatBetween(0, Math.PI * 2);
+        const d = radius * Phaser.Math.FloatBetween(0.18, 1.0);
+        const px = x + Math.cos(a) * d + Phaser.Math.Between(-10, 10);
+        const py = y + Math.sin(a) * d * 0.56 + Phaser.Math.Between(-7, 7);
+        const roll = Math.random();
+        if (roll < 0.46) {
+          southBoostAt(px, py, Phaser.Utils.Array.GetRandom(grassKeys), Phaser.Math.Between(44, 56), {
+            alpha: 0.88, maxAngle: 18,
+          });
+        } else if (roll < 0.76) {
+          southBoostAt(px, py, Phaser.Utils.Array.GetRandom(flowerKeys), Phaser.Math.Between(48, 62), {
+            maxAngle: 15,
+          });
+        } else if (roll < 0.90) {
+          southBoostAt(px, py, Phaser.Utils.Array.GetRandom(mushroomKeys), Phaser.Math.Between(36, 46), {
+            maxAngle: 10,
+          });
+        } else {
+          southBoostAt(px, py, Phaser.Utils.Array.GetRandom(bushKeys), Phaser.Math.Between(58, 72), {
+            maxAngle: 8, alignBottom: true,
+          });
+        }
+      }
       return;
     }
   };
-  for (let i = 0; i < 480; i++) southBoost(Phaser.Utils.Array.GetRandom(grassKeys),    52, { alpha: 0.9, maxAngle: 18, sway: true, swayAmp: 3 });
-  for (let i = 0; i < 320; i++) southBoost(Phaser.Utils.Array.GetRandom(flowerKeys),   60, { maxAngle: 15, sway: true, swayAmp: 2 });
-  for (let i = 0; i < 180; i++) southBoost(Phaser.Utils.Array.GetRandom(mushroomKeys), 44, { maxAngle: 10 });
-  for (let i = 0; i < 140; i++) southBoost(Phaser.Utils.Array.GetRandom(bushKeys),     68, { maxAngle: 8, alignBottom: true });
+  for (let i = 0; i < 42; i++) southBoostPatch();
 
   // Forest (north) — heavy trees, dark bushes, mushrooms. Tinted darker green.
   for (let i = 0; i < perfCount(760); i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     200, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'forest', tint: forestTint, shadow: true });
@@ -4878,7 +4914,7 @@ class PlayerController {
     // Cosmetic milestone title (e.g. "« Boss Hunter »"). Sits above the
     // class/level tag. Hidden until the player earns at least one title.
     this.titleTag = scene.add.text(x, y, '', {
-      fontSize: '13px',
+      fontSize: '18px',
       fontStyle: 'bold',
       color: '#ffe066',
       stroke: '#000',
@@ -4886,6 +4922,9 @@ class PlayerController {
     }).setOrigin(0.5, 1).setVisible(false);
     this.titleTag.setShadow(0, 2, '#000000', 3, false, true);
     if (this.titleTag.setResolution) this.titleTag.setResolution(2);
+    this.titleUnderline = scene.add.rectangle(x, y, 10, 2, 0xffe066)
+      .setOrigin(0.5, 0.5)
+      .setVisible(false);
     this._refreshNameTag = () => {
       let title = 'Rookie';
       let color = '#ffffff';
@@ -4903,17 +4942,20 @@ class PlayerController {
         this.titleTag.setText(`« ${cosmetic.label} »`);
         this.titleTag.setColor(cosmetic.color);
         this.titleTag.setVisible(true);
-        // Pulse + chat callout on first earn (or on upgrade to a new title).
-        // Skip the very first refresh after spawn/load so titles already in
-        // the save don't fire a stale pulse.
-        if (this._titleInit && prev !== cosmetic.label) {
-          if (typeof ui !== 'undefined' && ui) {
-            ui.message(`✨ Title earned: ${cosmetic.label}`);
-          }
-          if (this.scene && this.scene.tweens) {
+        this.titleUnderline.setVisible(true);
+        this.titleUnderline.width = this.titleTag.width * 0.85;
+        // Playful pop when a new title is earned or when first spawning in
+        // if one was already earned.
+        if (!prev || prev !== cosmetic.label) {
+          if (!prev) {
             this.titleTag.setScale(1.6).setAlpha(1);
-            this.scene.tweens.add({
+            scene.tweens.add({
               targets: this.titleTag, scale: 1, duration: 380, ease: 'Back.easeOut',
+            });
+          } else {
+            this.titleTag.setScale(1.8).setAlpha(1);
+            scene.tweens.add({
+              targets: this.titleTag, scale: 1, duration: 450, ease: 'Back.easeOut',
             });
             spawnFloatText(this.scene, this.sprite.x, this.sprite.y - 86,
               `✨ ${cosmetic.label} ✨`, parseInt(cosmetic.color.slice(1), 16),
@@ -5060,7 +5102,10 @@ class PlayerController {
       this._syncFollowTarget();
       const deadTop = this.sprite.y - this.sprite.displayHeight / 2;
       this.nameTag.setPosition(this.sprite.x, deadTop);
-      if (this.titleTag.visible) this.titleTag.setPosition(this.sprite.x, deadTop - 18);
+      if (this.titleTag.visible) {
+        this.titleTag.setPosition(this.sprite.x, deadTop - 28);
+        this.titleUnderline.setPosition(this.sprite.x, deadTop - 26);
+      }
       return;
     }
 
@@ -5127,11 +5172,15 @@ class PlayerController {
             this.visitedLandmarks[key] = true;
             this.zeny += DISCOVERY_ZENY;
             this.gainExp(DISCOVERY_EXP);
-            const banner = this.scene.add.text(GAME_W / 2, 180,
+            if (!this.scene._activeLandmarkBanners) this.scene._activeLandmarkBanners = [];
+            this.scene._activeLandmarkBanners = this.scene._activeLandmarkBanners.filter(b => b.active);
+            const yOffset = this.scene._activeLandmarkBanners.length * 30;
+            const banner = this.scene.add.text(GAME_W / 2, 180 + yOffset,
               `★ Discovered new landmark! +${fmt(DISCOVERY_ZENY)}z, +${DISCOVERY_EXP} EXP`, {
               fontSize: '22px', fontStyle: 'bold', color: '#ffe066',
               stroke: '#000', strokeThickness: 4,
             }).setOrigin(0.5).setScrollFactor(0).setDepth(15000).setAlpha(0);
+            this.scene._activeLandmarkBanners.push(banner);
             this.scene.tweens.add({ targets: banner, alpha: 1, duration: 300,
               yoyo: true, hold: 1400, onComplete: () => banner.destroy() });
             if (typeof sfxLevelUp === 'function') sfxLevelUp();
@@ -5264,7 +5313,10 @@ class PlayerController {
       this._refreshNameTag();
       this._titleCheckAt = time + 1000;
     }
-    if (this.titleTag.visible) this.titleTag.setPosition(this.sprite.x, topY - 18);
+    if (this.titleTag.visible) {
+      this.titleTag.setPosition(this.sprite.x, topY - 28);
+      this.titleUnderline.setPosition(this.sprite.x, topY - 26);
+    }
     // HP bar above player, only when not full.
     const wounded = this.hp < this.maxHP;
     this.hpBarBg.setVisible(wounded);
@@ -5833,12 +5885,12 @@ class MonsterController {
 
   update(time, delta) {
     if (!this.alive) return;
+    if (!this.provoked && this._dormantUntil && time < this._dormantUntil) return;
 
     const dx = player.sprite.x - this.sprite.x;
     const dy = player.sprite.y - this.sprite.y;
     const dist = Math.hypot(dx, dy);
     const playerAlive = !player.dead;
-    if (!this.provoked && this._dormantUntil && time < this._dormantUntil) return;
     const dormant = !this.provoked && dist > 1450;
     if (dormant) {
       this.sprite.setVelocity(0, 0);
@@ -6093,12 +6145,11 @@ const WEATHER_INTERVAL_MS = 60000;  // events more often
 const WEATHER_JITTER_MS = 12000;
 const WEATHER_DURATION_MS = 16000;  // each burst lasts longer
 const WEATHER_STYLE = {
-  // Rates pushed 3-4x so weather has visible presence on screen.
-  grasslands: { name: 'petal storm', color: 0xffb7d5, rate: 38 },
-  forest:     { name: 'low mist',    color: 0xbde8d1, rate: 22 },
-  desert:     { name: 'sand swirl',  color: 0xffd28a, rate: 42 },
-  ruins:      { name: 'dust devils', color: 0xd7c8aa, rate: 28 },
-  riverside:  { name: 'rain burst',  color: 0x88ccff, rate: 60 },
+  grasslands: { name: 'petal storm', color: 0xffb7d5, rate: 12 },
+  forest:     { name: 'low mist',    color: 0xbde8d1, rate: 8 },
+  desert:     { name: 'sand swirl',  color: 0xffd28a, rate: 12 },
+  ruins:      { name: 'dust devils', color: 0xd7c8aa, rate: 8 },
+  riverside:  { name: 'rain burst',  color: 0x88ccff, rate: 14 },
 };
 let _nextWeatherAt = 0;
 let _weatherEvent = null;
@@ -6166,7 +6217,7 @@ function tickWeatherBurst(scene, time, delta) {
 
 // Phase 10a: always-on Focus-Grove ambient drift. Independent of the
 // weather scheduler — gentle petals + dust motes always present so the
-// world breathes. Caps at ~24 alive concurrent.
+  // world breathes. Capped tightly so particles never dominate frame time.
 // Phase 10d: chick + bunny critter wanderers. Each critter sits at a base
 // (baseX, baseY), waits a randomized delay, walks/hops to a nearby point
 // within ±80 px, swaps to its walk frame during motion and back to idle
@@ -6197,14 +6248,13 @@ function tickCozyCritters(scene, time) {
 function tickCozyAmbient(scene, time, delta) {
   if (!scene.__cozyAmbient) scene.__cozyAmbient = { alive: 0 };
   const state = scene.__cozyAmbient;
-  if (state.alive >= 24) return;
-  // ~2 spawns per second (delta in ms).
-  const expected = 0.002 * delta;
+  if (state.alive >= 8) return;
+  const expected = 0.0007 * delta;
   let count = Math.floor(expected);
   if (Math.random() < expected - count) count += 1;
   const cam = scene.cameras.main;
   for (let i = 0; i < count; i++) {
-    if (state.alive >= 24) break;
+    if (state.alive >= 8) break;
     const x = cam.scrollX + Math.random() * cam.width;
     const y = cam.scrollY + Math.random() * cam.height;
     const isPetal = Math.random() < 0.6;
@@ -8127,7 +8177,7 @@ class UIManager {
     // for road cells; at 60 fps that was 1.35M getCellType() calls/sec
     // and the biggest single per-frame cost in the game.
     const now = (player && player.scene) ? player.scene.time.now : 0;
-    if (this._miniLastDraw && now - this._miniLastDraw < 100) return;
+    if (this._miniLastDraw && now - this._miniLastDraw < 250) return;
     this._miniLastDraw = now;
     const g = this.miniGfx;
     g.clear();
