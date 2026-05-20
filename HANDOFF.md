@@ -4,19 +4,41 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-20 — post session 107 large pine landmark pass.**
+**State as of 2026-05-20 — post session 108 large willow landmark pass.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 107 wires Sonny's generated
-  `tree_pine_large_01.png` as rare large pine anchors in forest/choke-line
-  compositions, continuing Tier 3 tree variety without global scatter spam.
-- **Cache version live in `project-grasslands/index.html`:** `?v=213`.
-- **Next change must use:** `?v=214`.
+- **Latest completed work:** session 108 wires Sonny's generated
+  `tree_willow_large_01.png` as rare riverside anchor trees, continuing Tier 3
+  tree variety without global scatter spam.
+- **Cache version live in `project-grasslands/index.html`:** `?v=214`.
+- **Next change must use:** `?v=215`.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these. Also leave the untracked misspelled
   `assets/decorations/camfire_01.png` alone unless Sonny explicitly confirms
   cleanup.
+
+**Where we left off (session 108):**
+- Goal: continue Tier 3 tree-variety/landmark pass after Sonny generated the
+  large willow PNG in Downloads.
+- Source asset:
+  `/Users/santipapmay/Downloads/tree_willow_large_01..png`. Note the source
+  filename has a double dot before `.png`. It was 1115x1410 RGB with a white
+  background and no alpha, so it was resized/keyed locally into
+  `project-grasslands/assets/decorations/tree_willow_large_01.png`.
+- Final project asset: `tree_willow_large_01.png`, 340x430 RGBA with real
+  alpha. The original Downloads file was left untouched.
+- `preload()` now loads `tree_willow_large_01` with cache bust `?v=214`.
+- `buildDecorations()` defines `largeWillowKey`; riverside anchor
+  compositions use it for some major riverside landmarks. It is deliberately
+  rare, not global scatter, to preserve session 105 performance gains.
+- Static decoration shadows remain disabled. Do not re-enable
+  `addPropShadow()`.
+- Cache bumped to `game.js?v=214`.
+- Verification: `node -c project-grasslands/game.js` passed; PNG
+  alpha/dimensions were confirmed; `localhost:8001` served `/`,
+  `game.js?v=214`, and
+  `assets/decorations/tree_willow_large_01.png?v=214` with HTTP 200.
 
 **Where we left off (session 107):**
 - Goal: continue Tier 3 tree-variety/landmark pass after Sonny generated the
