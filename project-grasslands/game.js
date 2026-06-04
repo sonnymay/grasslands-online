@@ -334,6 +334,32 @@ let shopOpen = false;
 let travelOpen = false;
 let trophyOpen = false;
 let npcDialogueOpen = false;
+// ---- Sims-style build/edit mode (single-player world editor) ----
+let editMode = false;          // when true, world clicks edit decorations
+let editSelected = null;       // currently selected decoration Image
+let editDragging = false;      // mid-drag flag
+let editGrabDX = 0, editGrabDY = 0; // pointer-to-object offset while dragging
+let editPanel = null;          // HUD panel container (built lazily)
+let editOutline = null;        // selection highlight Graphics (world space)
+let editAddPalette = null;     // add-object palette overlay container
+let worldSaveTimer = null;     // debounce handle for saveWorld()
+let editScene = null;          // scene ref for build-mode helpers
+const WORLD_KEY = 'grasslands_world_v1';
+// Decoration texture keys offered in the "Add Object" palette. Filtered to
+// those actually loaded at runtime, so missing assets are skipped silently.
+const EDIT_PALETTE_KEYS = [
+  'tree_oak_01', 'tree_pine_02', 'tree_round_03',
+  'tree_oak_large_01', 'tree_pine_large_01', 'tree_willow_large_01',
+  'bush_01', 'bush_02', 'forest_fern_01',
+  'deco_flower_cluster_01', 'deco_flower_cluster_02', 'deco_flower_cluster_03', 'deco_flower_cluster_04',
+  'deco_tallgrass_01', 'deco_tallgrass_02', 'deco_tallgrass_03',
+  'mushroom_red_01', 'mushroom_brown_02',
+  'deco_rock_01', 'deco_rock_02', 'deco_rock_03',
+  'boulder_mossy_01', 'boulder_mossy_02', 'rock_cliff_face_01',
+  'deco_sand_dune', 'cactus_set',
+  'ruins_pillar_broken_01', 'ruins_wall_broken_01', 'ruins_arch_broken_01', 'ruins_column_fallen_01',
+  'riverside_cattail_01', 'pond_01',
+];
 let hardMode = false; // doubles monster damage, EXP, and zeny drops
 let hudCompact = false;
 let minimapZoom = 1;
@@ -641,6 +667,12 @@ function preload() {
       setTimeout(() => overlay.remove(), 400);
     }
   });
+
+  // Hand-authored seamless grass/cobblestone/flower ground texture. Loaded
+  // under the 'grass_field_texture' key so the procedural canvas generator
+  // (createGrassFieldTexture) early-returns and the world tiles this art
+  // instead. Seamless, so it tiles cleanly across the 19200² field.
+  this.load.image('grass_field_texture', 'assets/decorations/grass_field_01.png?v=226');
 
   this.load.image('rookie_idle_south', 'assets/sprites/rookie_idle_south.png');
   this.load.image('rookie_walk_south', 'assets/sprites/rookie_walk_south.png');
@@ -1018,6 +1050,9 @@ function create() {
   }
   // Now that walkable exists, scatter decorations (some block cells).
   buildDecorations(scene);
+  // Apply the persisted editable-world layout (or snapshot the fresh one on
+  // first run). Must run after buildDecorations so __worldDecorations is full.
+  initWorldEdits(scene);
 
   // Ground click marker (small green ring) — appears at the target cell.
   clickMarker = scene.add.graphics();
@@ -1053,6 +1088,18 @@ function create() {
   const ZOOM_MAX = 1.6;
   const ZOOM_STEP = 1.12;
   scene.input.on('wheel', (_pointer, _objs, _dx, dy) => {
+    // In build mode the wheel resizes the selected object instead of zooming.
+    if (editMode && editSelected) {
+      const f = dy < 0 ? 1.08 : 1 / 1.08;
+      editSelected.setScale(
+        Phaser.Math.Clamp(editSelected.scaleX * f, 0.05, 8),
+        Phaser.Math.Clamp(editSelected.scaleY * f, 0.05, 8),
+      );
+      refreshSelectionOutline();
+      scheduleWorldSave();
+      return;
+    }
+    if (editMode) return; // build mode, nothing selected — don't zoom either
     const cam = scene.cameras.main;
     const factor = dy < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
     cam.zoom = Phaser.Math.Clamp(cam.zoom * factor, ZOOM_MIN, ZOOM_MAX);
@@ -1177,8 +1224,26 @@ function create() {
     scene.input.setDefaultCursor(over ? 'crosshair' : 'default');
   });
 
+  // Build mode: drag the selected decoration to follow the pointer.
+  scene.input.on('pointermove', (pointer) => {
+    if (!editMode || !editDragging || !editSelected) return;
+    const wp = pointer.positionToCamera(scene.cameras.main);
+    editSelected.x = wp.x - editGrabDX;
+    editSelected.y = wp.y - editGrabDY;
+    if (editSelected.originY === 1) editSelected.setDepth(editSelected.y);
+    refreshSelectionOutline();
+  });
+  scene.input.on('pointerup', () => {
+    if (editMode && editDragging) {
+      editDragging = false;
+      scheduleWorldSave();
+    }
+  });
+
   // Pointer: click a Blobling to fight it; click ground to walk there.
   scene.input.on('pointerdown', (pointer) => {
+    // Build mode hijacks world clicks for editing decorations, not movement.
+    if (editMode) { editPointerDown(scene, pointer); return; }
     // Block world clicks while any modal overlay is up.
     if (classSelectOpen || shopOpen || travelOpen || trophyOpen || npcDialogueOpen) return;
     // Ignore clicks that landed on a UI button (mute / autopilot / return /
@@ -1438,12 +1503,17 @@ function update(time, delta) {
   }
   ui.update();
 
-  // Y-sort: depth follows y position
-  if (player.shadow) player.shadow.setDepth(player.groundY - 2);
-  player.sprite.setDepth(player.sprite.y);
+  // Y-sort: depth follows y position. Every setDepth() flags Phaser's whole
+  // display list (~1k objects) for a re-sort, so only call it when the value
+  // actually changed, and skip monsters that are culled/dormant (invisible
+  // sprites don't need a depth). This keeps the per-frame depth-sort from
+  // firing on a static or offscreen world — the dominant idle-frame cost.
+  if (player.shadow && player.shadow.depth !== player.groundY - 2) player.shadow.setDepth(player.groundY - 2);
+  if (player.sprite.depth !== player.sprite.y) player.sprite.setDepth(player.sprite.y);
   for (const b of bloblings) {
-    if (b.shadow) b.shadow.setDepth(b.sprite.y - 2);
-    if (b.sprite) b.sprite.setDepth(b.sprite.y);
+    if (!b.sprite || !b.sprite.visible) continue;
+    if (b.shadow && b.shadow.depth !== b.sprite.y - 2) b.shadow.setDepth(b.sprite.y - 2);
+    if (b.sprite.depth !== b.sprite.y) b.sprite.setDepth(b.sprite.y);
   }
 }
 
@@ -1733,23 +1803,14 @@ function buildMap(scene) {
     // grass tilesprite layer so the field reads as Focus-Grove
     // golden-hour cozy instead of saturated forest green.
     const COZY_GRASS_TINT = 0xfff3d6;
+    // Single clean base layer. The old code stacked two offset/rescaled copies
+    // to break grid repetition, but this hand-painted texture has visible
+    // cobblestones/flowers — overlaying offset copies would ghost them into a
+    // double-image. The texture's own variation plus the decoration/dirt/wash
+    // passes above already break up the tiling.
     scene.add.tileSprite(0, 0, WORLD_W, WORLD_H, 'grass_field_texture')
       .setOrigin(0, 0)
       .setDepth(-1010)
-      .setTint(COZY_GRASS_TINT);
-    scene.add.tileSprite(0, 0, WORLD_W, WORLD_H, 'grass_field_texture')
-      .setOrigin(0, 0)
-      .setDepth(-1009.8)
-      .setAlpha(0.34)
-      .setTilePosition(713, 389)
-      .setTileScale(1.37, 1.19)
-      .setTint(COZY_GRASS_TINT);
-    scene.add.tileSprite(0, 0, WORLD_W, WORLD_H, 'grass_field_texture')
-      .setOrigin(0, 0)
-      .setDepth(-1009.7)
-      .setAlpha(0.18)
-      .setTilePosition(231, 947)
-      .setTileScale(0.73, 0.91)
       .setTint(COZY_GRASS_TINT);
   } else {
     scene.add.rectangle(0, 0, WORLD_W, WORLD_H, 0xc8d8a8, 1)
@@ -2121,6 +2182,32 @@ function addPathWashes(scene) {
     for (let c = 0; c < MAP_COLS; c++) {
       if (isPath(r, c)) roadNode(r, c);
     }
+  }
+
+  // ---- Bake the static road network into one texture (huge perf win) ----
+  // The 4 layers above hold ~1M path commands spanning the whole 19200² world.
+  // Phaser re-tessellates EVERY command of a Graphics object EVERY frame, with
+  // no internal viewport culling, so these alone were ~96% of the per-frame
+  // GPU load — the true cause of the long-standing slowness (prior sessions
+  // kept cutting cheap sprite decorations and never found this). Roads never
+  // change after map build, so render them once into a single RenderTexture
+  // that draws as one quad/frame instead of re-stroking 1M primitives at 60fps.
+  // Downscaled because 19200 exceeds the max GPU texture size; roads are soft
+  // washes, so the slight blur is invisible at play zoom.
+  try {
+    const layers = [gOuter, gMid, gInner, gFleck];
+    const SCALE = 0.2; // 19200 * 0.2 = 3840 px, GPU-safe (≤ 4096)
+    const rt = scene.add.renderTexture(0, 0, Math.ceil(WORLD_W * SCALE), Math.ceil(WORLD_H * SCALE))
+      .setOrigin(0, 0)
+      .setDepth(-1000);
+    layers.forEach((g) => g.setScale(SCALE));
+    rt.draw(layers, 0, 0);
+    layers.forEach((g) => g.destroy());
+    rt.setScale(1 / SCALE);
+    scene.__roadBakeRT = rt;
+  } catch (e) {
+    // RenderTexture unavailable on this device — keep the live graphics (still
+    // in the display list) so roads always render. Correctness over speed.
   }
 }
 
@@ -4118,41 +4205,50 @@ function buildDecorations(scene) {
   for (let i = 0; i < 42; i++) southBoostPatch();
 
   // Forest (north) — heavy trees, dark bushes, mushrooms. Tinted darker green.
-  for (let i = 0; i < perfCount(760); i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     200, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'forest', tint: forestTint, shadow: true });
-  for (let i = 0; i < perfCount(420); i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      78, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'forest', tint: forestTint, shadow: true });
-  for (let i = 0; i < perfCount(520); i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  48, { maxAngle: 10, zoneFilter: 'forest' });
-  for (let i = 0; i < perfCount(340); i++) place(Phaser.Utils.Array.GetRandom(forestFernKeys), 52, { alpha: 0.95, maxAngle: 16, zoneFilter: 'forest', shadow: true });
-  for (let i = 0; i < perfCount(500); i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     54, { alpha: 0.9, maxAngle: 18, zoneFilter: 'forest', tint: forestTint, sway: true, swayAmp: 2.5 });
-  // Forest mushroom rings — classic RO-y woodland touch.
-  for (let i = 0; i < perfCount(40, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(mushroomKeys), 46, Phaser.Math.Between(4, 8), { maxAngle: 10, zoneFilter: 'forest', spread: TILE_SIZE });
+  for (let i = 0; i < perfCount(300); i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     200, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'forest', tint: forestTint, shadow: true });
+  for (let i = 0; i < perfCount(160); i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      78, { maxAngle:  8, alignBottom: true, blockRadius: 1, zoneFilter: 'forest', tint: forestTint, shadow: true });
+  for (let i = 0; i < perfCount(180); i++) place(Phaser.Utils.Array.GetRandom(mushroomKeys),  48, { maxAngle: 10, zoneFilter: 'forest' });
+  for (let i = 0; i < perfCount(120); i++) place(Phaser.Utils.Array.GetRandom(forestFernKeys), 52, { alpha: 0.95, maxAngle: 16, zoneFilter: 'forest', shadow: true });
+  for (let i = 0; i < perfCount(200); i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     54, { alpha: 0.9, maxAngle: 18, zoneFilter: 'forest', tint: forestTint, sway: true, swayAmp: 2.5 });
+  // Forest clusters — dense groves and mushroom rings.
+  for (let i = 0; i < perfCount(80, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(treeKeys), 190, Phaser.Math.Between(2, 4), { maxAngle: 4, alignBottom: true, blockRadius: 2, zoneFilter: 'forest', tint: forestTint, spread: TILE_SIZE * 1.4 });
+  for (let i = 0; i < perfCount(60, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(bushKeys), 74, Phaser.Math.Between(3, 5), { maxAngle: 8, alignBottom: true, zoneFilter: 'forest', tint: forestTint, spread: TILE_SIZE });
+  for (let i = 0; i < perfCount(60, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(mushroomKeys), 46, Phaser.Math.Between(4, 8), { maxAngle: 10, zoneFilter: 'forest', spread: TILE_SIZE });
+  for (let i = 0; i < perfCount(50, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(forestFernKeys), 50, Phaser.Math.Between(3, 6), { alpha: 0.95, maxAngle: 16, zoneFilter: 'forest', spread: TILE_SIZE * 0.9 });
 
   // Desert (south) — real sand tiles below, scatter cacti + dunes + sun-bleached rocks.
-  for (let i = 0; i < perfCount(460); i++) place(Phaser.Utils.Array.GetRandom(rockKeys),      54, { maxAngle: 12, alignBottom: true, blockRadius: 1, zoneFilter: 'desert', tint: desertRockTint, shadow: true });
-  for (let i = 0; i < perfCount(340); i++) place('cactus_set',                                90, { maxAngle:  6, alignBottom: true, blockRadius: 1, zoneFilter: 'desert', shadow: true });
-  for (let i = 0; i < perfCount(150); i++) place('deco_sand_dune',                           120, { maxAngle:  0, alpha: 0.85, zoneFilter: 'desert', allowFlip: false });
-  for (let i = 0; i < perfCount(90); i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     32, { alpha: 0.4, maxAngle: 20, zoneFilter: 'desert', tint: 0xd6c178 });
-  // Desert cactus clusters — oases of vegetation.
-  for (let i = 0; i < perfCount(26, PERF.clusters); i++) placeCluster('cactus_set', 88, Phaser.Math.Between(3, 6), { maxAngle: 6, alignBottom: true, blockRadius: 1, zoneFilter: 'desert', spread: TILE_SIZE, shadow: true });
+  for (let i = 0; i < perfCount(180); i++) place(Phaser.Utils.Array.GetRandom(rockKeys),      54, { maxAngle: 12, alignBottom: true, blockRadius: 1, zoneFilter: 'desert', tint: desertRockTint, shadow: true });
+  for (let i = 0; i < perfCount(120); i++) place('cactus_set',                                90, { maxAngle:  6, alignBottom: true, blockRadius: 1, zoneFilter: 'desert', shadow: true });
+  for (let i = 0; i < perfCount(60); i++) place('deco_sand_dune',                           120, { maxAngle:  0, alpha: 0.85, zoneFilter: 'desert', allowFlip: false });
+  for (let i = 0; i < perfCount(40); i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     32, { alpha: 0.4, maxAngle: 20, zoneFilter: 'desert', tint: 0xd6c178 });
+  // Desert clusters — oases and rock formations.
+  for (let i = 0; i < perfCount(40, PERF.clusters); i++) placeCluster('cactus_set', 88, Phaser.Math.Between(3, 6), { maxAngle: 6, alignBottom: true, blockRadius: 1, zoneFilter: 'desert', spread: TILE_SIZE, shadow: true });
+  for (let i = 0; i < perfCount(50, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(rockKeys), 52, Phaser.Math.Between(3, 5), { maxAngle: 12, alignBottom: true, blockRadius: 1, zoneFilter: 'desert', tint: desertRockTint, spread: TILE_SIZE * 0.8 });
 
   // Ruins (west) — heavy rocks, occasional dead bush. Greyish.
-  for (let i = 0; i < perfCount(740); i++) place(Phaser.Utils.Array.GetRandom(rockKeys),      58, { maxAngle: 14, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: ruinTint, shadow: true });
-  for (let i = 0; i < perfCount(200); i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      66, { maxAngle:  6, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: 0xa89878, shadow: true });
-  for (let i = 0; i < perfCount(120); i++) place(Phaser.Utils.Array.GetRandom(ruinsPillarKeys), 118, { maxAngle:  6, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', shadow: true });
-  for (let i = 0; i < perfCount(290); i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     46, { alpha: 0.7, maxAngle: 18, zoneFilter: 'ruins', tint: ruinTint, sway: true, swayAmp: 2 });
-  // Rock piles — broken architecture feeling without new art.
-  for (let i = 0; i < perfCount(32, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(rockKeys), 56, Phaser.Math.Between(4, 7), { maxAngle: 14, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: ruinTint, spread: TILE_SIZE * 0.9, shadow: true });
+  for (let i = 0; i < perfCount(280); i++) place(Phaser.Utils.Array.GetRandom(rockKeys),      58, { maxAngle: 14, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: ruinTint, shadow: true });
+  for (let i = 0; i < perfCount(80); i++) place(Phaser.Utils.Array.GetRandom(bushKeys),      66, { maxAngle:  6, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: 0xa89878, shadow: true });
+  for (let i = 0; i < perfCount(50); i++) place(Phaser.Utils.Array.GetRandom(ruinsPillarKeys), 118, { maxAngle:  6, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', shadow: true });
+  for (let i = 0; i < perfCount(100); i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     46, { alpha: 0.7, maxAngle: 18, zoneFilter: 'ruins', tint: ruinTint, sway: true, swayAmp: 2 });
+  // Ruins clusters — broken architecture rubble piles and pillar groups.
+  for (let i = 0; i < perfCount(50, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(rockKeys), 56, Phaser.Math.Between(4, 7), { maxAngle: 14, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', tint: ruinTint, spread: TILE_SIZE * 0.9, shadow: true });
+  for (let i = 0; i < perfCount(20, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(ruinsPillarKeys), 110, Phaser.Math.Between(2, 3), { maxAngle: 6, alignBottom: true, blockRadius: 1, zoneFilter: 'ruins', spread: TILE_SIZE * 0.7, shadow: true });
+  for (let i = 0; i < perfCount(30, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(bushKeys), 62, Phaser.Math.Between(3, 5), { maxAngle: 6, alignBottom: true, zoneFilter: 'ruins', tint: 0xa89878, spread: TILE_SIZE });
 
   // Riverside (east) — ponds, tall grass, flowers, occasional tree.
   for (let i = 0; i < perfCount(30, PERF.ponds, 1); i++) {
     const pond = place('pond_01', 240, { maxAngle:  0, alignBottom: true, blockRadius: 7, allowFlip: false, zoneFilter: 'riverside', shimmer: true });
     addPondEdgeDressing(pond, 'riverside');
   }
-  for (let i = 0; i < perfCount(700); i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     56, { alpha: 0.95, maxAngle: 18, zoneFilter: 'riverside', sway: true, swayAmp: 3 });
-  for (let i = 0; i < perfCount(500); i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),    60, { maxAngle: 15, zoneFilter: 'riverside', sway: true, swayAmp: 2 });
-  for (let i = 0; i < perfCount(360); i++) place(Phaser.Utils.Array.GetRandom(riversideCattailKeys), 68, { maxAngle: 10, alignBottom: true, zoneFilter: 'riverside', shadow: true, sway: true, swayAmp: 1.5 });
-  for (let i = 0; i < perfCount(180); i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'riverside', shadow: true });
-  // Riverside flower patches by the water.
-  for (let i = 0; i < perfCount(54, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(flowerKeys), 58, Phaser.Math.Between(5, 9), { maxAngle: 14, zoneFilter: 'riverside', sway: true, swayAmp: 2 });
+  for (let i = 0; i < perfCount(250); i++) place(Phaser.Utils.Array.GetRandom(grassKeys),     56, { alpha: 0.95, maxAngle: 18, zoneFilter: 'riverside', sway: true, swayAmp: 3 });
+  for (let i = 0; i < perfCount(160); i++) place(Phaser.Utils.Array.GetRandom(flowerKeys),    60, { maxAngle: 15, zoneFilter: 'riverside', sway: true, swayAmp: 2 });
+  for (let i = 0; i < perfCount(120); i++) place(Phaser.Utils.Array.GetRandom(riversideCattailKeys), 68, { maxAngle: 10, alignBottom: true, zoneFilter: 'riverside', shadow: true, sway: true, swayAmp: 1.5 });
+  for (let i = 0; i < perfCount(60); i++) place(Phaser.Utils.Array.GetRandom(treeKeys),     180, { maxAngle:  4, alignBottom: true, blockRadius: 2, zoneFilter: 'riverside', shadow: true });
+  // Riverside clusters — flower patches, cattail stands, grass meadows.
+  for (let i = 0; i < perfCount(70, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(flowerKeys), 58, Phaser.Math.Between(5, 9), { maxAngle: 14, zoneFilter: 'riverside', sway: true, swayAmp: 2 });
+  for (let i = 0; i < perfCount(50, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(riversideCattailKeys), 66, Phaser.Math.Between(3, 6), { maxAngle: 10, alignBottom: true, zoneFilter: 'riverside', sway: true, swayAmp: 1.5, spread: TILE_SIZE * 0.8 });
+  for (let i = 0; i < perfCount(60, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(grassKeys), 54, Phaser.Math.Between(5, 8), { alpha: 0.95, maxAngle: 18, zoneFilter: 'riverside', sway: true, swayAmp: 3, spread: TILE_SIZE });
+  for (let i = 0; i < perfCount(30, PERF.clusters); i++) placeCluster(Phaser.Utils.Array.GetRandom(treeKeys), 170, Phaser.Math.Between(2, 3), { maxAngle: 4, alignBottom: true, blockRadius: 2, zoneFilter: 'riverside', spread: TILE_SIZE * 1.5 });
 
   // Always keep spawn, plazas, and roads walkable after blocking decorations.
   const protect = (wx, wy) => {
@@ -5593,6 +5689,348 @@ function loadGameSave() {
     const raw = localStorage.getItem(SAVE_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch (e) { return null; }
+}
+
+// High-DPI text helper usable outside the UIManager (mirrors its local `crisp`).
+function crispText(t) {
+  if (t && t.setResolution) t.setResolution(UI_TEXT_RESOLUTION);
+  return t;
+}
+
+// ---------- Build/Edit mode: editable, persisted decoration world ----------
+// The decoration layout is random each load (unseeded RNG), so there is no
+// stable identity to anchor sparse edits against. Instead we persist the FULL
+// editable world as data: snapshot the generated world once, then load from
+// that data forever after. Every move/resize/add/delete re-saves the whole set.
+
+// Serialize one decoration Image to a compact record.
+function serializeDeco(img) {
+  return {
+    k: img.texture.key,
+    x: Math.round(img.x), y: Math.round(img.y),
+    sx: +img.scaleX.toFixed(4), sy: +img.scaleY.toFixed(4),
+    a: Math.round(img.angle),
+    f: img.flipX ? 1 : 0,
+    d: +img.depth.toFixed(2),
+    al: +img.alpha.toFixed(3),
+    t: img.isTinted ? img.tintTopLeft : null,
+    o: img.originY === 1 ? 1 : 0.5,
+  };
+}
+
+// Rebuild a decoration Image from a serialized record.
+function spawnEditableDeco(scene, e) {
+  if (!scene.textures.exists(e.k)) return null;
+  const img = scene.add.image(e.x, e.y, e.k);
+  img.setOrigin(0.5, e.o === 1 ? 1 : 0.5);
+  img.setScale(e.sx, e.sy);
+  img.setAngle(e.a || 0);
+  if (e.f) img.setFlipX(true);
+  img.setDepth(e.d);
+  img.setAlpha(e.al ?? 1);
+  if (e.t != null) img.setTint(e.t);
+  img.__editable = true;
+  (scene.__worldDecorations || (scene.__worldDecorations = [])).push(img);
+  return img;
+}
+
+// Persist the entire editable world. Debounced via scheduleWorldSave().
+function saveWorld() {
+  const scene = editScene;
+  if (!scene || !scene.__worldDecorations) return;
+  try {
+    const list = scene.__worldDecorations
+      .filter((o) => o && o.active && o.texture)
+      .map(serializeDeco);
+    localStorage.setItem(WORLD_KEY, JSON.stringify(list));
+  } catch (e) { /* localStorage full/disabled — ignore */ }
+}
+function scheduleWorldSave() {
+  if (worldSaveTimer) clearTimeout(worldSaveTimer);
+  worldSaveTimer = setTimeout(saveWorld, 400);
+}
+
+// Called once after buildDecorations: apply the saved layout, or snapshot the
+// fresh one on first run.
+function initWorldEdits(scene) {
+  editScene = scene;
+  let saved = null;
+  try {
+    const raw = localStorage.getItem(WORLD_KEY);
+    saved = raw ? JSON.parse(raw) : null;
+  } catch (e) { saved = null; }
+
+  if (Array.isArray(saved) && saved.length) {
+    // Drop the freshly-generated random props + their sway tweens, then
+    // rebuild the exact saved world.
+    if (scene.__swayProps) {
+      for (const sp of scene.__swayProps) { if (sp.tween) sp.tween.remove(); }
+      scene.__swayProps = [];
+    }
+    const old = scene.__worldDecorations || [];
+    for (const o of old) { if (o && o.destroy) o.destroy(); }
+    scene.__worldDecorations = [];
+    for (const e of saved) spawnEditableDeco(scene, e);
+  } else {
+    // First run — bake the current random layout as the canonical editable world.
+    for (const o of (scene.__worldDecorations || [])) { if (o) o.__editable = true; }
+    saveWorld();
+  }
+}
+
+// ---- Selection + editing ----
+function editPointerDown(scene, pointer) {
+  const wp = pointer.positionToCamera(scene.cameras.main);
+  // Ignore clicks that landed on a HUD button (panel / palette).
+  const hits = scene.input.hitTestPointer(pointer);
+  if (hits && hits.length > 0) return;
+  const target = pickDecoAt(scene, wp.x, wp.y);
+  if (target) {
+    selectDeco(target);
+    editDragging = true;
+    editGrabDX = wp.x - target.x;
+    editGrabDY = wp.y - target.y;
+  } else {
+    deselectDeco();
+  }
+}
+
+// Topmost (highest depth) decoration whose display bounds contain the point.
+function pickDecoAt(scene, wx, wy) {
+  const list = scene.__worldDecorations || [];
+  let best = null, bestDepth = -Infinity;
+  for (const o of list) {
+    if (!o || !o.active || !o.visible) continue;
+    const hw = o.displayWidth / 2, hh = o.displayHeight / 2;
+    // Account for bottom-origin props (origin y = 1): bounds sit above y.
+    const cy = o.originY === 1 ? o.y - hh : o.y;
+    if (Math.abs(wx - o.x) <= hw && Math.abs(wy - cy) <= hh) {
+      if (o.depth >= bestDepth) { bestDepth = o.depth; best = o; }
+    }
+  }
+  return best;
+}
+
+function selectDeco(img) {
+  editSelected = img;
+  refreshSelectionOutline();
+  showEditPanel(editScene);
+}
+function deselectDeco() {
+  editSelected = null;
+  if (editOutline) editOutline.setVisible(false);
+}
+
+function refreshSelectionOutline() {
+  const scene = editScene;
+  if (!scene) return;
+  if (!editOutline) {
+    editOutline = scene.add.graphics().setDepth(99998);
+  }
+  editOutline.clear();
+  if (!editSelected) { editOutline.setVisible(false); return; }
+  const o = editSelected;
+  const hw = o.displayWidth / 2, hh = o.displayHeight / 2;
+  const cy = o.originY === 1 ? o.y - hh : o.y;
+  editOutline.setVisible(true);
+  editOutline.lineStyle(3, 0xffe066, 0.95);
+  editOutline.strokeRect(o.x - hw, cy - hh, hw * 2, hh * 2);
+  editOutline.fillStyle(0xffe066, 0.10);
+  editOutline.fillRect(o.x - hw, cy - hh, hw * 2, hh * 2);
+}
+
+// ---- Mode toggle ----
+function toggleEditMode(scene) {
+  if (editMode) exitEditMode(); else enterEditMode(scene);
+}
+function syncBuildButton() {
+  // Keep the toolbar toggle label in sync no matter how mode was changed
+  // (e.g. exiting via the panel's "Done" button).
+  if (ui && ui.bmText) {
+    ui.bmText.setText(editMode ? '🔨 Build: ON' : '🔨 Build: OFF');
+    ui.bmText.setColor(editMode ? '#ffe066' : '#c7d2b0');
+  }
+}
+function enterEditMode(scene) {
+  editMode = true;
+  editScene = scene;
+  if (player) { player.path = []; player.attackTarget = null; }
+  showEditPanel(scene);
+  syncBuildButton();
+  if (ui && ui.message) ui.message('🔨 Build mode ON — click a prop to move/resize. Wheel = resize.');
+}
+function exitEditMode() {
+  editMode = false;
+  editDragging = false;
+  deselectDeco();
+  hideEditPanel();
+  hideAddPalette();
+  saveWorld();
+  syncBuildButton();
+  if (ui && ui.message) ui.message('✓ Build mode off — changes saved.');
+}
+
+// ---- Object operations ----
+function editResize(factor) {
+  if (!editSelected) return;
+  editSelected.setScale(
+    Phaser.Math.Clamp(editSelected.scaleX * factor, 0.05, 8),
+    Phaser.Math.Clamp(editSelected.scaleY * factor, 0.05, 8),
+  );
+  refreshSelectionOutline();
+  scheduleWorldSave();
+}
+function editRotate() {
+  if (!editSelected) return;
+  editSelected.setAngle((editSelected.angle + 15) % 360);
+  refreshSelectionOutline();
+  scheduleWorldSave();
+}
+function editFlip() {
+  if (!editSelected) return;
+  editSelected.setFlipX(!editSelected.flipX);
+  scheduleWorldSave();
+}
+function editDelete() {
+  if (!editSelected) return;
+  const scene = editScene;
+  const list = scene.__worldDecorations || [];
+  const i = list.indexOf(editSelected);
+  if (i >= 0) list.splice(i, 1);
+  editSelected.destroy();
+  editSelected = null;
+  if (editOutline) editOutline.setVisible(false);
+  saveWorld();
+}
+function editAddObject(key) {
+  const scene = editScene;
+  const cam = scene.cameras.main;
+  const cx = cam.worldView.x + cam.worldView.width / 2;
+  const cy = cam.worldView.y + cam.worldView.height / 2;
+  const img = scene.add.image(cx, cy, key);
+  img.setOrigin(0.5, 1);
+  // Scale new prop to a sensible on-screen height (~80px) regardless of source.
+  const baseH = 80;
+  img.setScale(baseH / img.height);
+  img.setDepth(cy);
+  img.__editable = true;
+  (scene.__worldDecorations || (scene.__worldDecorations = [])).push(img);
+  selectDeco(img);
+  saveWorld();
+}
+
+function resetWorld() {
+  try { localStorage.removeItem(WORLD_KEY); } catch (e) { /* ignore */ }
+  location.reload();
+}
+
+// ---- Build-mode HUD: edit panel + add palette ----
+function showEditPanel(scene) {
+  if (!editMode) return;
+  if (editPanel) { editPanel.setVisible(true); return; }
+  const pad = 8, bw = 150, bh = 30, gap = 6;
+  const x = 14, y = 90;
+  editPanel = scene.add.container(0, 0).setScrollFactor(0).setDepth(10030);
+  const rows = [
+    ['＋  Bigger',    () => editResize(1.12)],
+    ['－  Smaller',   () => editResize(1 / 1.12)],
+    ['⟲  Rotate',    () => editRotate()],
+    ['⇋  Flip',      () => editFlip()],
+    ['🗑  Delete',    () => editDelete()],
+    ['＋  Add Object', () => showAddPalette(scene)],
+    ['✓  Done',       () => exitEditMode()],
+  ];
+  const panelH = pad * 2 + 24 + rows.length * (bh + gap);
+  const bgW = bw + pad * 2;
+  const bg = scene.add.rectangle(x - pad, y - 28, bgW, panelH, 0x241c12, 0.92)
+    .setOrigin(0, 0).setScrollFactor(0).setStrokeStyle(2, 0xffe066, 0.8);
+  editPanel.add(bg);
+  const title = crispText(scene.add.text(x, y - 22, '🔨 BUILD', {
+    fontSize: '14px', fontStyle: 'bold', color: '#ffe066', stroke: '#000', strokeThickness: 3,
+  }).setScrollFactor(0));
+  editPanel.add(title);
+  rows.forEach(([label, fn], i) => {
+    const by = y + 8 + i * (bh + gap);
+    const danger = label.indexOf('Delete') >= 0;
+    const done = label.indexOf('Done') >= 0;
+    const btn = scene.add.rectangle(x, by, bw, bh, danger ? 0x3a1c18 : done ? 0x1c3320 : 0x352a1a, 0.95)
+      .setOrigin(0, 0).setScrollFactor(0)
+      .setStrokeStyle(1, danger ? 0xff7777 : done ? 0x88ee99 : 0xf0c66c, 0.85)
+      .setInteractive({ useHandCursor: true });
+    const txt = crispText(scene.add.text(x + bw / 2, by + bh / 2, label, {
+      fontSize: '13px', fontStyle: 'bold',
+      color: danger ? '#ffb0b0' : done ? '#bff0c8' : '#ffe9b0',
+      stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0));
+    btn.on('pointerdown', (p, lx, ly, ev) => { ev && ev.stopPropagation && ev.stopPropagation(); fn(); });
+    editPanel.add(btn); editPanel.add(txt);
+  });
+}
+function hideEditPanel() {
+  if (editPanel) { editPanel.destroy(true); editPanel = null; }
+}
+
+function showAddPalette(scene) {
+  if (editAddPalette) { editAddPalette.setVisible(true); return; }
+  const keys = EDIT_PALETTE_KEYS.filter((k) => scene.textures.exists(k));
+  const cols = 6, cell = 92, pad = 16;
+  const gridW = cols * cell;
+  const rows = Math.ceil(keys.length / cols);
+  const gridH = rows * cell;
+  const totalW = gridW + pad * 2;
+  const totalH = gridH + pad * 2 + 70;
+  const ox = (GAME_W - totalW) / 2;
+  const oy = (GAME_H - totalH) / 2;
+  editAddPalette = scene.add.container(0, 0).setScrollFactor(0).setDepth(10040);
+  const screen = scene.add.rectangle(0, 0, GAME_W, GAME_H, 0x000000, 0.6)
+    .setOrigin(0, 0).setScrollFactor(0).setInteractive();
+  screen.on('pointerdown', (p, lx, ly, ev) => { ev && ev.stopPropagation && ev.stopPropagation(); });
+  editAddPalette.add(screen);
+  const bg = scene.add.rectangle(ox, oy, totalW, totalH, 0x241c12, 0.98)
+    .setOrigin(0, 0).setScrollFactor(0).setStrokeStyle(2, 0xffe066, 0.85);
+  editAddPalette.add(bg);
+  const title = crispText(scene.add.text(ox + pad, oy + 12, 'ADD OBJECT — tap to place at screen center', {
+    fontSize: '15px', fontStyle: 'bold', color: '#ffe066', stroke: '#000', strokeThickness: 3,
+  }).setScrollFactor(0));
+  editAddPalette.add(title);
+  keys.forEach((key, i) => {
+    const gx = ox + pad + (i % cols) * cell;
+    const gy = oy + 44 + Math.floor(i / cols) * cell;
+    const slot = scene.add.rectangle(gx + 4, gy + 4, cell - 8, cell - 8, 0x352a1a, 0.95)
+      .setOrigin(0, 0).setScrollFactor(0).setStrokeStyle(1, 0xf0c66c, 0.7)
+      .setInteractive({ useHandCursor: true });
+    const thumb = scene.add.image(gx + cell / 2, gy + cell / 2, key).setScrollFactor(0);
+    const maxThumb = cell - 24;
+    const s = Math.min(maxThumb / thumb.width, maxThumb / thumb.height);
+    thumb.setScale(s);
+    slot.on('pointerdown', (p, lx, ly, ev) => {
+      ev && ev.stopPropagation && ev.stopPropagation();
+      editAddObject(key);
+      hideAddPalette();
+    });
+    editAddPalette.add(slot); editAddPalette.add(thumb);
+  });
+  // Footer: Close + Reset World.
+  const fy = oy + totalH - 34;
+  const closeBtn = scene.add.rectangle(ox + pad, fy, 120, 26, 0x1c3320, 0.95)
+    .setOrigin(0, 0).setScrollFactor(0).setStrokeStyle(1, 0x88ee99, 0.85)
+    .setInteractive({ useHandCursor: true });
+  const closeTxt = crispText(scene.add.text(ox + pad + 60, fy + 13, '✕ Close', {
+    fontSize: '13px', fontStyle: 'bold', color: '#bff0c8', stroke: '#000', strokeThickness: 2,
+  }).setOrigin(0.5).setScrollFactor(0));
+  closeBtn.on('pointerdown', (p, lx, ly, ev) => { ev && ev.stopPropagation && ev.stopPropagation(); hideAddPalette(); });
+  editAddPalette.add(closeBtn); editAddPalette.add(closeTxt);
+  const resetBtn = scene.add.rectangle(ox + totalW - pad - 150, fy, 150, 26, 0x3a1c18, 0.95)
+    .setOrigin(0, 0).setScrollFactor(0).setStrokeStyle(1, 0xff7777, 0.85)
+    .setInteractive({ useHandCursor: true });
+  const resetTxt = crispText(scene.add.text(ox + totalW - pad - 75, fy + 13, '⟳ Reset World', {
+    fontSize: '13px', fontStyle: 'bold', color: '#ffb0b0', stroke: '#000', strokeThickness: 2,
+  }).setOrigin(0.5).setScrollFactor(0));
+  resetBtn.on('pointerdown', (p, lx, ly, ev) => { ev && ev.stopPropagation && ev.stopPropagation(); resetWorld(); });
+  editAddPalette.add(resetBtn); editAddPalette.add(resetTxt);
+}
+function hideAddPalette() {
+  if (editAddPalette) { editAddPalette.destroy(true); editAddPalette = null; }
 }
 
 function applySave() {
@@ -7800,6 +8238,13 @@ class UIManager {
     });
     addTip(this.shBg, 'Spend zeny on upgrades', btnX, row.y + btnH / 2);
 
+    // Build Mode — Sims-style world editor: move/resize/delete/add decorations.
+    row = addToolbarButton('🔨 Build: OFF', 'toggle');
+    this.bmBg = row.bg;
+    this.bmText = row.text;
+    this.bmBg.on('pointerdown', () => { toggleEditMode(scene); });
+    addTip(this.bmBg, 'Move, resize, add or delete objects', btnX, row.y + btnH / 2);
+
     // Compact-HUD button was removed. hudCompact stays false so the HUD
     // always renders in its single "clean" layout.
 
@@ -8076,6 +8521,14 @@ class UIManager {
 
     this.lvlText.setText(`Lv.${player.level}`);
     this.zenyText.setText(`${fmt(player.zeny)}z`);
+
+    // The bars above are cheap and stay per-frame so HP/EXP feel responsive.
+    // Everything below — quest/gear text rebuilds, the all-monster boss scan,
+    // and the minimap — is throttled to ~8 Hz. The HUD does not need 60 Hz,
+    // and the boss scan was hypot-ing all ~143 monsters every single frame.
+    const _now = (this.scene && this.scene.time) ? this.scene.time.now : 0;
+    if (this._lastHud && _now - this._lastHud < 120) return;
+    this._lastHud = _now;
 
     // Label flips between Choose / Change based on whether a class is set.
     // Show escalating swap cost so the player can plan zeny spend.

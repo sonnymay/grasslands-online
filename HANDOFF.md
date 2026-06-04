@@ -4,18 +4,101 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-05-20 — post session 114 static-decoration performance pass.**
+**State as of 2026-06-03 — post session 117 Sims-style build/edit mode.**
 
 - **Branch:** `main`.
-- **Latest completed work:** session 114 disabled decorative ambient animation
-  loops while performance is under review.
-- **Cache version live in `project-grasslands/index.html`:** `?v=223`.
-- **Next change must use:** `?v=224`.
+- **Session 117 (build/edit mode):** added a single-player Sims-style world
+  editor. Toolbar `🔨 Build` toggle enters build mode: click a decoration to
+  select (yellow outline), drag to move, mouse wheel or ＋/－ buttons to resize,
+  ⟲ Rotate, ⇋ Flip, 🗑 Delete, and ＋ Add Object (palette of ~31 decoration
+  keys, filtered to loaded textures). **Persistence:** the decoration layout is
+  random each load (unseeded RNG → no stable identity), so the whole editable
+  world is persisted as data under localStorage key `grasslands_world_v1`.
+  `initWorldEdits(scene)` (called in create() right after `buildDecorations`)
+  either rebuilds the saved world (destroying the fresh random props) or, on
+  first run, snapshots the random layout as the canonical editable world. Every
+  edit re-saves (debounced 400ms). Scope: only `__worldDecorations` scatter
+  props are editable; camp/NPC/signpost/landmarks are untouched. Edited world is
+  treated as non-blocking (blockRadius not reconstructed from snapshot) — a
+  known v1 tradeoff. Palette footer has `⟳ Reset World` (clears the key +
+  reloads → fresh random layout). Verified end-to-end in preview: add/move/
+  resize/delete persist across reload, no console errors. Cache `?v=227`.
+- **Latest completed work:** session 116 found and fixed the true cause of the
+  long-standing "super slow" framerate. It was NOT decoration count (10+ prior
+  sessions cut decorations with no real win). The cause: `addPathWashes()`
+  painted the entire static road network as 4 live world-space `Graphics`
+  objects holding ~1.08M path commands. Phaser re-tessellates every command of
+  a Graphics object EVERY frame with no viewport culling, so those 4 layers
+  alone were ~96% of the per-frame GPU load on the 19200² world. Fix: bake the
+  4 road layers into ONE downscaled `RenderTexture` once at map build, then
+  destroy the live Graphics. Per-frame Graphics command load dropped from
+  ~1.22M to ~144k (−88%). Also two CPU wins: monster Y-depth sort now skips
+  invisible/unchanged monsters (was dirtying the whole display-list depth-sort
+  every frame), and `UIManager.update()` throttles its 143-monster boss scan +
+  quest/gear text + minimap to ~8 Hz (was 60 Hz).
+- **Cache version live in `project-grasslands/index.html`:** `?v=227`.
+- **Next change must use:** `?v=228`.
+- **Session 116b (background swap):** replaced the procedurally generated
+  `grass_field_texture` with Sonny's hand-painted seamless grass/cobblestone/
+  flower PNG. Source `~/Downloads/ChatGPT Image Jun 3, 2026, 06_44_32 PM.png`
+  (1254² RGB, seamless) was copied + resized to
+  `assets/decorations/grass_field_01.png` (1024²) and loaded in `preload()`
+  under the `grass_field_texture` key (so `createGrassFieldTexture()`
+  early-returns). `buildMap()` now uses ONE base tileSprite instead of three —
+  the old two offset/rescaled overlay copies would ghost the visible
+  cobblestones into a double-image. Cozy warm tint `0xfff3d6` retained.
+- **Lesson for future sessions:** if the game feels slow, DO NOT cut sprite
+  decorations (they are cheap and culled). Check the display list for large
+  static `Graphics` command buffers
+  (`scene.sys.displayList.list.filter(o=>o.type==='Graphics')` → inspect
+  `o.commandBuffer.length`) and bake static world paint into a `RenderTexture`.
+  Remaining static ground Graphics (`addGrassTones` −960/−959, `addDirtPatchScatter`
+  −955, `addTerrainRelief` −958, ~144k cmds total) are the same anti-pattern and
+  can be baked the same way if more headroom is needed.
 - **Pre-existing dirt to leave alone:** 8 modified `knight_*.png` and 10
   untracked `wizard_*.png` in `assets/sprites/`. Sonny's work — do not
   stage, commit, or revert these. Also leave the untracked misspelled
   `assets/decorations/camfire_01.png` alone unless Sonny explicitly confirms
   cleanup.
+
+**Where we left off (session 115):**
+- Goal: play the game, walk around, identify visual issues with map organization
+  and decoration placement, then fix them.
+- Fixed "g is not defined" ReferenceError in `addPathWashes()`: the road edge
+  fleck drawing loop referenced a variable `g` that should have been `gFleck`.
+  Renamed all occurrences to `gFleck`.
+- Fixed road alpha seam artifacts: replaced transparent overlay colors
+  (`fillStyle(color, alpha)`) with pre-calculated solid opaque hex colors for
+  all three road layers (outer, mid, inner). Circle-joint overlap no longer
+  produces visible seam lines.
+- Disabled `addOcclusionTestGrove()` — it was a debug/test feature placing a
+  dense tree grove near the spawn signpost that blocked movement paths.
+- Added spawn exclusion zone to `place()` and `placeCluster()`: random global
+  scatter now skips a 900×640px rectangle centered on spawn. This keeps the
+  camp area clean and readable. Landmark/camp decorations use
+  `ignoreSpawnLimit: true` to bypass this filter.
+- Rebalanced grasslands (center) decoration counts: single-scatter items
+  reduced ~60-75% (e.g. grass 900→500, flowers 240→60, trees 160→60), cluster
+  counts increased ~30-40% (e.g. grass clusters 260→340, flower clusters
+  210→280, tree clusters 46→60). This shifts the visual weight from
+  pepper-shaker randomness to intentional organic patches.
+- Rebalanced forest (north): single trees 760→300, bushes 420→160, mushrooms
+  520→180, ferns 340→120, grass 500→200. Added new cluster passes for trees
+  (80 groves), bushes (60 thickets), mushrooms (60 rings), ferns (50 patches).
+- Rebalanced desert (south): rocks 460→180, cacti 340→120, dunes 150→60, grass
+  90→40. Added rock formation clusters (50) alongside existing cactus clusters
+  (26→40).
+- Rebalanced ruins (west): rocks 740→280, bushes 200→80, pillars 120→50, grass
+  290→100. Added pillar groups (20 clusters), bush thickets (30 clusters)
+  alongside existing rock piles (32→50).
+- Rebalanced riverside (east): grass 700→250, flowers 500→160, cattails 360→120,
+  trees 180→60. Added cattail stand clusters (50), grass meadow clusters (60),
+  tree copse clusters (30) alongside existing flower patches (54→70).
+- Cache bumped to `game.js?v=224`.
+- Verification: `node -c project-grasslands/game.js` passed; `localhost:8001`
+  served `/` and `game.js?v=224` with HTTP 200. Headless browser walk-around
+  confirmed no PAGE ERROR logs — only AudioContext autoplay warnings and minor
+  WebGL canvas warnings that are pre-existing.
 
 **Where we left off (session 114):**
 - Goal: keep going after v222 reduced display-list weight but browser metrics
