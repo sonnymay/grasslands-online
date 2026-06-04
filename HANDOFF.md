@@ -4,9 +4,21 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-06-03 — post session 117c build mode + collision + discoverability.**
+**State as of 2026-06-03 — post session 117d build-mode polish (undo/duplicate/size).**
 
 - **Branch:** `main`.
+- **Session 117d (build-mode polish):** made the editor forgiving + fast.
+  **Undo** (Ctrl/Cmd+Z or `↶ Undo` button): operation-inverse stack
+  `editUndoStack` (cap 30, cleared on exit). Each mutation pushes its inverse
+  before changing — delete→`{t:'recreate',rec}`, add/duplicate→`{t:'remove',img}`,
+  move/resize/rotate/flip→`{t:'restore',img,prev}`. `editUndo()` restores object
+  + collision (`updateDecoBlock`). Wheel-resize coalesces a scroll burst into one
+  undo entry via `editWheelGestureAt` (400ms gap). **Duplicate** (Ctrl/Cmd+D or
+  `⧉ Duplicate`): clones selected at +44,+44, selects clone. **Remember size**:
+  `editLastAddH` tracks the last resized/selected prop's display height; new Adds
+  reuse it (was hard-coded 80px). Delete now shows an undo hint toast. Verified:
+  add/delete/move undo (delete-undo restores collision too), duplicate blocks if
+  solid, resize-then-add matches size, no console errors. Cache `?v=230`.
 - **Session 117c (collision):** restored solid-prop collision for the
   data-driven world (the known v1 tradeoff). Collision is now DERIVED from the
   visible snapshot objects, not buildDecorations' discarded random blocks.
@@ -52,8 +64,8 @@
   invisible/unchanged monsters (was dirtying the whole display-list depth-sort
   every frame), and `UIManager.update()` throttles its 143-monster boss scan +
   quest/gear text + minimap to ~8 Hz (was 60 Hz).
-- **Cache version live in `project-grasslands/index.html`:** `?v=229`.
-- **Next change must use:** `?v=230`.
+- **Cache version live in `project-grasslands/index.html`:** `?v=230`.
+- **Next change must use:** `?v=231`.
 - **Session 116b (background swap):** replaced the procedurally generated
   `grass_field_texture` with Sonny's hand-painted seamless grass/cobblestone/
   flower PNG. Source `~/Downloads/ChatGPT Image Jun 3, 2026, 06_44_32 PM.png`

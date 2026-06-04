@@ -339,6 +339,10 @@ let editMode = false;          // when true, world clicks edit decorations
 let editSelected = null;       // currently selected decoration Image
 let editDragging = false;      // mid-drag flag
 let editGrabDX = 0, editGrabDY = 0; // pointer-to-object offset while dragging
+let editDragPrev = null;       // {x,y,depth} captured at drag start for undo
+let editWheelGestureAt = 0;    // timestamp to coalesce wheel-resize undo entries
+let editUndoStack = [];        // operation-inverse stack (cap 30)
+let editLastAddH = 80;         // last-used display height — new props reuse it
 let editPanel = null;          // HUD panel container (built lazily)
 let editOutline = null;        // selection highlight Graphics (world space)
 let editAddPalette = null;     // add-object palette overlay container
@@ -1090,11 +1094,19 @@ function create() {
   scene.input.on('wheel', (_pointer, _objs, _dx, dy) => {
     // In build mode the wheel resizes the selected object instead of zooming.
     if (editMode && editSelected) {
+      // Coalesce a scroll burst into ONE undo entry (capture state at the
+      // start of the gesture; a 400ms gap starts a new gesture).
+      const now = scene.time.now;
+      if (!editWheelGestureAt || now - editWheelGestureAt > 400) {
+        pushUndo({ t: 'restore', img: editSelected, prev: captureState(editSelected) });
+      }
+      editWheelGestureAt = now;
       const f = dy < 0 ? 1.08 : 1 / 1.08;
       editSelected.setScale(
         Phaser.Math.Clamp(editSelected.scaleX * f, 0.05, 8),
         Phaser.Math.Clamp(editSelected.scaleY * f, 0.05, 8),
       );
+      editLastAddH = editSelected.displayHeight;
       updateDecoBlock(editSelected);
       refreshSelectionOutline();
       scheduleWorldSave();
@@ -1198,6 +1210,13 @@ function create() {
   scene.input.keyboard.on('keydown-B', () => {
     toggleEditMode(scene);
   });
+  // Build-mode shortcuts: Ctrl/Cmd+Z = undo, Ctrl/Cmd+D = duplicate selected.
+  scene.input.keyboard.on('keydown-Z', (e) => {
+    if (editMode && (e.ctrlKey || e.metaKey)) { if (e.preventDefault) e.preventDefault(); editUndo(); }
+  });
+  scene.input.keyboard.on('keydown-D', (e) => {
+    if (editMode && (e.ctrlKey || e.metaKey)) { if (e.preventDefault) e.preventDefault(); editDuplicate(); }
+  });
 
   // Shift+R wipes localStorage save and reloads (for testing / new run).
   scene.input.keyboard.on('keydown-R', (e) => {
@@ -1242,8 +1261,15 @@ function create() {
   scene.input.on('pointerup', () => {
     if (editMode && editDragging) {
       editDragging = false;
-      if (editSelected) updateDecoBlock(editSelected); // moved → re-block new cells
-      scheduleWorldSave();
+      if (editSelected) {
+        // Record the move for undo only if the prop actually moved.
+        if (editDragPrev && (Math.abs(editSelected.x - editDragPrev.x) > 1 || Math.abs(editSelected.y - editDragPrev.y) > 1)) {
+          pushUndo({ t: 'restore', img: editSelected, prev: editDragPrev });
+        }
+        updateDecoBlock(editSelected); // moved → re-block new cells
+        scheduleWorldSave();
+      }
+      editDragPrev = null;
     }
   });
 
@@ -5886,6 +5912,7 @@ function editPointerDown(scene, pointer) {
     editDragging = true;
     editGrabDX = wp.x - target.x;
     editGrabDY = wp.y - target.y;
+    editDragPrev = captureState(target); // for move undo (committed on pointerup)
   } else {
     deselectDeco();
   }
@@ -5909,6 +5936,7 @@ function pickDecoAt(scene, wx, wy) {
 
 function selectDeco(img) {
   editSelected = img;
+  if (img) editLastAddH = img.displayHeight; // new Adds match the picked prop's size
   refreshSelectionOutline();
   showEditPanel(editScene);
 }
@@ -5958,6 +5986,7 @@ function enterEditMode(scene) {
 function exitEditMode() {
   editMode = false;
   editDragging = false;
+  editUndoStack = []; // undo history is per build-mode session
   deselectDeco();
   hideEditPanel();
   hideAddPalette();
@@ -5969,35 +5998,34 @@ function exitEditMode() {
 // ---- Object operations ----
 function editResize(factor) {
   if (!editSelected) return;
+  pushUndo({ t: 'restore', img: editSelected, prev: captureState(editSelected) });
   editSelected.setScale(
     Phaser.Math.Clamp(editSelected.scaleX * factor, 0.05, 8),
     Phaser.Math.Clamp(editSelected.scaleY * factor, 0.05, 8),
   );
+  editLastAddH = editSelected.displayHeight; // remember size for future Adds
   updateDecoBlock(editSelected); // footprint scales with size
   refreshSelectionOutline();
   scheduleWorldSave();
 }
 function editRotate() {
   if (!editSelected) return;
+  pushUndo({ t: 'restore', img: editSelected, prev: captureState(editSelected) });
   editSelected.setAngle((editSelected.angle + 15) % 360);
   refreshSelectionOutline();
   scheduleWorldSave();
 }
 function editFlip() {
   if (!editSelected) return;
+  pushUndo({ t: 'restore', img: editSelected, prev: captureState(editSelected) });
   editSelected.setFlipX(!editSelected.flipX);
   scheduleWorldSave();
 }
 function editDelete() {
   if (!editSelected) return;
-  const scene = editScene;
-  const list = scene.__worldDecorations || [];
-  const i = list.indexOf(editSelected);
-  if (i >= 0) list.splice(i, 1);
-  removeDecoBlock(editSelected); // free its blocked cells
-  editSelected.destroy();
-  editSelected = null;
-  if (editOutline) editOutline.setVisible(false);
+  pushUndo({ t: 'recreate', rec: serializeDeco(editSelected) });
+  removeDecoImg(editSelected);
+  if (ui && ui.message) ui.message('Deleted — Ctrl+Z (or ↶ Undo) to restore.');
   saveWorld();
 }
 function editAddObject(key) {
@@ -6007,13 +6035,74 @@ function editAddObject(key) {
   const cy = cam.worldView.y + cam.worldView.height / 2;
   const img = scene.add.image(cx, cy, key);
   img.setOrigin(0.5, 1);
-  // Scale new prop to a sensible on-screen height (~80px) regardless of source.
-  const baseH = 80;
-  img.setScale(baseH / img.height);
+  // Reuse the last-used size so adding a row of same-size props is fast.
+  img.setScale(editLastAddH / img.height);
   img.setDepth(cy);
   img.__editable = true;
   (scene.__worldDecorations || (scene.__worldDecorations = [])).push(img);
   applyDecoBlock(img); // new prop blocks immediately if it's a solid type
+  pushUndo({ t: 'remove', img });
+  selectDeco(img);
+  saveWorld();
+}
+
+// ---- Undo + duplicate (forgiving, fast editing) ----
+function pushUndo(entry) {
+  editUndoStack.push(entry);
+  if (editUndoStack.length > 30) editUndoStack.shift();
+}
+function captureState(img) {
+  return { x: img.x, y: img.y, scaleX: img.scaleX, scaleY: img.scaleY, angle: img.angle, flipX: img.flipX, depth: img.depth };
+}
+// Remove an image from the world (shared by delete + undo-of-add).
+function removeDecoImg(img) {
+  const scene = editScene;
+  const list = scene.__worldDecorations || [];
+  const i = list.indexOf(img);
+  if (i >= 0) list.splice(i, 1);
+  removeDecoBlock(img);
+  if (editSelected === img) { editSelected = null; if (editOutline) editOutline.setVisible(false); }
+  img.destroy();
+}
+function editUndo() {
+  const e = editUndoStack.pop();
+  if (!e) { if (ui && ui.message) ui.message('Nothing to undo.'); return; }
+  const scene = editScene;
+  if (e.t === 'remove') {
+    // Undo an add → remove it.
+    if (e.img && e.img.scene) removeDecoImg(e.img);
+  } else if (e.t === 'recreate') {
+    // Undo a delete → re-spawn from the serialized record.
+    const img = spawnEditableDeco(scene, e.rec);
+    if (img) { applyDecoBlock(img); selectDeco(img); }
+  } else if (e.t === 'restore') {
+    // Undo a move/resize/rotate/flip → restore the prior transform.
+    const img = e.img;
+    if (img && img.scene) {
+      img.setPosition(e.prev.x, e.prev.y).setScale(e.prev.scaleX, e.prev.scaleY)
+         .setAngle(e.prev.angle).setFlipX(e.prev.flipX).setDepth(e.prev.depth);
+      updateDecoBlock(img);
+      selectDeco(img);
+    }
+  }
+  saveWorld();
+}
+function editDuplicate() {
+  if (!editSelected) { if (ui && ui.message) ui.message('Select an object first, then Duplicate.'); return; }
+  const scene = editScene;
+  const src = editSelected;
+  const img = scene.add.image(src.x + 44, src.y + 44, src.texture.key);
+  img.setOrigin(0.5, src.originY === 1 ? 1 : 0.5);
+  img.setScale(src.scaleX, src.scaleY);
+  img.setAngle(src.angle);
+  if (src.flipX) img.setFlipX(true);
+  img.setAlpha(src.alpha);
+  if (src.isTinted) img.setTint(src.tintTopLeft);
+  img.setDepth(src.originY === 1 ? img.y : src.depth);
+  img.__editable = true;
+  (scene.__worldDecorations || (scene.__worldDecorations = [])).push(img);
+  applyDecoBlock(img);
+  pushUndo({ t: 'remove', img });
   selectDeco(img);
   saveWorld();
 }
@@ -6035,6 +6124,8 @@ function showEditPanel(scene) {
     ['－  Smaller',   () => editResize(1 / 1.12)],
     ['⟲  Rotate',    () => editRotate()],
     ['⇋  Flip',      () => editFlip()],
+    ['⧉  Duplicate',  () => editDuplicate()],
+    ['↶  Undo',      () => editUndo()],
     ['🗑  Delete',    () => editDelete()],
     ['＋  Add Object', () => showAddPalette(scene)],
     ['✓  Done',       () => exitEditMode()],
