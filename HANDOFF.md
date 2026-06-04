@@ -4,9 +4,25 @@
 
 ## 🤖 PICK-UP FOR CODEX (start here)
 
-**State as of 2026-06-03 — post session 117 Sims-style build/edit mode.**
+**State as of 2026-06-03 — post session 117c build mode + collision + discoverability.**
 
 - **Branch:** `main`.
+- **Session 117c (collision):** restored solid-prop collision for the
+  data-driven world (the known v1 tradeoff). Collision is now DERIVED from the
+  visible snapshot objects, not buildDecorations' discarded random blocks.
+  `rebuildDecoCollision(scene)` (end of `initWorldEdits`) resets `walkable` to
+  all-true then blocks only solid props (`decoBlockRadius`: trees/rocks/bushes/
+  boulders/pillars/ruins/tents/cacti/ponds block; grass/flowers/mushrooms/ferns/
+  cattails/dunes/floor washes via `NON_SOLID_DECO_RE` do not). Footprint radius
+  scales with on-screen width so resizing changes collision. A per-cell
+  `decoRef` Uint16 ref-count lets overlapping props share cells; build-mode
+  add/move/resize/delete call `applyDecoBlock`/`removeDecoBlock`/`updateDecoBlock`
+  to keep `walkable` live. Spawn cell + ring forced walkable. Verified: 463/1674
+  props block, ground cover walkable, add/move/delete update cells correctly.
+  Cache `?v=229`.
+- **Session 117b (discoverability):** moved the `🔨 Build Mode` toggle to the
+  top of the ACTIONS toolbar group as a gold action button; added `B` key to
+  toggle build mode. Cache `?v=228`.
 - **Session 117 (build/edit mode):** added a single-player Sims-style world
   editor. Toolbar `🔨 Build` toggle enters build mode: click a decoration to
   select (yellow outline), drag to move, mouse wheel or ＋/－ buttons to resize,
@@ -36,8 +52,8 @@
   invisible/unchanged monsters (was dirtying the whole display-list depth-sort
   every frame), and `UIManager.update()` throttles its 143-monster boss scan +
   quest/gear text + minimap to ~8 Hz (was 60 Hz).
-- **Cache version live in `project-grasslands/index.html`:** `?v=227`.
-- **Next change must use:** `?v=228`.
+- **Cache version live in `project-grasslands/index.html`:** `?v=229`.
+- **Next change must use:** `?v=230`.
 - **Session 116b (background swap):** replaced the procedurally generated
   `grass_field_texture` with Sonny's hand-painted seamless grass/cobblestone/
   flower PNG. Source `~/Downloads/ChatGPT Image Jun 3, 2026, 06_44_32 PM.png`

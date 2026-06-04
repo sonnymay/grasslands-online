@@ -1095,6 +1095,7 @@ function create() {
         Phaser.Math.Clamp(editSelected.scaleX * f, 0.05, 8),
         Phaser.Math.Clamp(editSelected.scaleY * f, 0.05, 8),
       );
+      updateDecoBlock(editSelected);
       refreshSelectionOutline();
       scheduleWorldSave();
       return;
@@ -1241,6 +1242,7 @@ function create() {
   scene.input.on('pointerup', () => {
     if (editMode && editDragging) {
       editDragging = false;
+      if (editSelected) updateDecoBlock(editSelected); // moved → re-block new cells
       scheduleWorldSave();
     }
   });
@@ -5755,6 +5757,92 @@ function scheduleWorldSave() {
   worldSaveTimer = setTimeout(saveWorld, 400);
 }
 
+// ---- Decoration collision ----
+// The player should not walk through solid props (trees, rocks, bushes,
+// boulders, pillars, ruins, tents, cacti, ponds). Ground cover (grass,
+// flowers, mushrooms, ferns, cattails, dunes, floor washes) stays walk-through.
+// Collision is DERIVED from the visible snapshot objects (not the discarded
+// random layout buildDecorations blocked), and updated live as objects are
+// moved/resized/added/deleted. A per-cell ref-count lets overlapping props
+// share cells without one unblocking another.
+const NON_SOLID_DECO_RE = /^(deco_tallgrass|deco_flower|mushroom_|forest_fern|riverside_cattail|deco_sand_dune|deco_grass|floor_|deco_pebble|deco_crack|deco_dry|deco_stone|deco_sand_scuff)/;
+let decoRef = null; // Uint16 per-cell block ref-count (idx = r*GRID_COLS + c)
+
+function decoBlockRadius(img) {
+  if (!img || !img.texture) return 0;
+  if (NON_SOLID_DECO_RE.test(img.texture.key)) return 0;
+  // Footprint scales with the prop's on-screen width, so resizing it in build
+  // mode changes how much it blocks.
+  return Phaser.Math.Clamp(Math.round(img.displayWidth * 0.42 / CELL_SIZE), 1, 10);
+}
+function ensureDecoRef() {
+  if (!decoRef) decoRef = new Uint16Array(GRID_ROWS * GRID_COLS);
+}
+function decoCells(img, radius) {
+  const cells = [];
+  const cx = Math.floor(img.x / CELL_SIZE);
+  const cy = Math.floor(img.y / CELL_SIZE);
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      if (Math.hypot(dx, dy) > radius + 0.3) continue;
+      const r = cy + dy, c = cx + dx;
+      if (r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS) cells.push(r * GRID_COLS + c);
+    }
+  }
+  return cells;
+}
+function applyDecoBlock(img) {
+  if (!walkable || !img) return;
+  img.__cells = null;
+  const radius = decoBlockRadius(img);
+  if (radius <= 0) return;
+  ensureDecoRef();
+  const cells = decoCells(img, radius);
+  for (const idx of cells) {
+    decoRef[idx]++;
+    const r = (idx / GRID_COLS) | 0;
+    walkable[r][idx - r * GRID_COLS] = false;
+  }
+  img.__cells = cells;
+}
+function removeDecoBlock(img) {
+  if (!img || !img.__cells || !walkable) { if (img) img.__cells = null; return; }
+  ensureDecoRef();
+  for (const idx of img.__cells) {
+    if (decoRef[idx] > 0) decoRef[idx]--;
+    if (decoRef[idx] === 0) {
+      const r = (idx / GRID_COLS) | 0;
+      walkable[r][idx - r * GRID_COLS] = true;
+    }
+  }
+  img.__cells = null;
+}
+function updateDecoBlock(img) { removeDecoBlock(img); applyDecoBlock(img); }
+
+function rebuildDecoCollision(scene) {
+  if (!walkable) return;
+  for (let r = 0; r < GRID_ROWS; r++) {
+    const row = walkable[r];
+    for (let c = 0; c < GRID_COLS; c++) row[c] = true;
+  }
+  ensureDecoRef();
+  decoRef.fill(0);
+  for (const o of (scene.__worldDecorations || [])) applyDecoBlock(o);
+  // Keep the spawn cell + a small ring clear so the player can never spawn or
+  // warp home into a blocked cell.
+  const sc = Math.floor((WORLD_W / 2) / CELL_SIZE);
+  const sr = Math.floor((WORLD_H / 2) / CELL_SIZE);
+  for (let dr = -2; dr <= 2; dr++) {
+    for (let dc = -2; dc <= 2; dc++) {
+      const r = sr + dr, c = sc + dc;
+      if (r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS) {
+        walkable[r][c] = true;
+        decoRef[r * GRID_COLS + c] = 0;
+      }
+    }
+  }
+}
+
 // Called once after buildDecorations: apply the saved layout, or snapshot the
 // fresh one on first run.
 function initWorldEdits(scene) {
@@ -5781,6 +5869,9 @@ function initWorldEdits(scene) {
     for (const o of (scene.__worldDecorations || [])) { if (o) o.__editable = true; }
     saveWorld();
   }
+  // Derive player collision from the now-final visible world (trees/rocks/etc.
+  // block; ground cover doesn't). Replaces buildDecorations' stale random blocks.
+  rebuildDecoCollision(scene);
 }
 
 // ---- Selection + editing ----
@@ -5882,6 +5973,7 @@ function editResize(factor) {
     Phaser.Math.Clamp(editSelected.scaleX * factor, 0.05, 8),
     Phaser.Math.Clamp(editSelected.scaleY * factor, 0.05, 8),
   );
+  updateDecoBlock(editSelected); // footprint scales with size
   refreshSelectionOutline();
   scheduleWorldSave();
 }
@@ -5902,6 +5994,7 @@ function editDelete() {
   const list = scene.__worldDecorations || [];
   const i = list.indexOf(editSelected);
   if (i >= 0) list.splice(i, 1);
+  removeDecoBlock(editSelected); // free its blocked cells
   editSelected.destroy();
   editSelected = null;
   if (editOutline) editOutline.setVisible(false);
@@ -5920,6 +6013,7 @@ function editAddObject(key) {
   img.setDepth(cy);
   img.__editable = true;
   (scene.__worldDecorations || (scene.__worldDecorations = [])).push(img);
+  applyDecoBlock(img); // new prop blocks immediately if it's a solid type
   selectDeco(img);
   saveWorld();
 }
