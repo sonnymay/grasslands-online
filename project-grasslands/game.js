@@ -1193,6 +1193,11 @@ function create() {
     }
   });
 
+  // B toggles Sims-style build/edit mode (move/resize/add/delete props).
+  scene.input.keyboard.on('keydown-B', () => {
+    toggleEditMode(scene);
+  });
+
   // Shift+R wipes localStorage save and reloads (for testing / new run).
   scene.input.keyboard.on('keydown-R', (e) => {
     if (e.shiftKey) {
@@ -8159,6 +8164,14 @@ class UIManager {
     toolbarY += 4;
     addSection('ACTIONS');
 
+    // Build Mode — Sims-style world editor (move/resize/add/delete props).
+    // First + gold so it's the most visible action; also toggled with the B key.
+    row = addToolbarButton('🔨 Build Mode', 'action');
+    this.bmBg = row.bg;
+    this.bmText = row.text;
+    this.bmBg.on('pointerdown', () => { toggleEditMode(scene); });
+    addTip(this.bmBg, 'Move, resize, add or delete objects (or press B)', btnX, row.y + btnH / 2);
+
     // Change Class button — always visible. Below Lv 10 it just tells the
     // player to keep leveling. At Lv 10+ it opens the class chooser
     // (re-pickable at any time). Sits below Hard Mode toggle.
@@ -8237,13 +8250,6 @@ class UIManager {
       showShop(scene);
     });
     addTip(this.shBg, 'Spend zeny on upgrades', btnX, row.y + btnH / 2);
-
-    // Build Mode — Sims-style world editor: move/resize/delete/add decorations.
-    row = addToolbarButton('🔨 Build: OFF', 'toggle');
-    this.bmBg = row.bg;
-    this.bmText = row.text;
-    this.bmBg.on('pointerdown', () => { toggleEditMode(scene); });
-    addTip(this.bmBg, 'Move, resize, add or delete objects', btnX, row.y + btnH / 2);
 
     // Compact-HUD button was removed. hudCompact stays false so the HUD
     // always renders in its single "clean" layout.
