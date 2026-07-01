@@ -57,3 +57,7 @@ vercel deploy --prod
 
 If the CLI asks to link the project, choose the existing GitHub repo/project if
 one exists, or create a new Vercel project.
+
+---
+
+> Last verified: 2026-07-01
