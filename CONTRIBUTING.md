@@ -44,3 +44,7 @@ Thanks for your interest in contributing to Grasslands Online! ⚔️🌾
                                       - - Maintain idle-friendly pacing — players shouldn't need to click constantly
                                         - - New encounters or buildings should be balanced with existing progression
                                           - - Keep the UI clean and readable on both desktop and mobile
+
+---
+
+_Updated: 2026-07-01 — docs reviewed for accuracy._
